@@ -1,0 +1,138 @@
+---
+import Layout from "../layouts/Layout.astro";
+import BreadcrumbSchema from "../components/schema/BreadcrumbSchema.astro";
+const breadcrumbs = [
+    { name: "Home", url: "https://xarticl.es" },
+    { name: "Terms & Conditions", url: "https://xarticl.es/terms" },
+];
+---
+
+<Layout
+    site="Xarticl.es"
+    title="Terms & Conditions"
+    tagline="The rules that keep this directory fair and useful for everyone"
+    pageTitle="Terms & Conditions"
+    pageDescription="Read the Xarticl.es Terms and Conditions to understand acceptable use, intellectual property rights, disclaimers, and affiliate disclosures for our long-form articles directory."
+    canonicalUrl="https://xarticl.es/terms"
+    ogTitle="Terms & Conditions — Xarticl.es"
+    ogDescription="Read the Xarticl.es Terms and Conditions: acceptable use, intellectual property, disclaimers, and affiliate disclosures for our articles directory."
+    ogType="website"
+    ogUrl="https://xarticl.es/terms"
+    ogSiteName="Xarticl.es"
+>
+    <BreadcrumbSchema items={breadcrumbs} />
+
+    <main id="main-content" class="container">
+        <div class="legal-content-wrapper">
+            <header class="legal-header">
+                <h1 class="nu-c-h5 nu-u-text--primary">Terms & Conditions</h1>
+                <p class="last-updated">Last Updated: January 4, 2026</p>
+            </header>
+
+            <article class="nu-u-text--secondary" itemscope itemtype="https://schema.org/WebPage">
+                <p class="nu-c-fs-regular">
+                    By accessing <strong class="nu-u-text--primary">Xarticl.es</strong>,
+                    you accept these Terms and Conditions in full. Please read them carefully.
+                    If you disagree with any part, please discontinue use of the site.
+                </p>
+
+                <h2 class="nu-c-h6 nu-u-text--primary">1. About Xarticl.es</h2>
+                <p>
+                    Xarticl.es is a curated directory of the best long-form articles
+                    published on X (formerly Twitter). We aggregate, categorize, and surface
+                    high-quality writing to help readers discover valuable content. We do not
+                    host, own, or produce the articles themselves — we link to original sources.
+                </p>
+
+                <h2 class="nu-c-h6 nu-u-text--primary">2. Acceptable Use</h2>
+                <p>
+                    You agree to use Xarticl.es only for lawful purposes. You must not:
+                </p>
+                <ul>
+                    <li>Scrape, crawl, or harvest data from this directory for commercial use without permission.</li>
+                    <li>Attempt to reverse-engineer or disrupt the website's infrastructure.</li>
+                    <li>Use the directory to promote spam, malware, or misleading information.</li>
+                    <li>Impersonate any person or entity in connection with the site.</li>
+                </ul>
+
+                <h2 class="nu-c-h6 nu-u-text--primary">3. Intellectual Property</h2>
+                <p>
+                    Unless otherwise stated, Xarticl.es and its author own the intellectual
+                    property rights for all original material on this site — including the
+                    curation methodology, design, and written descriptions. All rights reserved.
+                </p>
+                <ul>
+                    <li>Do not republish or redistribute our curated content without attribution.</li>
+                    <li>Do not sell, rent, or sub-license material from this directory.</li>
+                    <li>Do not reproduce or copy our content for commercial gain.</li>
+                </ul>
+                <p>
+                    Article content belongs to their respective authors. We link to original
+                    sources and make no claim over third-party content.
+                </p>
+
+                <h2 class="nu-c-h6 nu-u-text--primary">4. Disclaimer of Warranties</h2>
+                <p>
+                    All information on Xarticl.es is provided "as is" without warranty of
+                    any kind, express or implied. The content landscape on X changes rapidly —
+                    article availability, authors, and links are subject to change without notice.
+                    We do not guarantee that external links will remain active or accurate.
+                </p>
+
+                <h2 class="nu-c-h6 nu-u-text--primary">5. Limitation of Liability</h2>
+                <p>
+                    To the fullest extent permitted by law, Xarticl.es and its author shall
+                    not be liable for any indirect, incidental, special, or consequential
+                    damages arising from your use of this directory or any linked third-party
+                    content.
+                </p>
+
+                <h2 class="nu-c-h6 nu-u-text--primary">6. Affiliate Disclosure</h2>
+                <p>
+                    Some links on Xarticl.es may be affiliate links. If you click on a link
+                    and make a purchase or sign up for a service, we may receive a commission
+                    at no extra cost to you. We only include affiliate links for services we
+                    believe are genuinely valuable. This helps support the ongoing maintenance
+                    of the project.
+                </p>
+
+                <h2 class="nu-c-h6 nu-u-text--primary">7. Third-Party Content</h2>
+                <p>
+                    Xarticl.es links to third-party articles and websites. We are not
+                    responsible for the content, accuracy, or practices of those sites.
+                    Links do not constitute endorsement unless explicitly stated.
+                </p>
+
+                <h2 class="nu-c-h6 nu-u-text--primary">8. Privacy</h2>
+                <p>
+                    Your use of Xarticl.es is also governed by our
+                    <a href="/privacy" class="nu-u-link--subtle">Privacy Policy</a>,
+                    which is incorporated into these Terms by reference.
+                </p>
+
+                <h2 class="nu-c-h6 nu-u-text--primary">9. Modifications</h2>
+                <p>
+                    We reserve the right to revise these Terms at any time. Updates will
+                    be reflected on this page with a new "Last Updated" date. Continued
+                    use of the site after changes constitutes your acceptance of the
+                    revised Terms.
+                </p>
+
+                <h2 class="nu-c-h6 nu-u-text--primary">10. Governing Law</h2>
+                <p>
+                    These Terms are governed by the laws of the jurisdiction in which
+                    the founder operates. Any disputes shall be resolved in accordance
+                    with those laws.
+                </p>
+
+                <h2 class="nu-c-h6 nu-u-text--primary">11. Contact</h2>
+                <p>
+                    Questions about these Terms? Contact
+                    <a href="https://twitter.com/abdou_hll" target="_blank" rel="noopener noreferrer" class="nu-u-link--subtle">@abdou_hll</a>
+                    on social media or via our
+                    <a href="https://github.com/" target="_blank" rel="noopener noreferrer" class="nu-u-link--subtle">GitHub repository</a>.
+                </p>
+            </article>
+        </div>
+    </main>
+</Layout>

@@ -1,0 +1,40 @@
+---
+interface Article {
+    title: string;
+    preview_text: string;
+    original_img_url?: string | null;
+    id_str: string;
+    screen_name: string;
+    slug?: string;
+    created_at?: string;
+}
+
+interface Props {
+    items: Article[];
+    listName: string;
+}
+
+const { items, listName } = Astro.props;
+
+const itemListElements = items.slice(0, 100).map((tool, index) => ({
+    "@type": "ListItem",
+    position: index + 1,
+    item: {
+        "@type": "SoftwareApplication",
+        name: tool.title,
+        url: `https://www.xarticl.es/articles/${tool.slug}`,
+        description: tool.preview_text,
+        applicationCategory: "MultimediaApplication",
+    },
+}));
+
+const schema = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: listName,
+    numberOfItems: items.length,
+    itemListElement: itemListElements,
+};
+---
+
+<script type="application/ld+json" set:html={JSON.stringify(schema)} />

@@ -1,0 +1,25 @@
+---
+interface Props {
+    url?: string;
+}
+
+const { url = "https://www.xarticl.es" } = Astro.props;
+
+const schema = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "Xarticl.es",
+    url: url,
+    description: "A curated directory of the best long-form articles on X",
+    potentialAction: {
+        "@type": "SearchAction",
+        target: {
+            "@type": "EntryPoint",
+            urlTemplate: `${url}/?search={search_term_string}`,
+        },
+        "query-input": "required name=search_term_string",
+    },
+};
+---
+
+<script type="application/ld+json" set:html={JSON.stringify(schema)} />

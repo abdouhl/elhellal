@@ -1,0 +1,119 @@
+---
+import Layout from "../layouts/Layout.astro";
+import BreadcrumbSchema from "../components/schema/BreadcrumbSchema.astro";
+const breadcrumbs = [
+    { name: "Home", url: "https://xarticl.es" },
+    { name: "Cookie Policy", url: "https://xarticl.es/cookies" },
+];
+---
+
+<Layout
+    site="Xarticl.es"
+    title="Cookie Policy"
+    tagline="How and why we use cookies on this site"
+    pageTitle="Cookie Policy"
+    pageDescription="Learn how Xarticl.es uses cookies for analytics and advertising, what data is collected, and how you can manage or opt out of cookies in your browser."
+    canonicalUrl="https://xarticl.es/cookies"
+    ogTitle="Cookie Policy — Xarticl.es"
+    ogDescription="Learn how Xarticl.es uses cookies for analytics and advertising, and how to manage your cookie preferences."
+    ogType="website"
+    ogUrl="https://xarticl.es/cookies"
+    ogSiteName="Xarticl.es"
+>
+    <BreadcrumbSchema items={breadcrumbs} />
+
+    <main id="main-content" class="container">
+        <div class="legal-content-wrapper">
+            <header class="legal-header">
+                <h1 class="nu-c-h5 nu-u-text--primary">Cookie Policy</h1>
+                <p class="last-updated">Last Updated: January 4, 2026</p>
+            </header>
+
+            <article class="nu-u-text--secondary">
+                <p class="nu-c-fs-regular">
+                    This Cookie Policy explains what cookies are, how <strong class="nu-u-text--primary">Xarticl.es</strong>
+                    uses them, and your choices regarding cookies. Reading this alongside
+                    our <a href="/privacy" class="nu-u-link--subtle">Privacy Policy</a> will
+                    give you a full picture of how we handle your data.
+                </p>
+
+                <h2 class="nu-c-h6 nu-u-text--primary">1. What Are Cookies?</h2>
+                <p>
+                    Cookies are small text files placed on your device when you visit a website.
+                    They help websites remember your preferences, understand how you use the site,
+                    and deliver relevant advertising. Cookies are widely used and generally harmless.
+                </p>
+
+                <h2 class="nu-c-h6 nu-u-text--primary">2. Cookies We Use</h2>
+                <p>We use the following categories of cookies:</p>
+                <ul>
+                    <li>
+                        <strong class="nu-u-text--primary">Essential Cookies</strong> — Necessary for
+                        basic site functionality (e.g., remembering your theme preference). These cannot
+                        be disabled without breaking the site experience.
+                    </li>
+                    <li>
+                        <strong class="nu-u-text--primary">Analytics Cookies</strong> — Set by Google
+                        Analytics to collect anonymized data on how visitors use the site (pages visited,
+                        session duration, traffic sources). This helps us improve Xarticl.es.
+                    </li>
+                    <li>
+                        <strong class="nu-u-text--primary">Advertising Cookies</strong> — Set by Google
+                        AdSense and similar networks to show you relevant ads based on your interests.
+                        These may track your browsing across other sites.
+                    </li>
+                </ul>
+
+                <h2 class="nu-c-h6 nu-u-text--primary">3. Third-Party Cookies</h2>
+                <p>
+                    Third-party services we use — including Google Analytics and Google AdSense —
+                    may set their own cookies. We do not control these cookies. You can learn more
+                    about Google's cookie practices at
+                    <a href="https://policies.google.com/technologies/cookies" target="_blank" rel="noopener noreferrer" class="nu-u-link--subtle">Google's Cookie Policy</a>.
+                </p>
+
+                <h2 class="nu-c-h6 nu-u-text--primary">4. Managing Cookies</h2>
+                <p>
+                    You can control and manage cookies in several ways:
+                </p>
+                <ul>
+                    <li>
+                        <strong class="nu-u-text--primary">Browser settings</strong> — Most browsers let you
+                        block or delete cookies. Check your browser's help documentation for instructions.
+                    </li>
+                    <li>
+                        <strong class="nu-u-text--primary">Google Analytics opt-out</strong> — Install the
+                        <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener noreferrer" class="nu-u-link--subtle">Google Analytics Opt-out Add-on</a>.
+                    </li>
+                    <li>
+                        <strong class="nu-u-text--primary">Ad personalization</strong> — Manage preferences
+                        at <a href="https://adssettings.google.com" target="_blank" rel="noopener noreferrer" class="nu-u-link--subtle">Google Ad Settings</a>.
+                    </li>
+                </ul>
+                <p>
+                    Note: disabling cookies may affect the functionality of Xarticl.es and other websites.
+                </p>
+
+                <h2 class="nu-c-h6 nu-u-text--primary">5. Local Storage</h2>
+                <p>
+                    In addition to cookies, we use your browser's <strong class="nu-u-text--primary">localStorage</strong>
+                    to save articles you bookmark. This is not a cookie — it stays on your device
+                    and is never transmitted to us. Clear it anytime via your browser settings.
+                </p>
+
+                <h2 class="nu-c-h6 nu-u-text--primary">6. Updates to This Policy</h2>
+                <p>
+                    We may update this Cookie Policy from time to time. The "Last Updated" date
+                    at the top of this page will reflect any changes.
+                </p>
+
+                <h2 class="nu-c-h6 nu-u-text--primary">7. Contact</h2>
+                <p>
+                    Questions about our cookie usage? Reach out to
+                    <a href="https://twitter.com/abdou_hll" target="_blank" rel="noopener noreferrer" class="nu-u-link--subtle">@abdou_hll</a>
+                    on social media.
+                </p>
+            </article>
+        </div>
+    </main>
+</Layout>

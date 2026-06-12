@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://xarticl.es/sitemap-index.xml

@@ -1,0 +1,55 @@
+---
+import SearchInput from "./SearchInput";
+import ParticleBackground from "./ParticleBackground";
+
+interface Props {
+    title: string;
+    tagline: string;
+    showSearch?: boolean;
+    searchPlaceholder?: string;
+}
+
+const {
+    title,
+    tagline,
+    showSearch = false,
+    searchPlaceholder = "Search by name, category, or feature...",
+} = Astro.props;
+---
+
+<div class="hero">
+    <ParticleBackground client:load />
+    <div class="container">
+        <h1 class="nu-c-h5 nu-u-text--primary nu-u-mt-0 nu-u-mb-s title">
+            {title}
+        </h1>
+        <p class="nu-c-fs-small nu-u-text--secondary description-text">
+            {tagline}
+        </p>
+        {
+            showSearch && (
+                <SearchInput client:load placeholder={searchPlaceholder} />
+            )
+        }
+    </div>
+</div>
+
+<style>
+    .hero {
+        margin-bottom: var(--spacing-10);
+        margin-top: var(--spacing-10);
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .container {
+        position: relative;
+        z-index: 1;
+    }
+
+    .hero :global(.search-container) {
+        display: flex;
+        justify-content: center;
+    }
+</style>

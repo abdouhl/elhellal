@@ -1,0 +1,23 @@
+---
+import Layout from "../layouts/Layout.astro";
+import FavoritesView from "../components/FavoritesView";
+import BreadcrumbSchema from "../components/schema/BreadcrumbSchema.astro";
+
+const breadcrumbs = [
+    { name: "Home", url: "https://xarticl.es" },
+    { name: "Saved articles" },
+];
+---
+
+<Layout
+    site="Xarticl.es - Saved articles"
+    title="Saved articles"
+    tagline="articles you've saved for quick access"
+    pageTitle="Saved articles"
+    pageDescription="Your saved articles collection"
+>
+    <BreadcrumbSchema items={breadcrumbs} />
+    <main id="main-content">
+        <FavoritesView client:load />
+    </main>
+</Layout>

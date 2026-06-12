@@ -1,0 +1,26 @@
+---
+import Layout from "../layouts/Layout.astro";
+
+import Dashboard from "../components/Dashboard";
+import OrganizationSchema from "../components/schema/OrganizationSchema.astro";
+import ItemListSchema from "../components/schema/ItemListSchema.astro";
+import data from "../data/articles.json";
+
+// Flatten all tools for the homepage ItemList
+const allTools = data.articles.flatMap((category: any) => category.content);
+---
+
+<Layout
+  site="Xarticl.es"
+  title="Xarticl.es"
+  pageTitle="Xarticl.es — Discover the Best Long-Form Articles from X"
+  pageDescription="Explore the best long-form articles from X in one place. Xarticl.es curates high-quality content about AI, startups, investing, productivity, technology, and business from top creators on X."
+  tagline="A curated directory of the best long-form articles on X."
+  showSearch={true}
+>
+  <OrganizationSchema />
+  <ItemListSchema items={allTools} listName="Articles Directory - All Articles" />
+  <main id="main-content">
+    <Dashboard client:load category="all" transition:persist />
+  </main>
+</Layout>

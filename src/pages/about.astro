@@ -1,0 +1,103 @@
+---
+import Layout from "../layouts/Layout.astro";
+import BreadcrumbSchema from "../components/schema/BreadcrumbSchema.astro";
+const breadcrumbs = [
+    { name: "Home", url: "https://xarticl.es" },
+    { name: "About", url: "https://xarticl.es/about" },
+];
+---
+
+<Layout
+    site="Xarticl.es"
+    title="About"
+    tagline="The story behind the best long-form article directory on X"
+    pageTitle="About Xarticl.es"
+    pageDescription="Xarticl.es is a curated directory of the best long-form articles published on X (formerly Twitter). Learn about our mission, curation process, and the person behind the project."
+    canonicalUrl="https://xarticl.es/about"
+    ogTitle="About Xarticl.es — A curated directory of long-form articles on X"
+    ogDescription="Learn about Xarticl.es, our curation process, and our mission to surface the best long-form writing on X (formerly Twitter)."
+    ogType="website"
+    ogUrl="https://xarticl.es/about"
+    ogSiteName="Xarticl.es"
+>
+    <BreadcrumbSchema items={breadcrumbs} />
+
+    <main id="main-content" class="container">
+        <div class="legal-content-wrapper">
+            <header class="legal-header">
+                <h1 class="nu-c-h5 nu-u-text--primary">About Xarticl.es</h1>
+                <p class="last-updated">A curated directory of long-form articles on X</p>
+            </header>
+
+            <article class="nu-u-text--secondary" itemscope itemtype="https://schema.org/AboutPage">
+
+                <h2 class="nu-c-h6 nu-u-text--primary">What Is Xarticl.es?</h2>
+                <p>
+                    <strong class="nu-u-text--primary">Xarticl.es</strong> is a curated directory
+                    of the best long-form articles published on X (formerly Twitter). X has become
+                    home to some of the most insightful, in-depth writing on the internet — but
+                    it's buried under an endless stream of short posts. We surface the best of it.
+                </p>
+                <p>
+                    We index threads, essays, deep-dives, and long-form posts across categories
+                    like technology, AI, finance, science, design, and more — all written by
+                    some of the sharpest minds on the platform.
+                </p>
+
+                <h2 class="nu-c-h6 nu-u-text--primary">Our Mission</h2>
+                <p>
+                    Great writing deserves to be found. Our mission is simple: make it easy to
+                    discover high-quality long-form content on X, regardless of follower counts
+                    or algorithmic visibility. Quality over virality.
+                </p>
+
+                <h2 class="nu-c-h6 nu-u-text--primary">How We Curate</h2>
+                <p>
+                    Every article in the directory is manually reviewed before being added.
+                    We look for:
+                </p>
+                <ul>
+                    <li>Original thinking and genuine insight</li>
+                    <li>Depth — pieces that go beyond surface-level takes</li>
+                    <li>Well-structured writing that is worth your time</li>
+                    <li>Relevance across a range of topics and disciplines</li>
+                </ul>
+                <p>
+                    We do not chase trending content. We look for articles that will still be
+                    worth reading six months from now.
+                </p>
+
+                <h2 class="nu-c-h6 nu-u-text--primary">Who Built This?</h2>
+                <p>
+                    Xarticl.es is built and maintained by
+                    <a href="https://elhellal.com/" target="_blank" rel="noopener noreferrer" class="nu-u-link--subtle">Abderahmane Hellal</a>
+                    (<a href="https://twitter.com/abdou_hll" target="_blank" rel="noopener noreferrer" class="nu-u-link--subtle">@abdou_hll</a>)
+                    — a developer and curator passionate about surfacing great writing on the web.
+                </p>
+
+                <h2 class="nu-c-h6 nu-u-text--primary">Submit an Article</h2>
+                <p>
+                    Found a great long-form piece on X that deserves more attention? We'd love
+                    to hear about it. Reach out to
+                    <a href="https://twitter.com/abdou_hll" target="_blank" rel="noopener noreferrer" class="nu-u-link--subtle">@abdou_hll</a>
+                    on X with your suggestion.
+                </p>
+
+                <h2 class="nu-c-h6 nu-u-text--primary">Advertising & Support</h2>
+                <p>
+                    Xarticl.es is free to use. The project is supported through display advertising
+                    and affiliate links. See our <a href="/terms" class="nu-u-link--subtle">Terms & Conditions</a>
+                    and <a href="/privacy" class="nu-u-link--subtle">Privacy Policy</a> for full details
+                    on how ads work on this site.
+                </p>
+
+                <h2 class="nu-c-h6 nu-u-text--primary">Contact</h2>
+                <p>
+                    For questions, feedback, or partnership inquiries, contact
+                    <a href="https://twitter.com/abdou_hll" target="_blank" rel="noopener noreferrer" class="nu-u-link--subtle">@abdou_hll</a>
+                    on X, or visit <a href="https://elhellal.com/" target="_blank" rel="noopener noreferrer" class="nu-u-link--subtle">elhellal.com</a>.
+                </p>
+            </article>
+        </div>
+    </main>
+</Layout>

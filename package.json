@@ -1,0 +1,83 @@
+{
+  "name": "xarticles",
+  "version": "1.0.0",
+  "description": "A collection of the best long-form X articles on business, money, and leverage—curated for builders who value clarity over noise",
+  "type": "module",
+  "private": false,
+  "main": "src/data/tools.json",
+  "files": [
+    "src/data/tools.json",
+    "src/data/tools/*.json",
+    "src/data/metadata.json",
+    "src/data/slug-map.json",
+    "src/data/tool-metadata/*.json"
+  ],
+  "exports": {
+    ".": "./src/data/tools.json",
+    "./tools": "./src/data/tools.json",
+    "./metadata": "./src/data/metadata.json",
+    "./slug-map": "./src/data/slug-map.json",
+    "./categories/*": "./src/data/tools/*.json",
+    "./tool/*": "./src/data/tool-metadata/*.json"
+  },
+  "scripts": {
+    "add-slugs": "bun run scripts/add-slugs.ts",
+    "clean": "rm -rf dist .astro src/data/slug-map.json src/data/tool-metadata",
+    "generate-llms": "bun run scripts/generate-llms.ts",
+    "prepare-data": "bun run add-slugs && bun run scripts/split-data.ts && bun run scripts/generate-slug-map.ts && bun run scripts/generate-article-metadata.ts && bun run generate-llms",
+    "prepublishOnly": "bun run prepare-data",
+    "dev": "bun run prepare-data && astro dev",
+    "start": "astro dev",
+    "build": "bun run prepare-data && astro build",
+    "preview": "astro preview",
+    "astro": "astro",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "check-data": "bun run scripts/check-data.ts",
+    "update-metadata": "bun run scripts/update-metadata.ts"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "^12.6.12",
+    "@astrojs/partytown": "^2.1.4",
+    "@astrojs/react": "^4.4.2",
+    "@astrojs/sitemap": "^3.7.0",
+    "astro": "^5.17.2",
+    "fuse.js": "^7.1.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@new-ui/foundations": "^0.3.4",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.4",
+    "jsdom": "^28.0.0",
+    "node-html-parser": "^7.0.2",
+    "vitest": "^4.0.18",
+    "wrangler": "^4.67.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/planetabhi/riseofmachine.git"
+  },
+  "bugs": {
+    "url": "https://github.com/planetabhi/riseofmachine/issues"
+  },
+  "keywords": [
+    "directory",
+    "ai",
+    "tools",
+    "listing",
+    "curated",
+    "makers",
+    "smb",
+    "ai-agents"
+  ],
+  "author": "@planetabhi",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
+}

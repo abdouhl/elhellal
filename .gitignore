@@ -1,0 +1,31 @@
+# build output
+dist/
+
+# generated types
+.astro/
+
+# dependencies
+node_modules/
+.netlify
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# environment variables
+.env
+.env.production
+
+# macOS-specific files
+.DS_Store
+
+# vscode
+.vscode
+
+# ignore data directories
+src/data/articles/
+src/data/article-metadata/
+src/data/slug-map.json

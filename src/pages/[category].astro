@@ -1,0 +1,43 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Dashboard from "../components/Dashboard";
+import ItemListSchema from "../components/schema/ItemListSchema.astro";
+import BreadcrumbSchema from "../components/schema/BreadcrumbSchema.astro";
+import data from "../data/articles.json";
+
+export function getStaticPaths() {
+  // Derive paths from data instead of hardcoding
+  return data.articles.map((cat: any) => ({
+    params: { category: cat.category }
+  }));
+}
+
+const { category } = Astro.params;
+
+// Get tools for this category
+const categoryData = data.articles.find((cat: any) => cat.category === category);
+const categoryTools = categoryData?.content || [];
+const categoryTitle = categoryData?.title || category;
+
+// Breadcrumb data
+const breadcrumbs = [
+  { name: "Home", url: "https://xarticl.es" },
+  { name: categoryTitle },
+];
+---
+
+<Layout
+  site={`Xarticl.es - ${category}`}
+  title="Xarticl.es"
+  tagline="A curated directory of the best long-form articles on X."
+  pageTitle={`Best ${category.charAt(0).toUpperCase() + category.slice(1)} Articles on X – Curated Articles | Xarticl.es`}
+  pageDescription={`Explore the best ${category.charAt(0).toUpperCase() + category.slice(1)} articles from X (Twitter). This page curates high-quality articles about ${category}.`}
+  showSearch={true}
+  searchPlaceholder={`Search in ${categoryTitle}...`}
+>
+  <ItemListSchema items={categoryTools} listName={`${categoryTitle} Articles`} />
+  <BreadcrumbSchema items={breadcrumbs} />
+  <main id="main-content">
+    <Dashboard client:load category={category} transition:persist />
+  </main>
+</Layout>

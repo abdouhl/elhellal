@@ -1,0 +1,128 @@
+.link-card {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    background-color: #111111;
+    border-radius: 12px;
+    position: relative;
+    box-shadow:
+        0px 0px 0px 0.5px rgba(255, 255, 255, 0.08),
+        0px 4px 16px rgba(0, 0, 0, 0.4);
+    content-visibility: auto;
+    contain-intrinsic-size: auto;
+    will-change: transform;
+    overflow: hidden;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.link-card:is(:hover, :focus-within) {
+    transform: translateY(-2px);
+    box-shadow:
+        0px 0px 0px 1px rgba(255, 255, 255, 0.15),
+        0px 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+/* Cover image — fills top of card, fixed ratio */
+.card-cover {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    position: relative;
+    background-color: #1a1a1a;
+    flex-shrink: 0;
+}
+
+.card-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* Tag row overlaid on image, bottom-left */
+p.distribution {
+    margin: 0;
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    display: flex;
+    gap: 5px;
+    z-index: 5;
+}
+
+.card-cover p.distribution {
+    z-index: 10;
+}
+
+/* Tags — dark frosted pill, matches screenshot */
+span.tag {
+    background-color: rgba(0, 0, 0, 0.62);
+    color: #ffffff;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    padding: 2px 8px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    font-family: var(--monospace);
+    font-size: 11px;
+    line-height: 1.5;
+    border: 0.5px solid rgba(255, 255, 255, 0.12);
+}
+
+span.tag-new {
+    background-color: rgba(255, 80, 0, 0.2);
+    color: #ff7a40;
+    border: 0.5px solid rgba(255, 80, 0, 0.3);
+    padding: 2px 7px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    font-family: var(--monospace);
+    font-size: 11px;
+    line-height: 1.5;
+}
+
+/* Title link — flush under the image */
+.link-card > a {
+    width: 100%;
+    text-decoration: none;
+    padding: 10px 12px 12px;
+    display: block;
+    color: var(--content-primary);
+}
+
+.link-card strong {
+    font-weight: 700;
+    color: #f0f0f0;
+    font-size: 15px;
+    line-height: 1.3;
+    display: block;
+}
+
+/* Bookmark button */
+.card-bookmark {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 10;
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.link-card:hover .card-bookmark,
+.link-card:focus-within .card-bookmark {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.card-bookmark:has(.bookmarked) {
+    opacity: 1;
+}
+
+@media (hover: none) {
+    .card-bookmark {
+        opacity: 1;
+    }
+}
