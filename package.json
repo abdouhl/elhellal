@@ -1,7 +1,7 @@
 {
-  "name": "xarticles",
+  "name": "elhellal",
   "version": "1.0.0",
-  "description": "A collection of the best long-form X articles on business, money, and leverage—curated for builders who value clarity over noise",
+  "description": "Arabic Substack articles directory",
   "type": "module",
   "private": false,
   "main": "src/data/tools.json",
