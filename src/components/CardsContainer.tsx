@@ -66,6 +66,12 @@ export default function CardsContainer({
         } catch (err) { }
     }, []);
 
+    const categoryTitleMap = useMemo(() => {
+        const map: Record<string, string> = {};
+        (data.articles as Category[]).forEach(c => { map[c.category] = c.title; });
+        return map;
+    }, []);
+
     const allFlatTools = useMemo((): ArticleWithCategory[] => {
         return (data.articles as Category[]).flatMap((item) =>
             item.content.map((tool) => ({
@@ -215,7 +221,7 @@ export default function CardsContainer({
                         screen_name={screen_name}
                         dateAdded={created_at}
                         slug={slug}
-                        category={category}
+                        category={categoryTitleMap[category] || category}
                         image={original_img_url}
                     />
                 ))}

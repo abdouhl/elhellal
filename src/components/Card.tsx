@@ -75,9 +75,6 @@ export default function Card({
                     {category && (
                         <span className="tag">{category}</span>
                     )}
-                    {screen_name && (
-                        <span className="tag">@{screen_name}</span>
-                    )}
                 </p>
             </div>
             <a
@@ -89,6 +86,9 @@ export default function Card({
             >
                 <strong className="nu-c-helper-text nu-u-mt-1 nu-u-mb-1">{title}</strong>
             </a>
+            {screen_name && (
+                <p className="card-author">@{screen_name}</p>
+            )}
             {slug && (
                 <div className="card-bookmark">
                     <BookmarkButton slug={slug} title={title} variant="small" />
