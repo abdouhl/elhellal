@@ -5,7 +5,7 @@ import partytown from "@astrojs/partytown";
 import sitemap from "@astrojs/sitemap";
 
 export default defineConfig({
-  site: 'https://xarticl.es',
+  site: 'https://elhellal.com',
   integrations: [react(), partytown(
     {
       config: {

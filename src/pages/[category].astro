@@ -21,19 +21,19 @@ const categoryTitle = categoryData?.title || category;
 
 // Breadcrumb data
 const breadcrumbs = [
-  { name: "Home", url: "https://xarticl.es" },
+  { name: "الرئيسية", url: "https://elhellal.com" },
   { name: categoryTitle },
 ];
 ---
 
 <Layout
-  site={`Xarticl.es - ${category}`}
-  title="Xarticl.es"
-  tagline="A curated directory of the best long-form articles on X."
-  pageTitle={`Best ${category.charAt(0).toUpperCase() + category.slice(1)} Articles on X – Curated Articles | Xarticl.es`}
-  pageDescription={`Explore the best ${category.charAt(0).toUpperCase() + category.slice(1)} articles from X (Twitter). This page curates high-quality articles about ${category}.`}
+  site={`الهلال - ${categoryTitle}`}
+  title="الهلال"
+  tagline="دليل منتقى لأفضل المقالات العربية على Substack"
+  pageTitle={`أفضل مقالات ${categoryTitle} – مقالات منتقاة | الهلال`}
+  pageDescription={`استكشف أفضل المقالات العربية في تصنيف ${categoryTitle} على Substack. محتوى عربي عالي الجودة منتقى بعناية.`}
   showSearch={true}
-  searchPlaceholder={`Search in ${categoryTitle}...`}
+  searchPlaceholder={`ابحث في ${categoryTitle}...`}
 >
   <ItemListSchema items={categoryTools} listName={`${categoryTitle} Articles`} />
   <BreadcrumbSchema items={breadcrumbs} />

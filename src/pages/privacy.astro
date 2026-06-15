@@ -2,127 +2,115 @@
 import Layout from "../layouts/Layout.astro";
 import BreadcrumbSchema from "../components/schema/BreadcrumbSchema.astro";
 const breadcrumbs = [
-    { name: "Home", url: "https://xarticl.es" },
-    { name: "Privacy Policy", url: "https://xarticl.es/privacy" },
+    { name: "الرئيسية", url: "https://elhellal.com" },
+    { name: "سياسة الخصوصية", url: "https://elhellal.com/privacy" },
 ];
 ---
 
 <Layout
-    site="Xarticl.es"
-    title="Privacy Policy"
-    tagline="How we collect, use, and protect your information"
-    pageTitle="Privacy Policy"
-    pageDescription="Read the Xarticl.es Privacy Policy to understand how we handle your data, use cookies, and protect your privacy when you browse our curated long-form articles directory."
-    canonicalUrl="https://xarticl.es/privacy"
-    ogTitle="Privacy Policy — Xarticl.es"
-    ogDescription="Read the Xarticl.es Privacy Policy to understand how we handle your data, use cookies, and protect your privacy."
+    site="الهلال"
+    title="سياسة الخصوصية"
+    tagline="كيف نجمع معلوماتك ونستخدمها ونحميها"
+    pageTitle="سياسة الخصوصية"
+    pageDescription="اقرأ سياسة خصوصية الهلال لفهم كيفية التعامل مع بياناتك واستخدام ملفات الارتباط وحماية خصوصيتك عند تصفح دليل المقالات العربية."
+    canonicalUrl="https://elhellal.com/privacy"
+    ogTitle="سياسة الخصوصية — الهلال"
+    ogDescription="اقرأ سياسة خصوصية الهلال لفهم كيفية التعامل مع بياناتك وحماية خصوصيتك."
     ogType="website"
-    ogUrl="https://xarticl.es/privacy"
-    ogSiteName="Xarticl.es"
+    ogUrl="https://elhellal.com/privacy"
+    ogSiteName="الهلال"
 >
     <BreadcrumbSchema items={breadcrumbs} />
 
     <main id="main-content" class="container">
         <div class="legal-content-wrapper">
             <header class="legal-header">
-                <h1 class="nu-c-h5 nu-u-text--primary">Privacy Policy</h1>
-                <p class="last-updated">Last Updated: January 4, 2026</p>
+                <h1 class="nu-c-h5 nu-u-text--primary">سياسة الخصوصية</h1>
+                <p class="last-updated">آخر تحديث: ٤ يناير ٢٠٢٦</p>
             </header>
 
             <article class="nu-u-text--secondary" itemscope itemtype="https://schema.org/WebPage">
                 <p class="nu-c-fs-regular">
-                    At <strong class="nu-u-text--primary">Xarticl.es</strong>, accessible from
-                    <a href="https://xarticl.es" class="nu-u-link--subtle">https://xarticl.es</a>,
-                    your privacy is a priority. This Privacy Policy explains what information we
-                    collect, how we use it, and your rights as a visitor to our curated directory
-                    of the best long-form articles on X (formerly Twitter).
+                    في <strong class="nu-u-text--primary">الهلال</strong>، المتاح على
+                    <a href="https://elhellal.com" class="nu-u-link--subtle">https://elhellal.com</a>،
+                    خصوصيتك أولوية. توضح سياسة الخصوصية هذه المعلومات التي نجمعها، وكيف نستخدمها،
+                    وحقوقك كزائر لدليل المقالات العربية.
                 </p>
 
-                <h2 class="nu-c-h6 nu-u-text--primary">1. Information We Collect</h2>
+                <h2 class="nu-c-h6 nu-u-text--primary">١. المعلومات التي نجمعها</h2>
                 <p>
-                    Xarticl.es is a static website. We do not require account registration
-                    and do not directly collect personally identifiable information (PII).
-                    The only data we process comes from:
+                    الهلال موقع ثابت. لا يتطلب تسجيل حساب ولا يجمع معلومات تعريف شخصية مباشرةً.
+                    البيانات الوحيدة التي نعالجها تأتي من:
                 </p>
                 <ul>
-                    <li><strong class="nu-u-text--primary">Analytics data</strong> — anonymized usage statistics via Google Analytics (pages viewed, session duration, browser type, general location).</li>
-                    <li><strong class="nu-u-text--primary">Local storage</strong> — article IDs you bookmark, stored only in your browser.</li>
-                    <li><strong class="nu-u-text--primary">Contact data</strong> — only if you reach out via social media or GitHub.</li>
+                    <li><strong class="nu-u-text--primary">بيانات التحليلات</strong> — إحصائيات مجهولة الهوية عبر Google Analytics (الصفحات المزارة، مدة الجلسة، نوع المتصفح، الموقع العام).</li>
+                    <li><strong class="nu-u-text--primary">التخزين المحلي</strong> — معرّفات المقالات التي تحفظها، مخزّنة في متصفحك فقط.</li>
+                    <li><strong class="nu-u-text--primary">بيانات التواصل</strong> — فقط إذا تواصلت معنا عبر وسائل التواصل الاجتماعي.</li>
                 </ul>
 
-                <h2 class="nu-c-h6 nu-u-text--primary">2. Local Storage & Bookmarks</h2>
+                <h2 class="nu-c-h6 nu-u-text--primary">٢. التخزين المحلي والمقالات المحفوظة</h2>
                 <p>
-                    Our "Saved Articles" feature uses your browser's <strong class="nu-u-text--primary">localStorage</strong>
-                    to remember articles you bookmark. This data lives entirely on your device
-                    and is never transmitted to our servers. You can clear it anytime by
-                    clearing your browser data or clicking "Remove" in the UI.
+                    تستخدم ميزة "المقالات المحفوظة" <strong class="nu-u-text--primary">localStorage</strong>
+                    في متصفحك لحفظ المقالات التي تضعها في المفضلة. تبقى هذه البيانات على جهازك تماماً
+                    ولا تُرسل إلى خوادمنا. يمكنك حذفها في أي وقت بمسح بيانات المتصفح أو الضغط على "حذف" في الواجهة.
                 </p>
 
-                <h2 class="nu-c-h6 nu-u-text--primary">3. Google Analytics</h2>
+                <h2 class="nu-c-h6 nu-u-text--primary">٣. Google Analytics</h2>
                 <p>
-                    We use Google Analytics to understand how visitors interact with Xarticl.es.
-                    Google Analytics collects anonymized data such as pages visited, time on site,
-                    and referring sources. This data helps us improve the directory. No personally
-                    identifiable data is shared with us. You may opt out by installing the
-                    <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener noreferrer" class="nu-u-link--subtle">Google Analytics Opt-out Browser Add-on</a>.
+                    نستخدم Google Analytics لفهم كيفية تفاعل الزوار مع الهلال.
+                    يجمع Google Analytics بيانات مجهولة كالصفحات المزارة والوقت المستغرق ومصادر الإحالة.
+                    لا تُشارك معنا أي بيانات شخصية. يمكنك إلغاء الاشتراك بتثبيت
+                    <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener noreferrer" class="nu-u-link--subtle">إضافة إلغاء اشتراك Google Analytics</a>.
                 </p>
 
-                <h2 class="nu-c-h6 nu-u-text--primary">4. Cookies</h2>
+                <h2 class="nu-c-h6 nu-u-text--primary">٤. ملفات الارتباط</h2>
                 <p>
-                    We use cookies to optimize your browsing experience, remember preferences,
-                    and analyze traffic. Cookies are small text files stored by your browser.
-                    Third-party services like Google Analytics also set their own cookies.
-                    For full details on managing cookies, see our
-                    <a href="/cookies" class="nu-u-link--subtle">Cookie Policy</a>.
+                    نستخدم ملفات الارتباط لتحسين تجربة التصفح وتذكّر التفضيلات وتحليل حركة الزيارات.
+                    تضع خدمات الطرف الثالث كـ Google Analytics ملفات ارتباطها الخاصة.
+                    للتفاصيل الكاملة حول إدارة ملفات الارتباط، راجع
+                    <a href="/cookies" class="nu-u-link--subtle">سياسة ملفات الارتباط</a>.
                 </p>
 
-                <h2 class="nu-c-h6 nu-u-text--primary">5. Advertising</h2>
+                <h2 class="nu-c-h6 nu-u-text--primary">٥. الإعلانات</h2>
                 <p>
-                    Xarticl.es may display ads through Google AdSense or similar networks
-                    to help sustain the project. These networks may use cookies to show you
-                    relevant ads based on your browsing history. You can manage ad
-                    personalization in your
-                    <a href="https://adssettings.google.com" target="_blank" rel="noopener noreferrer" class="nu-u-link--subtle">Google Ad Settings</a>.
-                    We do not sell your personal data to advertisers.
+                    قد يعرض الهلال إعلانات عبر Google AdSense أو شبكات مماثلة لدعم المشروع.
+                    قد تستخدم هذه الشبكات ملفات الارتباط لعرض إعلانات ذات صلة بناءً على سجل تصفحك.
+                    يمكنك إدارة تخصيص الإعلانات من خلال
+                    <a href="https://adssettings.google.com" target="_blank" rel="noopener noreferrer" class="nu-u-link--subtle">إعدادات إعلانات Google</a>.
+                    لا نبيع بياناتك الشخصية للمعلنين.
                 </p>
 
-                <h2 class="nu-c-h6 nu-u-text--primary">6. Third-Party Links</h2>
+                <h2 class="nu-c-h6 nu-u-text--primary">٦. روابط الطرف الثالث</h2>
                 <p>
-                    Our directory links to external articles and websites. We are not
-                    responsible for the privacy practices or content of those third-party
-                    sites. We encourage you to review their privacy policies before
-                    providing any personal information.
+                    يحتوي دليلنا على روابط لمقالات ومواقع خارجية. لسنا مسؤولين عن ممارسات الخصوصية
+                    أو محتوى تلك المواقع. ننصحك بمراجعة سياسات الخصوصية الخاصة بها قبل تقديم أي معلومات شخصية.
                 </p>
 
-                <h2 class="nu-c-h6 nu-u-text--primary">7. Children's Privacy</h2>
+                <h2 class="nu-c-h6 nu-u-text--primary">٧. خصوصية الأطفال</h2>
                 <p>
-                    Xarticl.es does not knowingly collect personal information from
-                    children under 13. If you believe a child has submitted personal
-                    information, please contact us so we can remove it.
+                    لا يجمع الهلال معلومات شخصية من الأطفال دون الثالثة عشرة عن قصد.
+                    إذا اعتقدت أن طفلاً قدّم معلومات شخصية، يرجى التواصل معنا لحذفها.
                 </p>
 
-                <h2 class="nu-c-h6 nu-u-text--primary">8. Your Rights</h2>
+                <h2 class="nu-c-h6 nu-u-text--primary">٨. حقوقك</h2>
                 <p>
-                    Depending on your location, you may have rights under GDPR, CCPA,
-                    or other regulations, including the right to access, correct, or
-                    delete your data. Since we collect minimal data, the primary action
-                    available is clearing your browser's localStorage. For other requests,
-                    contact us below.
+                    وفقاً لموقعك، قد تتمتع بحقوق بموجب GDPR أو CCPA أو أنظمة أخرى،
+                    تشمل حق الوصول والتصحيح والحذف. نظراً لمحدودية البيانات التي نجمعها،
+                    الإجراء الرئيسي المتاح هو مسح localStorage في متصفحك.
+                    للطلبات الأخرى، تواصل معنا أدناه.
                 </p>
 
-                <h2 class="nu-c-h6 nu-u-text--primary">9. Changes to This Policy</h2>
+                <h2 class="nu-c-h6 nu-u-text--primary">٩. تغييرات على هذه السياسة</h2>
                 <p>
-                    We may update this Privacy Policy periodically. Changes will be
-                    reflected with an updated "Last Updated" date at the top of this page.
-                    Continued use of Xarticl.es after changes constitutes acceptance.
+                    قد نحدّث سياسة الخصوصية هذه بشكل دوري. ستنعكس التغييرات بتحديث تاريخ "آخر تحديث"
+                    في أعلى هذه الصفحة. استمرار استخدامك للهلال بعد التغييرات يُعدّ قبولاً لها.
                 </p>
 
-                <h2 class="nu-c-h6 nu-u-text--primary">10. Contact Us</h2>
+                <h2 class="nu-c-h6 nu-u-text--primary">١٠. تواصل معنا</h2>
                 <p>
-                    Questions about our privacy practices? Reach out to
+                    لديك أسئلة حول ممارسات الخصوصية؟ تواصل مع
                     <a href="https://twitter.com/abdou_hll" target="_blank" rel="noopener noreferrer" class="nu-u-link--subtle">@abdou_hll</a>
-                    on social media or via our
-                    <a href="https://github.com/" target="_blank" rel="noopener noreferrer" class="nu-u-link--subtle">GitHub repository</a>.
+                    على وسائل التواصل الاجتماعي.
                 </p>
             </article>
         </div>

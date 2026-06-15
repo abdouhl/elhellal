@@ -60,22 +60,20 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/planetabhi/riseofmachine.git"
+    "url": "git+https://github.com/abdouhl/elhellal.git"
   },
   "bugs": {
-    "url": "https://github.com/planetabhi/riseofmachine/issues"
+    "url": "https://github.com/abdouhl/elhellal/issues"
   },
   "keywords": [
+    "arabic",
+    "substack",
+    "articles",
     "directory",
-    "ai",
-    "tools",
-    "listing",
     "curated",
-    "makers",
-    "smb",
-    "ai-agents"
+    "arabic-content"
   ],
-  "author": "@planetabhi",
+  "author": "@abdou_hll",
   "license": "MIT",
   "publishConfig": {
     "access": "public"

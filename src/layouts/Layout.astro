@@ -1,8 +1,16 @@
 ---
 import { ViewTransitions } from "astro:transitions";
 import WebSiteSchema from "../components/schema/WebSiteSchema.astro";
-import Hero from "../components/Hero.astro";
+import SearchInput from "../components/SearchInput";
 import "@new-ui/foundations";
+
+const headerDate = new Date().toLocaleDateString('ar-SA', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+});
+const headerDateISO = new Date().toISOString().split('T')[0];
 
 export interface Props {
     site: string;
@@ -22,6 +30,7 @@ export interface Props {
     twitterDescription?: string;
     twitterImage?: string;
     pageFavicon?: string;
+    keywords?: string;
     showSearch?: boolean;
     searchPlaceholder?: string;
 }
@@ -44,8 +53,9 @@ const {
     twitterDescription,
     twitterImage,
     pageFavicon,
+    keywords,
     showSearch = false,
-    searchPlaceholder = "Search by name, category, or author...",
+    searchPlaceholder = "ابحث بالعنوان أو التصنيف أو الكاتب...",
 } = Astro.props;
 ---
 
@@ -64,18 +74,18 @@ const {
         <title>
             {
                 pageTitle
-                    ? `${pageTitle} | Xarticl.es`
-                    : `${site} — A curated directory of the best long-form articles on X.`
+                    ? `${pageTitle} | الهلال`
+                    : `${site} — دليل منتقى لأفضل المقالات العربية على Substack`
             }
         </title>
         <meta name="author" content="@abdou_hll" />
         <meta
             name="description"
             content={pageDescription ||
-                "A curated directory of the best long-form articles on X."}
+                "دليل منتقى لأفضل المقالات العربية على Substack"}
         />
         <link rel="sitemap" href="/sitemap-index.xml" />
-        <link rel="canonical" href={canonicalUrl || `https://xarticl.es${Astro.url.pathname}`} />
+        <link rel="canonical" href={canonicalUrl || `https://elhellal.com${Astro.url.pathname}`} />
         {ogTitle && <meta property="og:title" content={ogTitle} />}
         {ogType && <meta property="og:type" content={ogType} />}
         {
@@ -94,6 +104,7 @@ const {
             )
         }
         {twitterImage && <meta name="twitter:image" content={twitterImage} />}
+        {keywords && <meta name="keywords" content={keywords} />}
 
         <!-- Google tag (gtag.js) -->
         <script
@@ -116,62 +127,70 @@ const {
     </head>
 
     <body>
-        <a href="#main-content" class="skip-link">Skip to main content</a>
-        <div class="floating-nav" aria-label="main navigation">
-            <div class="left-group">
-                <div class="logo">
-                    <a href="/" aria-label="home page" tabindex="-1"
-                        ><img
-                            src="/xarticles.svg"
-                            width="32"
-                            height="32"
-                            alt="Rise of Machine"
-                            aria-hidden="true"
-                        /></a
-                    >
-                </div>
-            </div>
-            <div class="btn-group">
-                <button
-                    class="new-filter-toggle"
-                    id="new-filter-toggle"
-                    title="Recently added tools"
-                    aria-label="Filter new tools"
-                    aria-pressed="false"
-                >
-                    <span class="fire-emoji">🔥</span>
-                </button>
-                <a
-                    href="/saved"
-                    class="favorites-link"
-                    id="favoritesLink"
-                    style="display: none;"
-                >
-                    <span class="favorites-text">Saved articles</span>
-                    <span class="favorites-count" id="favoritesCount"></span>
-                </a>
-            </div>
-        </div>
+        <a href="#main-content" class="skip-link">التخطي إلى المحتوى الرئيسي</a>
 
-        <Hero
-            title={title}
-            tagline={tagline}
-            showSearch={showSearch}
-            searchPlaceholder={searchPlaceholder}
-        />
+        <header class="site-header" aria-label="رأس الصفحة">
+            <div class="site-header-inner">
+                <div class="site-header-top">
+                    <time class="header-date" datetime={headerDateISO}>{headerDate}</time>
+
+                    <div class="header-brand">
+                        <a href="/" class="brand-link" aria-label="الصفحة الرئيسية">
+                            <img
+                                src="/xarticles.svg"
+                                width="44"
+                                height="44"
+                                alt=""
+                                aria-hidden="true"
+                            />
+                            <span class="brand-name">{site}</span>
+                        </a>
+                        <p class="brand-tagline">{tagline}</p>
+                    </div>
+
+                    <div class="header-actions">
+                        <button
+                            class="new-filter-toggle"
+                            id="new-filter-toggle"
+                            title="المضاف حديثاً"
+                            aria-label="تصفية الجديد"
+                            aria-pressed="false"
+                        >
+                            <span class="fire-emoji">🔥</span>
+                        </button>
+                        <a
+                            href="/saved"
+                            class="favorites-link"
+                            id="favoritesLink"
+                            style="display: none;"
+                        >
+                            <span class="favorites-text">المحفوظة</span>
+                            <span class="favorites-count" id="favoritesCount"></span>
+                        </a>
+                    </div>
+                </div>
+
+                {showSearch && (
+                    <div class="header-search-row">
+                        <SearchInput client:load placeholder={searchPlaceholder} />
+                    </div>
+                )}
+            </div>
+        </header>
+
         <slot />
 
         <footer class="footer" aria-label="Site footer">
-            <nav class="footer-nav" aria-label="Footer navigation">
-                <a href="/about" class="nu-u-link--subtle">About</a>
+            <nav class="footer-nav" aria-label="تذييل الصفحة">
+                <a href="/about" class="nu-u-link--subtle">حول الموقع</a>
                 <span class="footer-separator" aria-hidden="true">·</span>
-                <a href="/privacy" class="nu-u-link--subtle">Privacy</a>
+                <a href="/privacy" class="nu-u-link--subtle">الخصوصية</a>
                 <span class="footer-separator" aria-hidden="true">·</span>
-                <a href="/terms" class="nu-u-link--subtle">Terms</a>
+                <a href="/terms" class="nu-u-link--subtle">الشروط</a>
                 <span class="footer-separator" aria-hidden="true">·</span>
-                <a href="/cookies" class="nu-u-link--subtle">Cookies</a>
+                <a href="/cookies" class="nu-u-link--subtle">ملفات الارتباط</a>
                 <span class="footer-separator" aria-hidden="true">·</span>
-                <a href="/sitemap-index.xml" class="nu-u-link--subtle">Sitemap</a>
+                <a href="/sitemap-index.xml" class="nu-u-link--subtle">خريطة الموقع</a>
             </nav>
             <p class="footer-copy">
                 ABDERAHMANE HELLAL 2026 ©
@@ -319,16 +338,91 @@ const {
     .nu-u-link--subtle {
         color: var(--content-secondary) !important;
     }
-    .floating-nav {
-        padding: var(--spacing-06) var(--spacing-09);
-        top: 0;
-        left: 0;
-        right: 0;
+    .site-header {
+        border-bottom: 0.5px solid var(--border-muted);
+    }
+
+    .site-header-inner {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: var(--spacing-08) var(--spacing-09) 0;
+    }
+
+    .site-header-top {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        z-index: 999999;
+        gap: var(--spacing-04);
+        padding-bottom: var(--spacing-06);
     }
+
+    .header-date {
+        font-family: var(--monospace);
+        font-size: var(--desktop-caption);
+        line-height: var(--lh-desktop-caption);
+        color: var(--content-secondary);
+        flex: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .header-brand {
+        flex: 0 0 auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .brand-link {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--spacing-03);
+        text-decoration: none;
+        color: inherit;
+    }
+
+    .brand-name {
+        font-family: "ROM-Bold", var(--system-ui);
+        font-size: 1.75rem;
+        line-height: 1.2;
+        color: var(--content-primary);
+    }
+
+    .brand-tagline {
+        font-family: var(--monospace);
+        font-size: var(--desktop-caption);
+        line-height: var(--lh-desktop-caption);
+        color: var(--content-secondary);
+        margin: var(--spacing-01) 0 0 0;
+    }
+
+    .header-actions {
+        flex: 1;
+        display: flex;
+        gap: var(--spacing-03);
+        align-items: center;
+        justify-content: flex-end;
+    }
+
+    .header-search-row {
+        padding: var(--spacing-04) 0 var(--spacing-05);
+        border-top: 0.5px solid var(--border-muted);
+        display: flex;
+        justify-content: center;
+    }
+
+    .header-search-row .search-container {
+        margin-top: 0;
+        width: 100%;
+        max-width: 36rem;
+    }
+
+    .header-search-row .search-input-wrapper {
+        max-width: 100%;
+    }
+
     .btn-group {
         display: flex;
         gap: var(--spacing-03);
@@ -370,12 +464,6 @@ const {
             color: var(--content-secondary);
         }
     }
-    .left-group {
-        display: flex;
-        align-items: center;
-        gap: var(--spacing-03);
-    }
-
     .new-filter-toggle {
         z-index: 999;
         width: var(--spacing-08);
@@ -576,12 +664,24 @@ const {
         outline-offset: 2px;
     }
 
+    @media (max-width: 48rem) {
+        .header-date {
+            display: none;
+        }
+        .header-actions {
+            flex: 0 0 auto;
+        }
+        .brand-name {
+            font-size: 1.35rem;
+        }
+    }
+
     @media (max-width: 30rem) {
         main {
             margin: auto var(--spacing-06);
         }
-        .floating-nav {
-            padding: var(--spacing-06) var(--spacing-06);
+        .site-header-inner {
+            padding: var(--spacing-05) var(--spacing-05) 0;
         }
         .container {
             margin: var(--spacing-06);
@@ -642,30 +742,10 @@ const {
     (function () {
         // Navigation & UI Management
         let previousScrollPosition = 0;
-        let pageCTAPosition = 0;
 
         const handleNavScroll = () => {
-            const nav = document.querySelector(".floating-nav");
-            if (!nav) return;
-
             const currentScrolledPosition =
                 window.scrollY || window.pageYOffset;
-            const scrollingDown =
-                currentScrolledPosition > previousScrollPosition;
-
-            if (scrollingDown) {
-                nav.classList.add("scroll-down");
-                nav.classList.remove("scroll-up");
-            } else {
-                nav.classList.add("scroll-up");
-                nav.classList.remove("scroll-down");
-            }
-
-            if (currentScrolledPosition > pageCTAPosition + 50) {
-                nav.classList.add("is-active");
-            } else {
-                nav.classList.remove("is-active");
-            }
             previousScrollPosition = currentScrolledPosition;
         };
 
@@ -707,13 +787,6 @@ const {
 
         // Core Initialization (Runs on every page load including initial)
         const init = () => {
-            // Handle Nav & CTA positions
-            const nav = document.querySelector(".floating-nav");
-            const pageCTA = document.querySelector(".floating-nav .submit-btn");
-            if (pageCTA) {
-                pageCTAPosition = pageCTA.getBoundingClientRect().bottom;
-            }
-
             // New Tools Filter Toggle - Idempotent listener
             const newFilterToggle =
                 document.querySelector("#new-filter-toggle");

@@ -4,17 +4,17 @@ import FavoritesView from "../components/FavoritesView";
 import BreadcrumbSchema from "../components/schema/BreadcrumbSchema.astro";
 
 const breadcrumbs = [
-    { name: "Home", url: "https://xarticl.es" },
-    { name: "Saved articles" },
+    { name: "الرئيسية", url: "https://elhellal.com" },
+    { name: "المقالات المحفوظة" },
 ];
 ---
 
 <Layout
-    site="Xarticl.es - Saved articles"
-    title="Saved articles"
-    tagline="articles you've saved for quick access"
-    pageTitle="Saved articles"
-    pageDescription="Your saved articles collection"
+    site="الهلال - المقالات المحفوظة"
+    title="المقالات المحفوظة"
+    tagline="المقالات التي حفظتها للوصول السريع"
+    pageTitle="المقالات المحفوظة"
+    pageDescription="مجموعة مقالاتك المحفوظة"
 >
     <BreadcrumbSchema items={breadcrumbs} />
     <main id="main-content">

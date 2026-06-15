@@ -38,10 +38,13 @@ export interface Article {
     screen_name: string;
     created_at: string;
     slug?: string;
+    url?: string;           // direct article URL (Substack, blog, etc.)
 
     tldr?: string;
     whyThisMatters?: string;
     whoShouldRead?: string;
+    metaDescription?: string;
+    keywords?: string[];
 }
 
 export interface Category {

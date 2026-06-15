@@ -2,135 +2,123 @@
 import Layout from "../layouts/Layout.astro";
 import BreadcrumbSchema from "../components/schema/BreadcrumbSchema.astro";
 const breadcrumbs = [
-    { name: "Home", url: "https://xarticl.es" },
-    { name: "Terms & Conditions", url: "https://xarticl.es/terms" },
+    { name: "الرئيسية", url: "https://elhellal.com" },
+    { name: "شروط الاستخدام", url: "https://elhellal.com/terms" },
 ];
 ---
 
 <Layout
-    site="Xarticl.es"
-    title="Terms & Conditions"
-    tagline="The rules that keep this directory fair and useful for everyone"
-    pageTitle="Terms & Conditions"
-    pageDescription="Read the Xarticl.es Terms and Conditions to understand acceptable use, intellectual property rights, disclaimers, and affiliate disclosures for our long-form articles directory."
-    canonicalUrl="https://xarticl.es/terms"
-    ogTitle="Terms & Conditions — Xarticl.es"
-    ogDescription="Read the Xarticl.es Terms and Conditions: acceptable use, intellectual property, disclaimers, and affiliate disclosures for our articles directory."
+    site="الهلال"
+    title="شروط الاستخدام"
+    tagline="القواعد التي تجعل هذا الدليل عادلاً ومفيداً للجميع"
+    pageTitle="شروط الاستخدام"
+    pageDescription="اقرأ شروط استخدام الهلال لفهم الاستخدام المقبول وحقوق الملكية الفكرية وإخلاء المسؤولية والإفصاح عن الروابط التابعة."
+    canonicalUrl="https://elhellal.com/terms"
+    ogTitle="شروط الاستخدام — الهلال"
+    ogDescription="اقرأ شروط استخدام الهلال: الاستخدام المقبول والملكية الفكرية وإخلاء المسؤولية وإفصاحات الروابط التابعة."
     ogType="website"
-    ogUrl="https://xarticl.es/terms"
-    ogSiteName="Xarticl.es"
+    ogUrl="https://elhellal.com/terms"
+    ogSiteName="الهلال"
 >
     <BreadcrumbSchema items={breadcrumbs} />
 
     <main id="main-content" class="container">
         <div class="legal-content-wrapper">
             <header class="legal-header">
-                <h1 class="nu-c-h5 nu-u-text--primary">Terms & Conditions</h1>
-                <p class="last-updated">Last Updated: January 4, 2026</p>
+                <h1 class="nu-c-h5 nu-u-text--primary">شروط الاستخدام</h1>
+                <p class="last-updated">آخر تحديث: ٤ يناير ٢٠٢٦</p>
             </header>
 
             <article class="nu-u-text--secondary" itemscope itemtype="https://schema.org/WebPage">
                 <p class="nu-c-fs-regular">
-                    By accessing <strong class="nu-u-text--primary">Xarticl.es</strong>,
-                    you accept these Terms and Conditions in full. Please read them carefully.
-                    If you disagree with any part, please discontinue use of the site.
+                    بدخولك إلى <strong class="nu-u-text--primary">الهلال</strong>،
+                    فأنت توافق على شروط الاستخدام هذه كاملةً. يُرجى قراءتها بعناية.
+                    إذا كنت لا توافق على أي جزء منها، يُرجى التوقف عن استخدام الموقع.
                 </p>
 
-                <h2 class="nu-c-h6 nu-u-text--primary">1. About Xarticl.es</h2>
+                <h2 class="nu-c-h6 nu-u-text--primary">١. حول الهلال</h2>
                 <p>
-                    Xarticl.es is a curated directory of the best long-form articles
-                    published on X (formerly Twitter). We aggregate, categorize, and surface
-                    high-quality writing to help readers discover valuable content. We do not
-                    host, own, or produce the articles themselves — we link to original sources.
+                    الهلال دليل منتقى لأفضل المقالات العربية المنشورة على Substack.
+                    نجمع المقالات ونصنّفها ونُبرز الكتابة العربية عالية الجودة لمساعدة القرّاء على اكتشاف محتوى قيّم.
+                    لا نستضيف المقالات ولا نمتلكها ولا ننتجها — نحن فقط نربطك بالمصادر الأصلية.
                 </p>
 
-                <h2 class="nu-c-h6 nu-u-text--primary">2. Acceptable Use</h2>
+                <h2 class="nu-c-h6 nu-u-text--primary">٢. الاستخدام المقبول</h2>
                 <p>
-                    You agree to use Xarticl.es only for lawful purposes. You must not:
+                    توافق على استخدام الهلال للأغراض المشروعة فقط. يحظر عليك:
                 </p>
                 <ul>
-                    <li>Scrape, crawl, or harvest data from this directory for commercial use without permission.</li>
-                    <li>Attempt to reverse-engineer or disrupt the website's infrastructure.</li>
-                    <li>Use the directory to promote spam, malware, or misleading information.</li>
-                    <li>Impersonate any person or entity in connection with the site.</li>
+                    <li>جمع البيانات أو استخراجها من الدليل للاستخدام التجاري دون إذن.</li>
+                    <li>محاولة الهندسة العكسية أو تعطيل البنية التحتية للموقع.</li>
+                    <li>استخدام الدليل للترويج للبريد العشوائي أو البرامج الضارة أو المعلومات المضللة.</li>
+                    <li>انتحال شخصية أي شخص أو كيان فيما يتعلق بالموقع.</li>
                 </ul>
 
-                <h2 class="nu-c-h6 nu-u-text--primary">3. Intellectual Property</h2>
+                <h2 class="nu-c-h6 nu-u-text--primary">٣. الملكية الفكرية</h2>
                 <p>
-                    Unless otherwise stated, Xarticl.es and its author own the intellectual
-                    property rights for all original material on this site — including the
-                    curation methodology, design, and written descriptions. All rights reserved.
+                    ما لم يُنص على خلاف ذلك، يمتلك الهلال ومؤسسه حقوق الملكية الفكرية لجميع المواد الأصلية
+                    على هذا الموقع — بما تشمل منهجية الانتقاء والتصميم والأوصاف المكتوبة. جميع الحقوق محفوظة.
                 </p>
                 <ul>
-                    <li>Do not republish or redistribute our curated content without attribution.</li>
-                    <li>Do not sell, rent, or sub-license material from this directory.</li>
-                    <li>Do not reproduce or copy our content for commercial gain.</li>
+                    <li>لا تعيد نشر أو توزيع محتوانا المنتقى دون نسبه إلينا.</li>
+                    <li>لا تبع أو تؤجر أو تمنح ترخيصاً لمواد من هذا الدليل.</li>
+                    <li>لا تنسخ محتوانا أو تستنسخه لأغراض تجارية.</li>
                 </ul>
                 <p>
-                    Article content belongs to their respective authors. We link to original
-                    sources and make no claim over third-party content.
+                    محتوى المقالات يعود لأصحابه. نحن نربط بالمصادر الأصلية ولا ندّعي أي حق على محتوى الطرف الثالث.
                 </p>
 
-                <h2 class="nu-c-h6 nu-u-text--primary">4. Disclaimer of Warranties</h2>
+                <h2 class="nu-c-h6 nu-u-text--primary">٤. إخلاء المسؤولية</h2>
                 <p>
-                    All information on Xarticl.es is provided "as is" without warranty of
-                    any kind, express or implied. The content landscape on X changes rapidly —
-                    article availability, authors, and links are subject to change without notice.
-                    We do not guarantee that external links will remain active or accurate.
+                    جميع المعلومات على الهلال مقدَّمة "كما هي" دون أي ضمان صريح أو ضمني.
+                    توافر المقالات والكُتّاب والروابط عرضة للتغيير دون إشعار.
+                    لا نضمن أن الروابط الخارجية ستظل نشطة أو دقيقة.
                 </p>
 
-                <h2 class="nu-c-h6 nu-u-text--primary">5. Limitation of Liability</h2>
+                <h2 class="nu-c-h6 nu-u-text--primary">٥. تحديد المسؤولية</h2>
                 <p>
-                    To the fullest extent permitted by law, Xarticl.es and its author shall
-                    not be liable for any indirect, incidental, special, or consequential
-                    damages arising from your use of this directory or any linked third-party
-                    content.
+                    بالقدر الأقصى الذي يسمح به القانون، لن يكون الهلال ومؤسسه مسؤولَين عن أي أضرار
+                    غير مباشرة أو عرضية أو خاصة أو تبعية تنشأ عن استخدامك لهذا الدليل أو أي محتوى مرتبط.
                 </p>
 
-                <h2 class="nu-c-h6 nu-u-text--primary">6. Affiliate Disclosure</h2>
+                <h2 class="nu-c-h6 nu-u-text--primary">٦. الإفصاح عن الروابط التابعة</h2>
                 <p>
-                    Some links on Xarticl.es may be affiliate links. If you click on a link
-                    and make a purchase or sign up for a service, we may receive a commission
-                    at no extra cost to you. We only include affiliate links for services we
-                    believe are genuinely valuable. This helps support the ongoing maintenance
-                    of the project.
+                    قد تكون بعض الروابط على الهلال روابط تابعة. إذا نقرت على رابط وأجريت عملية شراء
+                    أو اشتركت في خدمة، فقد نتلقى عمولة دون أي تكلفة إضافية عليك.
+                    ندرج الروابط التابعة فقط للخدمات التي نؤمن بقيمتها فعلاً.
+                    هذا يساعد في دعم صيانة المشروع.
                 </p>
 
-                <h2 class="nu-c-h6 nu-u-text--primary">7. Third-Party Content</h2>
+                <h2 class="nu-c-h6 nu-u-text--primary">٧. محتوى الطرف الثالث</h2>
                 <p>
-                    Xarticl.es links to third-party articles and websites. We are not
-                    responsible for the content, accuracy, or practices of those sites.
-                    Links do not constitute endorsement unless explicitly stated.
+                    يرتبط الهلال بمقالات ومواقع طرف ثالث. لسنا مسؤولين عن محتوى تلك المواقع
+                    أو دقتها أو ممارساتها. الروابط لا تعني التأييد ما لم يُصرّح بذلك.
                 </p>
 
-                <h2 class="nu-c-h6 nu-u-text--primary">8. Privacy</h2>
+                <h2 class="nu-c-h6 nu-u-text--primary">٨. الخصوصية</h2>
                 <p>
-                    Your use of Xarticl.es is also governed by our
-                    <a href="/privacy" class="nu-u-link--subtle">Privacy Policy</a>,
-                    which is incorporated into these Terms by reference.
+                    يخضع استخدامك للهلال أيضاً لـ
+                    <a href="/privacy" class="nu-u-link--subtle">سياسة الخصوصية</a>
+                    المدرجة في هذه الشروط بالإحالة.
                 </p>
 
-                <h2 class="nu-c-h6 nu-u-text--primary">9. Modifications</h2>
+                <h2 class="nu-c-h6 nu-u-text--primary">٩. التعديلات</h2>
                 <p>
-                    We reserve the right to revise these Terms at any time. Updates will
-                    be reflected on this page with a new "Last Updated" date. Continued
-                    use of the site after changes constitutes your acceptance of the
-                    revised Terms.
+                    نحتفظ بالحق في مراجعة هذه الشروط في أي وقت. ستنعكس التحديثات على هذه الصفحة
+                    بتاريخ "آخر تحديث" جديد. استمرار استخدام الموقع بعد التغييرات يُعدّ قبولاً للشروط المعدّلة.
                 </p>
 
-                <h2 class="nu-c-h6 nu-u-text--primary">10. Governing Law</h2>
+                <h2 class="nu-c-h6 nu-u-text--primary">١٠. القانون المطبّق</h2>
                 <p>
-                    These Terms are governed by the laws of the jurisdiction in which
-                    the founder operates. Any disputes shall be resolved in accordance
-                    with those laws.
+                    تخضع هذه الشروط لقوانين البلد الذي يعمل فيه المؤسس.
+                    تُحسم أي نزاعات وفقاً لتلك القوانين.
                 </p>
 
-                <h2 class="nu-c-h6 nu-u-text--primary">11. Contact</h2>
+                <h2 class="nu-c-h6 nu-u-text--primary">١١. تواصل معنا</h2>
                 <p>
-                    Questions about these Terms? Contact
+                    لديك أسئلة حول هذه الشروط؟ تواصل مع
                     <a href="https://twitter.com/abdou_hll" target="_blank" rel="noopener noreferrer" class="nu-u-link--subtle">@abdou_hll</a>
-                    on social media or via our
-                    <a href="https://github.com/" target="_blank" rel="noopener noreferrer" class="nu-u-link--subtle">GitHub repository</a>.
+                    على وسائل التواصل الاجتماعي.
                 </p>
             </article>
         </div>

@@ -43,22 +43,15 @@ export default function Card({
     const linkUrl = slug ? `/articles/${slug}` : href;
     const isNew = isRecentlyAdded(dateAdded, 30);
     const rawImage = image || 'https://pbs.twimg.com/media/HBYKYqjbcAI9_Jp.jpg';
+    const isR2Image = rawImage.startsWith(CF_R2_BASE);
 
-    const coverImage = cfImage(rawImage, {
-        width: 640,
-        height: 360,
-        fit: 'cover',
-        format: 'auto',
-        quality: 80,
-    });
+    const coverImage = isR2Image
+        ? cfImage(rawImage, { width: 640, height: 360, fit: 'cover', format: 'auto', quality: 80 })
+        : rawImage;
 
-    const coverImage2x = cfImage(rawImage, {
-        width: 1280,
-        height: 720,
-        fit: 'cover',
-        format: 'auto',
-        quality: 75,
-    });
+    const coverImage2x = isR2Image
+        ? cfImage(rawImage, { width: 1280, height: 720, fit: 'cover', format: 'auto', quality: 75 })
+        : rawImage;
 
     return (
         <li className="link-card">

@@ -9,13 +9,14 @@ const __dirname = path.dirname(__filename);
 function slugify(text: string): string {
     return text
         .toString()
+        .replace(/[ً-ٟؐ-ؚۖ-ۜ]/g, '') // strip Arabic diacritics (tashkeel)
         .toLowerCase()
         .trim()
-        .replace(/\s+/g, '-')     // Replace spaces with -
-        .replace(/[^\w-]+/g, '')     // Remove all non-word chars
-        .replace(/--+/g, '-')       // Replace multiple - with single -
-        .replace(/^-+/, '')         // Trim - from start of text
-        .replace(/-+$/, '');        // Trim - from end of text
+        .replace(/\s+/g, '-')
+        .replace(/[^\wء-ي٠-٩-]+/g, '') // keep ASCII word chars + Arabic letters/digits + hyphens
+        .replace(/--+/g, '-')
+        .replace(/^-+/, '')
+        .replace(/-+$/, '');
 }
 
 const toolsPath = path.join(__dirname, '../src/data/articles.json');

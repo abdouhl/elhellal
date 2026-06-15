@@ -4,6 +4,7 @@ import slugMap from "../../data/slug-map.json";
 import SoftwareApplicationSchema from "../../components/schema/SoftwareApplicationSchema.astro";
 import BreadcrumbSchema from "../../components/schema/BreadcrumbSchema.astro";
 import BookmarkButton from "../../components/BookmarkButton";
+import articlesConfig from "../../data/articles.json";
 
 export async function getStaticPaths() {
   const slugMapData = await import("../../data/slug-map.json");
@@ -36,7 +37,7 @@ const category = categoryName;
 
 const formatDate = (dateStr: string) => {
   try {
-    return new Date(dateStr).toLocaleDateString("en-US", {
+    return new Date(dateStr).toLocaleDateString("ar", {
       year: "numeric",
       month: "long",
       day: "numeric",
@@ -47,10 +48,15 @@ const formatDate = (dateStr: string) => {
 };
 
 const formattedDate = formatDate(tool.created_at);
-const canonicalUrl = `https://xarticl.es/articles/${tool.slug}/`;
+const canonicalUrl = `https://elhellal.com/articles/${tool.slug}/`;
 const faviconUrl = `/favicons/${slug}.png`;
 const fallbackPath = category === "all" ? "/" : `/${category}`;
 const tweetUrl = `https://x.com/${tool.screen_name}/status/${tool.id_str}`;
+const readUrl = tool.url || tweetUrl;
+const isSubstack = !!tool.url;
+const authorUrl = isSubstack
+    ? `https://${tool.screen_name}.substack.com`
+    : `https://x.com/${tool.screen_name}`;
 
 let meta: any = {};
 try {
@@ -59,13 +65,13 @@ try {
 } catch (e) {}
 
 const seoTitle = meta.title || tool.title;
-const seoDescription = meta.description || tool.body;
+const seoDescription = meta.description || tool.metaDescription || tool.preview_text;
 const seoOgImage = tool.original_img_url;
 const seoOgType = "article";
-const seoOgSiteName = "Xarticl.es";
+const seoOgSiteName = "الهلال";
 
 const encodedShareText = encodeURIComponent(
-  `Check out ${tool.title} - a great article I found on Xarticl.es!`
+  `اكتشف "${tool.title}" — مقالة رائعة وجدتها على الهلال! ${canonicalUrl}`
 );
 const encodedCanonicalUrl = encodeURIComponent(canonicalUrl);
 const xShareUrl = `https://x.com/intent/post?text=${encodedShareText}&url=${encodedCanonicalUrl}&via=${tool.screen_name}`;
@@ -76,22 +82,25 @@ const allCategoryTools = categoryTools.default || [];
 const otherTools = allCategoryTools.filter((t: any) => t.slug !== slug);
 const relatedTools = otherTools.sort(() => Math.random() - 0.5).slice(0, 3);
 
-const categoryTitle = category.charAt(0).toUpperCase() + category.slice(1);
+const categoryObj = (articlesConfig as any).articles?.find((c: any) => c.category === categoryName);
+const categoryTitle = categoryObj?.title || (category.charAt(0).toUpperCase() + category.slice(1));
 const breadcrumbs = [
-  { name: "Home", url: "https://xarticl.es" },
-  { name: categoryTitle, url: `https://xarticl.es/${category}` },
+  { name: "الرئيسية", url: "https://elhellal.com" },
+  { name: categoryTitle, url: `https://elhellal.com/${category}` },
   { name: tool.title },
 ];
 
 const tldr: string | undefined = tool.tldr;
 const whyThisMatters: string | undefined = tool.whyThisMatters;
 const whoShouldRead: string | undefined = tool.whoShouldRead;
+const keywords: string[] | undefined = tool.keywords;
+const keywordsString = keywords?.join(', ');
 ---
 
 <Layout
-  site={`Xarticl.es - ${tool.title}`}
+  site="الهلال"
   title={seoTitle}
-  tagline={seoDescription}
+  tagline="دليل منتقى لأفضل المقالات العربية على Substack"
   pageTitle={seoTitle}
   pageDescription={seoDescription}
   canonicalUrl={canonicalUrl}
@@ -106,10 +115,11 @@ const whoShouldRead: string | undefined = tool.whoShouldRead;
   twitterDescription={seoDescription}
   twitterImage={seoOgImage}
   pageFavicon={faviconUrl}
+  keywords={keywordsString}
 >
   <SoftwareApplicationSchema
     name={tool.title}
-    description={tool.body}
+    description={tool.preview_text}
     url={tool.url}
     tag={tool.tag}
     dateAdded={tool.created_at}
@@ -120,8 +130,8 @@ const whoShouldRead: string | undefined = tool.whoShouldRead;
   <main id="main-content" class="article-page">
 
     <!-- Breadcrumb -->
-    <nav class="breadcrumb" aria-label="Breadcrumb">
-      <a href="/">Home</a>
+    <nav class="breadcrumb" aria-label="مسار التنقل">
+      <a href="/">الرئيسية</a>
       <span aria-hidden="true">›</span>
       <a href={`/${category}`}>{categoryTitle}</a>
       <span aria-hidden="true">›</span>
@@ -136,11 +146,12 @@ const whoShouldRead: string | undefined = tool.whoShouldRead;
         <!-- Cover image -->
         <div class="article-cover">
           <img
-            src={tool.original_img_url}
+            src={tool.original_img_url || '/xarticles.svg'}
             alt={tool.title}
             class="article-cover-img"
             itemprop="image"
             loading="eager"
+            onerror="this.closest('.article-cover').style.display='none'"
           />
           <div class="article-cover-tags">
             <a href={`/${category}`} class="cover-tag">{categoryTitle}</a>
@@ -161,7 +172,7 @@ const whoShouldRead: string | undefined = tool.whoShouldRead;
                 <>
                   <span class="meta-dot">·</span>
                   <a
-                    href={`https://x.com/${tool.screen_name}`}
+                    href={authorUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     class="meta-author"
@@ -174,12 +185,21 @@ const whoShouldRead: string | undefined = tool.whoShouldRead;
             </div>
           </header>
 
+          <!-- Keywords -->
+          {keywords && keywords.length > 0 && (
+            <div class="article-keywords" aria-label="الكلمات المفتاحية">
+              {keywords.map((kw: string) => (
+                <span class="keyword-tag">{kw}</span>
+              ))}
+            </div>
+          )}
+
           <!-- About section -->
           <section class="article-about" aria-label="About this article">
-            {tool.body && (
-              <p class="article-summary" itemprop="description">{tool.body}</p>
+            {tool.preview_text && (
+              <p class="article-summary" itemprop="description">{tool.preview_text}</p>
             )}
-            {meta.description && meta.description !== tool.body && (
+            {meta.description && meta.description !== tool.preview_text && (
               <p class="article-description">{meta.description}</p>
             )}
           </section>
@@ -191,7 +211,7 @@ const whoShouldRead: string | undefined = tool.whoShouldRead;
               {tldr && (
                 <div class="core-section">
                   <p class="core-label">
-                    <span class="core-emoji">⚡</span> TL;DR
+                    <span class="core-emoji">⚡</span> ملخص
                   </p>
                   <p class="core-body">{tldr}</p>
                 </div>
@@ -200,7 +220,7 @@ const whoShouldRead: string | undefined = tool.whoShouldRead;
               {whyThisMatters && (
                 <div class="core-section">
                   <p class="core-label">
-                    <span class="core-emoji">🎯</span> Why this matters
+                    <span class="core-emoji">🎯</span> لماذا يهمك هذا
                   </p>
                   <p class="core-body">{whyThisMatters}</p>
                 </div>
@@ -209,7 +229,7 @@ const whoShouldRead: string | undefined = tool.whoShouldRead;
               {whoShouldRead && (
                 <div class="core-section">
                   <p class="core-label">
-                    <span class="core-emoji">👥</span> Who should read this
+                    <span class="core-emoji">👥</span> من يجب أن يقرأ هذا
                   </p>
                   <ul class="core-list">
                     {whoShouldRead
@@ -228,28 +248,39 @@ const whoShouldRead: string | undefined = tool.whoShouldRead;
 
           <!-- CTA -->
           <div class="article-cta">
-            {tool.id_str ? (
+            {readUrl ? (
               <a
-                href={tweetUrl}
+                href={readUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 class="btn-read"
                 itemprop="url"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256">
-                  <path d="M214.75,211.71l-62.6-98.38,61.77-67.95a8,8,0,0,0-11.84-10.76L143.24,99.34,102.75,35.71A8,8,0,0,0,96,32H48a8,8,0,0,0-6.75,12.3l62.6,98.37-61.77,68a8,8,0,1,0,11.84,10.76l58.84-64.72,40.49,63.63A8,8,0,0,0,160,224h48a8,8,0,0,0,6.75-12.29ZM164.39,208,62.57,48h29L193.43,208Z"/>
-                </svg>
-                Read on X
+                {isSubstack ? (
+                  <Fragment>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256">
+                      <path d="M224,104a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,104Zm8,56a8,8,0,0,1-8,8H32a8,8,0,0,1,0-16H224A8,8,0,0,1,232,160ZM40,72H216a8,8,0,0,0,0-16H40a8,8,0,0,0,0,16Z"/>
+                    </svg>
+                    اقرأ المقال
+                  </Fragment>
+                ) : (
+                  <Fragment>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256">
+                      <path d="M214.75,211.71l-62.6-98.38,61.77-67.95a8,8,0,0,0-11.84-10.76L143.24,99.34,102.75,35.71A8,8,0,0,0,96,32H48a8,8,0,0,0-6.75,12.3l62.6,98.37-61.77,68a8,8,0,1,0,11.84,10.76l58.84-64.72,40.49,63.63A8,8,0,0,0,160,224h48a8,8,0,0,0,6.75-12.29ZM164.39,208,62.57,48h29L193.43,208Z"/>
+                    </svg>
+                    اقرأ على X
+                  </Fragment>
+                )}
               </a>
             ) : (
-              <span class="btn-read btn-disabled">No link available</span>
+              <span class="btn-read btn-disabled">لا يوجد رابط</span>
             )}
             <BookmarkButton client:load slug={slug} title={tool.title} variant="default" />
           </div>
 
           <!-- Share -->
           <div class="article-share">
-            <span class="share-label">Share</span>
+            <span class="share-label">مشاركة</span>
             <div class="share-buttons">
               <a href={xShareUrl} target="_blank" rel="noopener noreferrer" class="share-btn" title="Share on X" aria-label="Share on X">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 256 256">
@@ -282,10 +313,10 @@ const whoShouldRead: string | undefined = tool.whoShouldRead;
 
         <!-- Author card -->
         <div class="sidebar-card">
-          <p class="sidebar-label">Author</p>
+          <p class="sidebar-label">الكاتب</p>
           <div class="author-row">
             <img
-              src={`https://unavatar.io/twitter/${tool.screen_name}`}
+              src={tool.profile_image_url_https || `https://unavatar.io/twitter/${tool.screen_name}`}
               alt={`@${tool.screen_name}`}
               class="author-avatar"
               onerror="this.src='/favicons/default.png'"
@@ -293,33 +324,33 @@ const whoShouldRead: string | undefined = tool.whoShouldRead;
             />
             <div>
               <a
-                href={`https://x.com/${tool.screen_name}`}
+                href={authorUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 class="author-handle"
               >
                 @{tool.screen_name}
               </a>
-              <p class="author-sub">View on X</p>
+              <p class="author-sub">{isSubstack ? 'Substack' : 'عرض على X'}</p>
             </div>
           </div>
         </div>
 
         <!-- Details card -->
         <div class="sidebar-card">
-          <p class="sidebar-label">Details</p>
+          <p class="sidebar-label">تفاصيل</p>
           <dl class="detail-list">
             <div class="detail-row">
-              <dt>Category</dt>
+              <dt>التصنيف</dt>
               <dd><a href={`/${category}`} class="detail-link">{categoryTitle}</a></dd>
             </div>
             <div class="detail-row">
-              <dt>Published</dt>
+              <dt>تاريخ النشر</dt>
               <dd>{formattedDate}</dd>
             </div>
             {tool.tag && (
               <div class="detail-row">
-                <dt>Tag</dt>
+                <dt>الوسم</dt>
                 <dd>{tool.tag}</dd>
               </div>
             )}
@@ -356,7 +387,7 @@ const whoShouldRead: string | undefined = tool.whoShouldRead;
     <!-- Related articles -->
     {relatedTools.length > 0 && (
       <section class="related-section" aria-label="Related articles">
-        <h2 class="related-heading">More in {categoryTitle}</h2>
+        <h2 class="related-heading">المزيد في {categoryTitle}</h2>
         <div class="related-grid">
           {relatedTools.map((t: any) => (
             <a href={`/articles/${t.slug}`} class="related-card">
@@ -383,7 +414,7 @@ const whoShouldRead: string | undefined = tool.whoShouldRead;
     )}
 
     <div class="page-nav">
-      <a href={fallbackPath} class="back-link">← Back to {categoryTitle}</a>
+      <a href={fallbackPath} class="back-link">العودة إلى {categoryTitle} →</a>
     </div>
 
   </main>
@@ -471,7 +502,7 @@ const whoShouldRead: string | undefined = tool.whoShouldRead;
     .article-cover-tags {
       position: absolute;
       bottom: 12px;
-      left: 12px;
+      right: 12px;
       display: flex;
       gap: 6px;
     }
@@ -524,6 +555,24 @@ const whoShouldRead: string | undefined = tool.whoShouldRead;
       text-decoration: none;
     }
     .meta-author:hover { color: #fff; }
+
+    /* Keywords */
+    .article-keywords {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .keyword-tag {
+      display: inline-block;
+      padding: 3px 10px;
+      background: rgba(255, 140, 0, 0.1);
+      border: 0.5px solid rgba(255, 140, 0, 0.25);
+      color: DarkOrange;
+      border-radius: 4px;
+      font-family: var(--monospace);
+      font-size: 11px;
+      line-height: 1.6;
+    }
 
     /* About */
     .article-about { display: flex; flex-direction: column; gap: var(--spacing-03); }
@@ -589,13 +638,13 @@ const whoShouldRead: string | undefined = tool.whoShouldRead;
       font-size: var(--desktop-body-sm);
       line-height: 1.6;
       color: #d0d0d0;
-      padding-left: 14px;
+      padding-right: 14px;
       position: relative;
     }
     .core-list li::before {
       content: "–";
       position: absolute;
-      left: 0;
+      right: 0;
       color: rgba(255,255,255,0.25);
     }
 
@@ -813,7 +862,7 @@ const whoShouldRead: string | undefined = tool.whoShouldRead;
     .related-tag {
       position: absolute;
       bottom: 8px;
-      left: 8px;
+      right: 8px;
       background: rgba(0,0,0,0.62);
       color: #fff;
       backdrop-filter: blur(6px);
