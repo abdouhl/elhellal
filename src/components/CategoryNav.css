@@ -6,11 +6,56 @@
   	background-color: var(--background-high-contrast);
   	-webkit-backdrop-filter: blur(.5rem);
   	backdrop-filter: blur(.5rem);
+  	border-top: 0.5px solid var(--border-muted);
+  	border-bottom: 1px solid var(--border-muted);
+  }
+
+  .category-nav-toggle {
+  	display: none;
+  	width: 100%;
+  	align-items: center;
+  	justify-content: space-between;
+  	background: none;
+  	border: none;
+  	outline: none;
+  	cursor: var(--c-pointer);
+  	padding: var(--spacing-04) var(--spacing-05);
+  	font-family: var(--body-copy);
+  	font-size: var(--desktop-body-sm);
+  	color: var(--content-primary);
+  }
+
+  .category-nav-toggle-icon {
+  	display: flex;
+  	flex-direction: column;
+  	justify-content: center;
+  	gap: 4px;
+  	width: 20px;
+  	height: 14px;
+  }
+
+  .category-nav-toggle-icon span {
+  	display: block;
+  	height: 1.5px;
+  	width: 100%;
+  	background-color: var(--content-primary);
+  	transition: transform 0.2s ease, opacity 0.2s ease;
+  }
+
+  .category-nav-toggle-icon.is-open span:nth-child(1) {
+  	transform: translateY(5.5px) rotate(45deg);
+  }
+
+  .category-nav-toggle-icon.is-open span:nth-child(2) {
+  	opacity: 0;
+  }
+
+  .category-nav-toggle-icon.is-open span:nth-child(3) {
+  	transform: translateY(-5.5px) rotate(-45deg);
   }
 
   .category-nav {
   	width: 100%;
-  	box-shadow: inset 0px -0.5px 0px var(--background-secondary);
   	white-space: nowrap;
   	display: flex;
   	align-items: center;
@@ -69,4 +114,34 @@
 
   .nav-fade-right.hide {
   	opacity: 0;
+  }
+
+  @media (max-width: 48rem) {
+  	.category-nav-toggle {
+  		display: flex;
+  	}
+
+  	.category-nav-container {
+  		border-bottom: none;
+  	}
+
+  	.category-nav {
+  		display: none;
+  		border-top: 0.5px solid var(--border-muted);
+  		border-bottom: 1px solid var(--border-muted);
+  	}
+
+  	.category-nav.is-open {
+  		display: flex;
+  		flex-direction: column;
+  		align-items: stretch;
+  		white-space: normal;
+  		overflow: visible;
+  		max-height: 70vh;
+  		overflow-y: auto;
+  	}
+
+  	.nav-fade {
+  		display: none;
+  	}
   }

@@ -53,10 +53,13 @@ const faviconUrl = `/favicons/${slug}.png`;
 const fallbackPath = category === "all" ? "/" : `/${category}`;
 const tweetUrl = `https://x.com/${tool.screen_name}/status/${tool.id_str}`;
 const readUrl = tool.url || tweetUrl;
-const isSubstack = !!tool.url;
+const sourceHost = tool.url ? new URL(tool.url).hostname.replace(/^www\./, '') : null;
+const isSubstack = !!sourceHost && sourceHost.endsWith('substack.com');
 const authorUrl = isSubstack
     ? `https://${tool.screen_name}.substack.com`
-    : `https://x.com/${tool.screen_name}`;
+    : tool.url
+      ? new URL(tool.url).origin
+      : `https://x.com/${tool.screen_name}`;
 
 let meta: any = {};
 try {
@@ -100,7 +103,7 @@ const keywordsString = keywords?.join(', ');
 <Layout
   site="الهلال"
   title={seoTitle}
-  tagline="دليل منتقى لأفضل المقالات العربية على Substack"
+  tagline="دليل منتقى لأفضل المقالات العربية على الإنترنت"
   pageTitle={seoTitle}
   pageDescription={seoDescription}
   canonicalUrl={canonicalUrl}
@@ -264,12 +267,7 @@ const keywordsString = keywords?.join(', ');
                     اقرأ المقال
                   </Fragment>
                 ) : (
-                  <Fragment>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256">
-                      <path d="M214.75,211.71l-62.6-98.38,61.77-67.95a8,8,0,0,0-11.84-10.76L143.24,99.34,102.75,35.71A8,8,0,0,0,96,32H48a8,8,0,0,0-6.75,12.3l62.6,98.37-61.77,68a8,8,0,1,0,11.84,10.76l58.84-64.72,40.49,63.63A8,8,0,0,0,160,224h48a8,8,0,0,0,6.75-12.29ZM164.39,208,62.57,48h29L193.43,208Z"/>
-                    </svg>
-                    اقرأ على X
-                  </Fragment>
+                  'اقرأ المقال'
                 )}
               </a>
             ) : (
@@ -331,7 +329,7 @@ const keywordsString = keywords?.join(', ');
               >
                 @{tool.screen_name}
               </a>
-              <p class="author-sub">{isSubstack ? 'Substack' : 'عرض على X'}</p>
+              <p class="author-sub">{isSubstack ? 'Substack' : (sourceHost ?? 'عرض على X')}</p>
             </div>
           </div>
         </div>

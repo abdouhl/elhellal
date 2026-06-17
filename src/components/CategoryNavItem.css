@@ -1,22 +1,31 @@
 .nav__item {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-02);
   text-decoration: none;
   border: none;
   outline: none;
   background: none;
   cursor: var(--c-pointer);
-  border-bottom: .5px solid transparent;
   font-family: var(--body-copy);
   font-weight: 400;
+  font-size: var(--desktop-body-sm);
+  line-height: var(--lh-desktop-body-sm);
   color: var(--content-secondary);
-  padding-block: var(--spacing-05);
-  padding-inline: var(--spacing-00);
-  margin-right: var(--spacing-06);
+  white-space: nowrap;
+  padding: var(--spacing-04) var(--spacing-05);
+  border-inline-end: 0.5px solid var(--border-muted);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.nav__item:first-child {
+  border-inline-start: 0.5px solid var(--border-muted);
 }
 
 span.category-count {
   color: var(--content-secondary-alt);
   font-family: var(--monospace);
+  font-size: var(--desktop-caption);
   display: inline-block;
   min-width: var(--spacing-07);
   text-align: center;
@@ -25,15 +34,29 @@ span.category-count {
 
 .nav__item:hover {
   color: var(--content-primary);
-  border-bottom: .5px solid var(--border-strong);
+  background-color: var(--background-secondary);
 }
 
 .nav__item.is-active {
-  color: var(--content-primary);
-  border-bottom: .5px solid var(--accent);
+  color: var(--accent);
+  font-family: "ROM-Bold", var(--system-ui);
 }
 
 .nav__item:hover span.category-count,
 .nav__item.is-active span.category-count {
-  color: var(--content-primary);
+  color: inherit;
+}
+
+@media (max-width: 48rem) {
+  .nav__item {
+    width: 100%;
+    border-inline-end: none;
+    border-bottom: 0.5px solid var(--border-muted);
+    padding: var(--spacing-05);
+    justify-content: space-between;
+  }
+
+  .nav__item:first-child {
+    border-inline-start: none;
+  }
 }

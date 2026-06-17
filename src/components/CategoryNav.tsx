@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import './CategoryNav.css';
 import data from '../data/articles.json';
 import CategoryNavItem from './CategoryNavItem';
@@ -14,8 +14,10 @@ interface NavItem {
 }
 
 export default function CategoryNav({ filter }: CategoryNavProps) {
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+
     const navItems: NavItem[] = [
-        { title: 'All Articles', category: 'all' },
+        { title: 'جميع المقالات', category: 'all' },
         ...(data.articles as Category[]).map(cat => ({
             title: cat.title,
             category: cat.category,
@@ -67,7 +69,27 @@ export default function CategoryNav({ filter }: CategoryNavProps) {
 
     return (
         <div className="category-nav-container">
-            <nav className="category-nav" tabIndex={-1}>
+            <button
+                type="button"
+                className="category-nav-toggle"
+                aria-expanded={isMenuOpen}
+                aria-controls="category-nav-list"
+                onClick={() => setIsMenuOpen((open) => !open)}
+            >
+                <span className="category-nav-toggle-label">التصنيفات</span>
+                <span className={`category-nav-toggle-icon ${isMenuOpen ? 'is-open' : ''}`} aria-hidden="true">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </span>
+            </button>
+
+            <nav
+                id="category-nav-list"
+                className={`category-nav ${isMenuOpen ? 'is-open' : ''}`}
+                tabIndex={-1}
+                onClick={() => setIsMenuOpen(false)}
+            >
                 {navItems.map((c, i) => (
                     <CategoryNavItem
                         key={i}
