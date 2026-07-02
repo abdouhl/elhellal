@@ -6,7 +6,16 @@
 	// Create with: bunx wrangler kv namespace create ARTICLE_VIEWS
 	// then paste the returned id below.
 	"kv_namespaces": [
-		{ "binding": "ARTICLE_VIEWS", "id": "REPLACE_WITH_KV_NAMESPACE_ID" }
+		{ "binding": "ARTICLE_VIEWS", "id": "251870004a90439ead04e09a9ac9412a" }
+	],
+	// Deploying this worker also creates/updates this Route automatically —
+	// no manual dashboard step needed. elhellal.com must already be an active
+	// zone on this Cloudflare account (it is, since the main site is deployed
+	// there). A path-specific route like this always takes precedence over the
+	// main site's catch-all, whether that's wired up as a Custom Domain or a
+	// broader Route, so it won't fight with the existing deployment.
+	"routes": [
+		{ "pattern": "elhellal.com/api/*", "zone_name": "elhellal.com" }
 	],
 	"observability": {
 		"enabled": true

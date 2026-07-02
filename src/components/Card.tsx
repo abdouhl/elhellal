@@ -12,6 +12,8 @@ interface CardProps {
     category?: string | undefined;
     image?: string | undefined;
     priority?: boolean;
+    /** Shows a numbered rank badge (used by the "الأكثر قراءة" section) */
+    rank?: number;
 }
 
 const CF_IMAGE_BASE = 'https://img.xarticl.es/cdn-cgi/image';
@@ -39,6 +41,7 @@ export default function Card({
     category,
     image,
     priority = false,
+    rank,
 }: CardProps) {
     const linkUrl = slug ? `/articles/${slug}` : href;
     const isNew = isRecentlyAdded(dateAdded, 30);
@@ -55,6 +58,7 @@ export default function Card({
 
     return (
         <li className="link-card">
+            {typeof rank === 'number' && <span className="card-rank">{rank}</span>}
             <div className="card-cover">
                 <img
                     src={coverImage}

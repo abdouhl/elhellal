@@ -6,6 +6,9 @@ import BreadcrumbSchema from "../../components/schema/BreadcrumbSchema.astro";
 import BookmarkButton from "../../components/BookmarkButton";
 import AdUnit from "../../components/AdUnit.astro";
 import articlesConfig from "../../data/articles.json";
+import { getQualifyingTagSlugSet, slugifyTag } from "../../utils/tags";
+
+const qualifyingTagSlugs = getQualifyingTagSlugSet();
 
 export async function getStaticPaths() {
   const slugMapData = await import("../../data/slug-map.json");
@@ -192,9 +195,14 @@ const keywordsString = keywords?.join(', ');
           <!-- Keywords -->
           {keywords && keywords.length > 0 && (
             <div class="article-keywords" aria-label="الكلمات المفتاحية">
-              {keywords.map((kw: string) => (
-                <span class="keyword-tag">{kw}</span>
-              ))}
+              {keywords.map((kw: string) => {
+                const tagSlug = slugifyTag(kw);
+                return qualifyingTagSlugs.has(tagSlug) ? (
+                  <a href={`/tags/${tagSlug}`} class="keyword-tag">{kw}</a>
+                ) : (
+                  <span class="keyword-tag">{kw}</span>
+                );
+              })}
             </div>
           )}
 
@@ -434,6 +442,36 @@ const keywordsString = keywords?.join(', ');
     }
   </script>
 
+  <!-- View-tracking beacon — feeds the "الأكثر قراءة" leaderboard. Silently
+       no-ops if the elhellal-views worker isn't deployed/routed yet. -->
+  <script type="module" data-astro-rerun>
+    import { VIEWS_API_BASE } from "../../config/views";
+
+    const match = window.location.pathname.match(/^\/articles\/([^/]+)\/?$/);
+    if (match) {
+      const slug = match[1];
+      let alreadyTracked = false;
+      try {
+        alreadyTracked = !!sessionStorage.getItem(`viewed:${slug}`);
+      } catch {}
+
+      if (!alreadyTracked) {
+        fetch(`${VIEWS_API_BASE}/track-view`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ slug }),
+          keepalive: true,
+        })
+          .then(() => {
+            try {
+              sessionStorage.setItem(`viewed:${slug}`, "1");
+            } catch {}
+          })
+          .catch(() => {});
+      }
+    }
+  </script>
+
   <style>
     /* ── Page shell ───────────────────────────────────── */
     .article-page {
@@ -574,6 +612,10 @@ const keywordsString = keywords?.join(', ');
       font-family: var(--monospace);
       font-size: 11px;
       line-height: 1.6;
+      text-decoration: none;
+    }
+    a.keyword-tag:hover {
+      background: rgba(255, 140, 0, 0.2);
     }
 
     /* About */

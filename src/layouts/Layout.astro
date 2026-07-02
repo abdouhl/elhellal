@@ -2,6 +2,7 @@
 import { ViewTransitions } from "astro:transitions";
 import WebSiteSchema from "../components/schema/WebSiteSchema.astro";
 import SearchInput from "../components/SearchInput";
+import NewsTicker from "../components/NewsTicker.astro";
 import "@new-ui/foundations";
 
 const headerDate = new Date().toLocaleDateString('ar-SA', {
@@ -205,11 +206,15 @@ const {
             </div>
         </header>
 
+        <NewsTicker />
+
         <slot />
 
         <footer class="footer" aria-label="Site footer">
             <nav class="footer-nav" aria-label="تذييل الصفحة">
                 <a href="/about" class="nu-u-link--subtle">حول الموقع</a>
+                <span class="footer-separator" aria-hidden="true">·</span>
+                <a href="/tags" class="nu-u-link--subtle">الوسوم</a>
                 <span class="footer-separator" aria-hidden="true">·</span>
                 <a href="/privacy" class="nu-u-link--subtle">الخصوصية</a>
                 <span class="footer-separator" aria-hidden="true">·</span>
@@ -850,6 +855,29 @@ const {
                         );
                     });
                     newFilterToggle._hasFilterListener = true;
+                }
+            }
+
+            // News ticker pause/play toggle — Idempotent listener
+            const tickerToggle = document.querySelector("#newsTickerToggle");
+            const tickerTrack = document.querySelector("#newsTickerTrack");
+            if (tickerToggle && tickerTrack) {
+                if (!tickerToggle._hasTickerListener) {
+                    tickerToggle.addEventListener("click", () => {
+                        const isPaused = tickerTrack.classList.toggle("is-paused");
+                        tickerToggle.setAttribute("aria-pressed", String(isPaused));
+                        tickerToggle.setAttribute(
+                            "aria-label",
+                            isPaused ? "تشغيل الشريط المتحرك" : "إيقاف الشريط المتحرك",
+                        );
+                        tickerToggle
+                            .querySelector(".icon-pause")
+                            .style.setProperty("display", isPaused ? "none" : "");
+                        tickerToggle
+                            .querySelector(".icon-play")
+                            .style.setProperty("display", isPaused ? "" : "none");
+                    });
+                    tickerToggle._hasTickerListener = true;
                 }
             }
 

@@ -1,0 +1,22 @@
+.most-read-section {
+    margin-bottom: var(--spacing-10);
+}
+
+.most-read-heading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 var(--spacing-05) 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--content-primary);
+}
+
+.most-read-icon {
+    font-size: 1.1rem;
+    filter: grayscale(0%);
+}
+
+.most-read-grid {
+    margin-bottom: 0;
+}

@@ -110,6 +110,26 @@ span.tag-new {
     line-height: 1.4;
 }
 
+/* Rank badge — top-left (RTL: opposite the bookmark button) */
+.card-rank {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 10;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: DarkOrange;
+    color: #111;
+    font-family: var(--monospace);
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 6px;
+}
+
 /* Bookmark button */
 .card-bookmark {
     position: absolute;

@@ -1,16 +1,22 @@
 {
 	"main": "dist/_worker.js/index.js",
 	"name": "elhellal",
-  "compatibility_date": "2026-02-21",
-  "compatibility_flags": [
-    "nodejs_compat",
-    "global_fetch_strictly_public"
-  ],
+	"compatibility_date": "2026-02-21",
+	"compatibility_flags": [
+		"nodejs_compat",
+		"global_fetch_strictly_public"
+	],
 	"assets": {
 		"binding": "ASSETS",
 		"directory": "./dist"
 	},
 	"observability": {
-    "enabled": true
-  }
+		"enabled": true
+	},
+	"kv_namespaces": [
+		{
+			"binding": "ARTICLE_VIEWS",
+			"id": "251870004a90439ead04e09a9ac9412a"
+		}
+	]
 }

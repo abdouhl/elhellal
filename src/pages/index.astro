@@ -2,6 +2,7 @@
 import Layout from "../layouts/Layout.astro";
 
 import Dashboard from "../components/Dashboard";
+import MostRead from "../components/MostRead";
 import OrganizationSchema from "../components/schema/OrganizationSchema.astro";
 import ItemListSchema from "../components/schema/ItemListSchema.astro";
 import data from "../data/articles.json";
@@ -21,6 +22,7 @@ const allTools = data.articles.flatMap((category: any) => category.content);
   <OrganizationSchema />
   <ItemListSchema items={allTools} listName="Articles Directory - All Articles" />
   <main id="main-content">
+    <MostRead client:load />
     <Dashboard client:load category="all" transition:persist />
   </main>
 </Layout>

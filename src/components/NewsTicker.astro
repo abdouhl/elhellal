@@ -1,0 +1,167 @@
+---
+import data from "../data/articles.json";
+import { isRecentlyAdded } from "../utils/dates";
+import type { Category } from "../types";
+
+const RECENT_DAYS = 3;
+const MAX_ITEMS = 15;
+
+const recentItems = (data.articles as Category[])
+    .flatMap((cat) => cat.content.map((article) => ({ ...article, category: cat.category })))
+    .filter((article) => article.slug && isRecentlyAdded(article.created_at, RECENT_DAYS))
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, MAX_ITEMS);
+---
+
+{recentItems.length > 0 && (
+    <div class="news-ticker" aria-label="آخر الإضافات">
+        <span class="ticker-label">
+            <span class="ticker-dot" aria-hidden="true"></span>
+            جديد
+        </span>
+
+        <div class="ticker-viewport">
+            <ul class="ticker-track" id="newsTickerTrack">
+                {[...recentItems, ...recentItems].map((item, i) => (
+                    <li class="ticker-item" aria-hidden={i >= recentItems.length ? "true" : undefined}>
+                        <a href={`/articles/${item.slug}`} tabindex={i >= recentItems.length ? -1 : undefined}>
+                            {item.title}
+                        </a>
+                    </li>
+                ))}
+            </ul>
+        </div>
+
+        <button
+            type="button"
+            class="ticker-toggle"
+            id="newsTickerToggle"
+            aria-label="إيقاف الشريط المتحرك"
+            aria-pressed="false"
+        >
+            <svg class="icon-pause" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 256 256" fill="currentColor">
+                <path d="M216,48H164a20,20,0,0,0-20,20V188a20,20,0,0,0,20,20h52a20,20,0,0,0,20-20V68A20,20,0,0,0,216,48ZM92,48H40A20,20,0,0,0,20,68V188a20,20,0,0,0,20,20H92a20,20,0,0,0,20-20V68A20,20,0,0,0,92,48Z"/>
+            </svg>
+            <svg class="icon-play" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 256 256" fill="currentColor" style="display:none">
+                <path d="M223.75,109.68,84.75,29.68a15.91,15.91,0,0,0-16,0A16,16,0,0,0,60.5,43.68V203.68a16,16,0,0,0,24.25,13.7l139-80a16,16,0,0,0,0-27.72Z"/>
+            </svg>
+        </button>
+    </div>
+)}
+
+<style>
+    .news-ticker {
+        display: flex;
+        align-items: stretch;
+        border-bottom: 0.5px solid var(--border-muted);
+        background: var(--background-secondary);
+    }
+
+    .ticker-label {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 var(--spacing-05);
+        font-family: var(--monospace);
+        font-size: var(--desktop-caption);
+        font-weight: 700;
+        color: DarkOrange;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        white-space: nowrap;
+    }
+
+    .ticker-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: DarkOrange;
+        animation: ticker-pulse 1.6s ease-in-out infinite;
+    }
+
+    @keyframes ticker-pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+    }
+
+    .ticker-viewport {
+        flex: 1;
+        overflow: hidden;
+        min-width: 0;
+        -webkit-mask-image: linear-gradient(to left, transparent, #000 24px, #000 calc(100% - 24px), transparent);
+        mask-image: linear-gradient(to left, transparent, #000 24px, #000 calc(100% - 24px), transparent);
+    }
+
+    .ticker-track {
+        display: flex;
+        align-items: center;
+        direction: ltr;
+        width: max-content;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        animation: ticker-scroll 40s linear infinite;
+    }
+
+    .news-ticker:hover .ticker-track,
+    .ticker-track.is-paused {
+        animation-play-state: paused;
+    }
+
+    @keyframes ticker-scroll {
+        from { transform: translateX(0); }
+        to { transform: translateX(-50%); }
+    }
+
+    .ticker-item {
+        flex-shrink: 0;
+        padding: var(--spacing-03) var(--spacing-05);
+        border-left: 0.5px solid var(--border-muted);
+    }
+
+    .ticker-item a {
+        font-size: var(--desktop-body-sm);
+        color: var(--content-secondary);
+        text-decoration: none;
+        white-space: nowrap;
+    }
+
+    .ticker-item a:hover {
+        color: var(--content-primary);
+    }
+
+    .ticker-toggle {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        border: none;
+        border-right: 0.5px solid var(--border-muted);
+        background: none;
+        color: var(--content-secondary);
+        cursor: var(--c-pointer);
+    }
+
+    .ticker-toggle:hover {
+        color: var(--content-primary);
+    }
+
+    .ticker-toggle:focus {
+        outline: 1px solid var(--button-primary);
+        outline-offset: -2px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .ticker-track {
+            animation-play-state: paused;
+        }
+    }
+
+    @media (max-width: 30rem) {
+        .ticker-label span:not(.ticker-dot) {
+            display: none;
+        }
+    }
+</style>

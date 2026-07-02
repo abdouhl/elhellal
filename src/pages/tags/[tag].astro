@@ -1,0 +1,134 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import Card from "../../components/Card";
+import BreadcrumbSchema from "../../components/schema/BreadcrumbSchema.astro";
+import ItemListSchema from "../../components/schema/ItemListSchema.astro";
+import { getQualifyingTags, type TaggedArticle } from "../../utils/tags";
+import data from "../../data/articles.json";
+import "../../components/CardsContainer.css";
+
+export async function getStaticPaths() {
+  return getQualifyingTags().map((tag) => ({
+    params: { tag: tag.slug },
+    props: { label: tag.label, articles: tag.articles },
+  }));
+}
+
+const { label, articles } = Astro.props as { label: string; articles: TaggedArticle[] };
+
+const categoryTitleMap: Record<string, string> = {};
+(data.articles as any[]).forEach((c) => { categoryTitleMap[c.category] = c.title; });
+
+const sorted = [...articles].sort(
+  (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+);
+
+const canonicalUrl = `https://elhellal.com/tags/${Astro.params.tag}/`;
+const breadcrumbs = [
+  { name: "الرئيسية", url: "https://elhellal.com" },
+  { name: "الوسوم", url: "https://elhellal.com/tags" },
+  { name: label },
+];
+---
+
+<Layout
+  site={`الهلال - ${label}`}
+  title="الهلال"
+  tagline="دليل منتقى لأفضل المقالات العربية على الإنترنت"
+  pageTitle={`مقالات عن ${label} | الهلال`}
+  pageDescription={`أفضل المقالات العربية المتعلقة بـ"${label}" — ${sorted.length} مقالة منتقاة بعناية من مصادر متعددة.`}
+  canonicalUrl={canonicalUrl}
+  ogTitle={`مقالات عن ${label} | الهلال`}
+  ogDescription={`${sorted.length} مقالة عربية منتقاة عن ${label}`}
+  ogUrl={canonicalUrl}
+  ogType="website"
+>
+  <ItemListSchema items={sorted} listName={`${label} Articles`} />
+  <BreadcrumbSchema items={breadcrumbs} />
+
+  <main id="main-content" class="tag-page">
+    <nav class="breadcrumb" aria-label="مسار التنقل">
+      <a href="/">الرئيسية</a>
+      <span aria-hidden="true">›</span>
+      <a href="/tags">الوسوم</a>
+      <span aria-hidden="true">›</span>
+      <span>{label}</span>
+    </nav>
+
+    <header class="tag-header">
+      <h1>#{label}</h1>
+      <p class="tag-count">{sorted.length} مقالة</p>
+    </header>
+
+    <ul role="list" class="link-card-grid">
+      {sorted.map((tool) => (
+        <Card
+          client:visible
+          href={tool.url || `https://x.com/${tool.screen_name}/status/${tool.id_str}`}
+          title={tool.title}
+          body={tool.preview_text}
+          screen_name={tool.screen_name}
+          dateAdded={tool.created_at}
+          slug={tool.slug}
+          category={categoryTitleMap[tool.category] || tool.category}
+          image={tool.original_img_url}
+        />
+      ))}
+    </ul>
+
+    <div class="page-nav">
+      <a href="/tags" class="back-link">كل الوسوم →</a>
+    </div>
+  </main>
+
+  <style>
+    .tag-page {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: var(--spacing-06) var(--spacing-05) var(--spacing-10);
+    }
+
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: var(--desktop-caption);
+      font-family: var(--monospace);
+      color: var(--content-secondary);
+      margin-bottom: var(--spacing-06);
+      flex-wrap: wrap;
+    }
+    .breadcrumb a { color: var(--content-secondary); text-decoration: none; }
+    .breadcrumb a:hover { color: var(--content-primary); }
+
+    .tag-header {
+      display: flex;
+      align-items: baseline;
+      gap: var(--spacing-03);
+      margin-bottom: var(--spacing-06);
+    }
+    .tag-header h1 {
+      margin: 0;
+      color: DarkOrange;
+      font-size: clamp(1.25rem, 3vw, 1.75rem);
+    }
+    .tag-count {
+      margin: 0;
+      font-family: var(--monospace);
+      font-size: var(--desktop-caption);
+      color: var(--content-secondary);
+    }
+
+    .page-nav {
+      margin-top: var(--spacing-07);
+      padding-top: var(--spacing-05);
+      border-top: 0.5px solid var(--border-muted);
+    }
+    .back-link {
+      font-size: var(--desktop-body-sm);
+      color: var(--content-secondary);
+      text-decoration: none;
+    }
+    .back-link:hover { color: var(--content-primary); }
+  </style>
+</Layout>
