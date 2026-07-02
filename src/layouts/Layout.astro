@@ -61,6 +61,32 @@ const {
 <html lang="ar" dir="rtl" data-new-ui-theme="dark">
     
     <head>
+        <!-- Google Funding Choices (ad-blocking recovery / Offerwall consent) — must load as early as possible in <head>, unprocessed and unbundled -->
+        <script async is:inline src="https://fundingchoicesmessages.google.com/i/pub-3610150616518651?ers=1"></script>
+        <script is:inline>
+            (function () {
+                function signalGooglefcPresent() {
+                    if (!window.frames["googlefcPresent"]) {
+                        if (document.body) {
+                            const iframe = document.createElement("iframe");
+                            iframe.style.width = "0";
+                            iframe.style.height = "0";
+                            iframe.style.border = "none";
+                            iframe.style.zIndex = "-1000";
+                            iframe.style.left = "-1000px";
+                            iframe.style.top = "-1000px";
+                            iframe.style.display = "none";
+                            iframe.name = "googlefcPresent";
+                            document.body.appendChild(iframe);
+                        } else {
+                            setTimeout(signalGooglefcPresent, 0);
+                        }
+                    }
+                }
+                signalGooglefcPresent();
+            })();
+        </script>
+
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width" />
         <link rel="icon" type="image/svg+xml" href="/xarticles.svg" />
