@@ -13,7 +13,6 @@
 	"observability": {
 		"enabled": true
 	},
-	
 	"kv_namespaces": [
 		{
 			"binding": "ARTICLE_VIEWS",
