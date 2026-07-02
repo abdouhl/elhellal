@@ -23,6 +23,29 @@
   }
 }
 
+/* In-feed ad card — same shell as .link-card so it sits flush in the grid */
+.ad-card {
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px 12px;
+  gap: 6px;
+}
+
+.ad-card-label {
+  font-family: var(--monospace);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.ad-card .adsbygoogle {
+  /* Fluid format computes its own height based on container width — don't
+     stretch it, just give it full width to size against. */
+  width: 100%;
+}
+
 .infinite-scroll-loader {
   display: flex;
   justify-content: center;

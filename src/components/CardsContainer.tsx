@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import Fuse from 'fuse.js';
 import Card from './Card';
+import AdCard from './AdCard';
 import EmptyState, { SearchIcon } from './EmptyState';
 import './CardsContainer.css';
 import data from '../data/articles.json';
@@ -9,6 +10,8 @@ import { toolComparators, seededShuffle, type SortKey } from '../utils/sorting';
 import { isRecentlyAdded } from '../utils/dates';
 
 const ITEMS_PER_PAGE = 32;
+// One ad slotted in per 12 articles — frequent enough to matter, sparse enough to stay out of the way.
+const AD_INTERVAL = 12;
 
 interface ArticleWithCategory extends Article {
     category: string;
@@ -192,6 +195,23 @@ export default function CardsContainer({
 
     const displayedCards = filteredCards.slice(0, displayedCount);
 
+    // Intersperse an ad card every AD_INTERVAL real cards. Indices are a stable
+    // prefix of displayedCards, so ad positions don't shift as infinite scroll
+    // appends more items — avoids remounting (and re-initializing) earlier ads.
+    const gridItems = useMemo(() => {
+        const items: Array<
+            | { type: 'card'; key: string; card: ArticleWithCategory }
+            | { type: 'ad'; key: string }
+        > = [];
+        displayedCards.forEach((card, i) => {
+            items.push({ type: 'card', key: `${card.title}-${i}`, card });
+            if ((i + 1) % AD_INTERVAL === 0 && i !== displayedCards.length - 1) {
+                items.push({ type: 'ad', key: `ad-${i}` });
+            }
+        });
+        return items;
+    }, [displayedCards]);
+
     // Check if searching with no results in a specific category
     const isSearchingInCategory = searchQuery && searchQuery.length >= 2 && filter !== 'all';
     const hasNoSearchResults = isSearchingInCategory && filteredCards.length === 0;
@@ -212,19 +232,23 @@ export default function CardsContainer({
     return (
         <section>
             <ul role="list" className="link-card-grid">
-                {displayedCards.map(({ id_str, title, preview_text, screen_name, created_at, slug, category, original_img_url, url }, i) => (
-                    <Card
-                        key={`${title}-${i}`}
-                        href={url || `https://x.com/${screen_name}/status/${id_str}`}
-                        title={title}
-                        body={preview_text}
-                        screen_name={screen_name}
-                        dateAdded={created_at}
-                        slug={slug}
-                        category={categoryTitleMap[category] || category}
-                        image={original_img_url}
-                    />
-                ))}
+                {gridItems.map((item) =>
+                    item.type === 'ad' ? (
+                        <AdCard key={item.key} />
+                    ) : (
+                        <Card
+                            key={item.key}
+                            href={item.card.url || `https://x.com/${item.card.screen_name}/status/${item.card.id_str}`}
+                            title={item.card.title}
+                            body={item.card.preview_text}
+                            screen_name={item.card.screen_name}
+                            dateAdded={item.card.created_at}
+                            slug={item.card.slug}
+                            category={categoryTitleMap[item.card.category] || item.card.category}
+                            image={item.card.original_img_url}
+                        />
+                    )
+                )}
             </ul>
 
             {displayedCount < filteredCards.length && (

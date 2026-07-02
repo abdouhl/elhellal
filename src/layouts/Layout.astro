@@ -116,6 +116,13 @@ const {
             gtag("config", "G-M9NPMBZLG3");
         </script>
 
+        <!-- Google AdSense (runs on the main thread — ad rendering needs direct DOM access, so it can't go through Partytown) -->
+        <script
+            async
+            src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3610150616518651"
+            crossorigin="anonymous"
+        ></script>
+
         <ViewTransitions />
         <WebSiteSchema />
     </head>
@@ -779,6 +786,22 @@ const {
         // Create throttled scroll handler once
         const throttledNavScroll = throttle(handleNavScroll, 80);
 
+        // Fills any <ins class="adsbygoogle"> not yet rendered — one push() per
+        // waiting slot. Exposed on window so client:load React islands (e.g. the
+        // in-feed ad cards added by infinite scroll) can trigger it themselves.
+        const loadAds = () => {
+            try {
+                document
+                    .querySelectorAll("ins.adsbygoogle")
+                    .forEach((ins) => {
+                        if (!ins.getAttribute("data-adsbygoogle-status")) {
+                            (window.adsbygoogle = window.adsbygoogle || []).push({});
+                        }
+                    });
+            } catch (e) {}
+        };
+        window.__elhellalLoadAds = loadAds;
+
         // Core Initialization (Runs on every page load including initial)
         const init = () => {
             // New Tools Filter Toggle - Idempotent listener
@@ -818,6 +841,7 @@ const {
             }
 
             updateFavoritesLink();
+            loadAds();
         };
 
         // Scroll Restoration

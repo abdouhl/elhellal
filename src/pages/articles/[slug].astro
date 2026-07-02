@@ -4,6 +4,7 @@ import slugMap from "../../data/slug-map.json";
 import SoftwareApplicationSchema from "../../components/schema/SoftwareApplicationSchema.astro";
 import BreadcrumbSchema from "../../components/schema/BreadcrumbSchema.astro";
 import BookmarkButton from "../../components/BookmarkButton";
+import AdUnit from "../../components/AdUnit.astro";
 import articlesConfig from "../../data/articles.json";
 
 export async function getStaticPaths() {
@@ -248,6 +249,9 @@ const keywordsString = keywords?.join(', ');
 
             </div>
           )}
+
+          <!-- In-article ad — sits at a natural reading break, after the summary/before the CTA -->
+          <AdUnit slot="8525183818" format="fluid" layout="in-article" className="article-ad" />
 
           <!-- CTA -->
           <div class="article-cta">
@@ -585,6 +589,14 @@ const keywordsString = keywords?.join(', ');
       font-size: var(--desktop-body-sm);
       line-height: 1.7;
       color: rgba(255,255,255,0.5);
+    }
+
+    /* ── In-article ad ─────────────────────────────────── */
+    /* :global() needed — className is forwarded into the AdUnit.astro child,
+       whose scoped styles don't share this page's scope hash. */
+    :global(.article-ad) {
+      padding-top: var(--spacing-05);
+      border-top: 0.5px solid rgba(255,255,255,0.08);
     }
 
     /* ── Core Structure ───────────────────────────────── */
