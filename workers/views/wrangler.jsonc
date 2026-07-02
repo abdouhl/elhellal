@@ -1,0 +1,14 @@
+{
+	"name": "elhellal-views",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-02-21",
+	"compatibility_flags": ["nodejs_compat"],
+	// Create with: bunx wrangler kv namespace create ARTICLE_VIEWS
+	// then paste the returned id below.
+	"kv_namespaces": [
+		{ "binding": "ARTICLE_VIEWS", "id": "REPLACE_WITH_KV_NAMESPACE_ID" }
+	],
+	"observability": {
+		"enabled": true
+	}
+}

@@ -40,8 +40,8 @@ export default function FavoritesView() {
             <section>
                 <EmptyState
                     icon={<BookmarkIcon />}
-                    message="Start saving AI tools by clicking the bookmark icon on any tool card. Your saved tools will appear here for quick access."
-                    actionText="Browse AI Tools"
+                    message="احفظ المقالات التي تعجبك بالنقر على أيقونة الحفظ في أي بطاقة مقال. ستظهر مقالاتك المحفوظة هنا للوصول إليها بسرعة."
+                    actionText="تصفح المقالات"
                     actionHref="/"
                 />
             </section>
@@ -53,7 +53,7 @@ export default function FavoritesView() {
             <div className="favorites-header">
                 <div className="favorites-info">
                     <p className="nu-c-fs-small nu-u-text--secondary">
-                        {bookmarkedArticles.length} {bookmarkedArticles.length === 1 ? 'tool' : 'tools'} saved
+                        {bookmarkedArticles.length} {bookmarkedArticles.length === 1 ? 'مقالة محفوظة' : 'مقالات محفوظة'}
                     </p>
                 </div>
 
@@ -63,10 +63,10 @@ export default function FavoritesView() {
                         onChange={(e) => setSortBy(e.target.value as FavoritesSortKey)}
                         className="sort-select"
                     >
-                        <option value="nameAsc">Name (A-Z)</option>
-                        <option value="nameDesc">Name (Z-A)</option>
-                        <option value="dateNewest">Newest First</option>
-                        <option value="dateOldest">Oldest First</option>
+                        <option value="nameAsc">الاسم (أ-ي)</option>
+                        <option value="nameDesc">الاسم (ي-أ)</option>
+                        <option value="dateNewest">الأحدث أولاً</option>
+                        <option value="dateOldest">الأقدم أولاً</option>
                     </select>
                 </div>
             </div>

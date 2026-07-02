@@ -221,8 +221,8 @@ export default function CardsContainer({
             <section>
                 <EmptyState
                     icon={<SearchIcon />}
-                    message={`No results found for "${searchQuery}" in this category.`}
-                    actionText="Search All Tools"
+                    message={`لا توجد نتائج لـ "${searchQuery}" في هذا التصنيف.`}
+                    actionText="ابحث في جميع المقالات"
                     actionHref="/"
                 />
             </section>
@@ -254,7 +254,7 @@ export default function CardsContainer({
             {displayedCount < filteredCards.length && (
                 <div ref={loaderRef} className="infinite-scroll-loader">
                     {isLoading && (
-                        <p className="loading-text">Loading more...</p>
+                        <p className="loading-text">جارٍ تحميل المزيد...</p>
                     )}
                 </div>
             )}
