@@ -91,7 +91,7 @@ export default function Card({
                 <strong className="nu-c-helper-text nu-u-mt-1 nu-u-mb-1">{title}</strong>
             </a>
             {screen_name && (
-                <p className="card-author">@{screen_name}</p>
+                <a href={`/authors/${screen_name}`} className="card-author">@{screen_name}</a>
             )}
             {slug && (
                 <div className="card-bookmark">

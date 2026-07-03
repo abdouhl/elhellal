@@ -1,0 +1,157 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import Card from "../../components/Card";
+import BreadcrumbSchema from "../../components/schema/BreadcrumbSchema.astro";
+import ItemListSchema from "../../components/schema/ItemListSchema.astro";
+import { getAuthors, type AuthorArticle } from "../../utils/authors";
+import data from "../../data/articles.json";
+import "../../components/CardsContainer.css";
+
+export async function getStaticPaths() {
+  return getAuthors().map((author) => ({
+    params: { author: author.screen_name },
+    props: { screen_name: author.screen_name, profileImage: author.profileImage, articles: author.articles },
+  }));
+}
+
+const { screen_name, profileImage, articles } = Astro.props as {
+  screen_name: string;
+  profileImage?: string;
+  articles: AuthorArticle[];
+};
+
+const categoryTitleMap: Record<string, string> = {};
+(data.articles as any[]).forEach((c) => { categoryTitleMap[c.category] = c.title; });
+
+const sorted = [...articles].sort(
+  (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+);
+
+const canonicalUrl = `https://elhellal.com/authors/${screen_name}/`;
+const breadcrumbs = [
+  { name: "الرئيسية", url: "https://elhellal.com" },
+  { name: "الكتّاب", url: "https://elhellal.com/authors" },
+  { name: `@${screen_name}` },
+];
+---
+
+<Layout
+  site={`الهلال - @${screen_name}`}
+  title="الهلال"
+  tagline="دليل منتقى لأفضل المقالات العربية على الإنترنت"
+  pageTitle={`مقالات @${screen_name} | الهلال`}
+  pageDescription={`تصفح ${sorted.length} مقالة منشورة بواسطة @${screen_name} على الهلال.`}
+  canonicalUrl={canonicalUrl}
+  ogTitle={`مقالات @${screen_name} | الهلال`}
+  ogDescription={`${sorted.length} مقالة بواسطة @${screen_name}`}
+  ogUrl={canonicalUrl}
+  ogType="profile"
+>
+  <ItemListSchema items={sorted} listName={`@${screen_name} Articles`} />
+  <BreadcrumbSchema items={breadcrumbs} />
+
+  <main id="main-content" class="author-page">
+    <nav class="breadcrumb" aria-label="مسار التنقل">
+      <a href="/">الرئيسية</a>
+      <span aria-hidden="true">›</span>
+      <a href="/authors">الكتّاب</a>
+      <span aria-hidden="true">›</span>
+      <span>@{screen_name}</span>
+    </nav>
+
+    <header class="author-header">
+      <img
+        src={profileImage || `https://unavatar.io/twitter/${screen_name}`}
+        alt={`@${screen_name}`}
+        class="author-avatar-lg"
+        onerror="this.src='/favicons/default.png'"
+        loading="eager"
+      />
+      <div>
+        <h1>@{screen_name}</h1>
+        <p class="author-count">{sorted.length} مقالة</p>
+      </div>
+    </header>
+
+    <ul role="list" class="link-card-grid">
+      {sorted.map((tool) => (
+        <Card
+          client:visible
+          href={tool.url || `https://x.com/${tool.screen_name}/status/${tool.id_str}`}
+          title={tool.title}
+          body={tool.preview_text}
+          screen_name={tool.screen_name}
+          dateAdded={tool.created_at}
+          slug={tool.slug}
+          category={categoryTitleMap[tool.category] || tool.category}
+          image={tool.original_img_url}
+        />
+      ))}
+    </ul>
+
+    <div class="page-nav">
+      <a href="/authors" class="back-link">كل الكتّاب →</a>
+    </div>
+  </main>
+
+  <style>
+    .author-page {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: var(--spacing-06) var(--spacing-05) var(--spacing-10);
+    }
+
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: var(--desktop-caption);
+      font-family: var(--monospace);
+      color: var(--content-secondary);
+      margin-bottom: var(--spacing-06);
+      flex-wrap: wrap;
+    }
+    .breadcrumb a { color: var(--content-secondary); text-decoration: none; }
+    .breadcrumb a:hover { color: var(--content-primary); }
+
+    .author-header {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-04);
+      margin-bottom: var(--spacing-07);
+    }
+    .author-avatar-lg {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      object-fit: cover;
+      background: var(--background-selected);
+      flex-shrink: 0;
+    }
+    .author-header h1 {
+      margin: 0;
+      color: DarkOrange;
+      font-size: clamp(1.25rem, 3vw, 1.75rem);
+      direction: ltr;
+      text-align: right;
+    }
+    .author-count {
+      margin: 4px 0 0;
+      font-family: var(--monospace);
+      font-size: var(--desktop-caption);
+      color: var(--content-secondary);
+    }
+
+    .page-nav {
+      margin-top: var(--spacing-07);
+      padding-top: var(--spacing-05);
+      border-top: 0.5px solid var(--border-muted);
+    }
+    .back-link {
+      font-size: var(--desktop-body-sm);
+      color: var(--content-secondary);
+      text-decoration: none;
+    }
+    .back-link:hover { color: var(--content-primary); }
+  </style>
+</Layout>

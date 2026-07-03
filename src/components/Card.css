@@ -102,12 +102,18 @@ span.tag-new {
 
 /* Author name at bottom of card */
 .card-author {
+    display: block;
     margin: 0;
     padding: 0 12px 10px;
     font-family: var(--monospace);
     font-size: 11px;
     color: rgba(255, 255, 255, 0.35);
     line-height: 1.4;
+    text-decoration: none;
+    width: fit-content;
+}
+.card-author:hover {
+    color: DarkOrange;
 }
 
 /* Rank badge — top-left (RTL: opposite the bookmark button) */

@@ -179,9 +179,7 @@ const keywordsString = keywords?.join(', ');
                 <>
                   <span class="meta-dot">·</span>
                   <a
-                    href={authorUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href={`/authors/${tool.screen_name}`}
                     class="meta-author"
                     itemprop="author"
                   >
@@ -200,7 +198,7 @@ const keywordsString = keywords?.join(', ');
                 return qualifyingTagSlugs.has(tagSlug) ? (
                   <a href={`/tags/${tagSlug}`} class="keyword-tag">{kw}</a>
                 ) : (
-                  <span class="keyword-tag">{kw}</span>
+                  <span class="keyword-tag keyword-tag--static" title="لا توجد صفحة كافية من المقالات لهذا الوسم بعد">{kw}</span>
                 );
               })}
             </div>
@@ -334,14 +332,19 @@ const keywordsString = keywords?.join(', ');
             />
             <div>
               <a
-                href={authorUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={`/authors/${tool.screen_name}`}
                 class="author-handle"
               >
                 @{tool.screen_name}
               </a>
-              <p class="author-sub">{isSubstack ? 'Substack' : (sourceHost ?? 'عرض على X')}</p>
+              <a
+                href={authorUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="author-sub"
+              >
+                {isSubstack ? 'Substack' : (sourceHost ?? 'عرض على X')}
+              </a>
             </div>
           </div>
         </div>
@@ -617,6 +620,12 @@ const keywordsString = keywords?.join(', ');
     a.keyword-tag:hover {
       background: rgba(255, 140, 0, 0.2);
     }
+    .keyword-tag--static {
+      background: rgba(255,255,255,0.04);
+      border-color: rgba(255,255,255,0.1);
+      color: rgba(255,255,255,0.4);
+      cursor: default;
+    }
 
     /* About */
     .article-about { display: flex; flex-direction: column; gap: var(--spacing-03); }
@@ -810,10 +819,14 @@ const keywordsString = keywords?.join(', ');
     }
     .author-handle:hover { color: var(--accent); }
     .author-sub {
+      display: block;
       margin: 0;
       font-size: var(--desktop-caption);
       color: var(--content-secondary);
+      text-decoration: none;
+      width: fit-content;
     }
+    .author-sub:hover { color: var(--accent); }
 
     /* Detail list */
     .detail-list {

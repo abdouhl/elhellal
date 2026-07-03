@@ -1,0 +1,133 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import BreadcrumbSchema from "../../components/schema/BreadcrumbSchema.astro";
+import { getAuthors } from "../../utils/authors";
+
+const authors = getAuthors();
+
+const breadcrumbs = [
+  { name: "الرئيسية", url: "https://elhellal.com" },
+  { name: "الكتّاب" },
+];
+---
+
+<Layout
+  site="الهلال - الكتّاب"
+  title="الهلال"
+  tagline="دليل منتقى لأفضل المقالات العربية على الإنترنت"
+  pageTitle="تصفح المقالات حسب الكاتب | الهلال"
+  pageDescription="تصفح جميع كتّاب ومؤلفي المقالات المنشورة على الهلال."
+  canonicalUrl="https://elhellal.com/authors/"
+>
+  <BreadcrumbSchema items={breadcrumbs} />
+
+  <main id="main-content" class="authors-page">
+    <nav class="breadcrumb" aria-label="مسار التنقل">
+      <a href="/">الرئيسية</a>
+      <span aria-hidden="true">›</span>
+      <span>الكتّاب</span>
+    </nav>
+
+    <header class="authors-header">
+      <h1>تصفح حسب الكاتب</h1>
+      <p>{authors.length} كاتباً ساهموا في مقالات الهلال</p>
+    </header>
+
+    <ul role="list" class="author-grid">
+      {authors.map((author) => (
+        <li>
+          <a href={`/authors/${author.screen_name}`} class="author-card">
+            <img
+              src={author.profileImage || `https://unavatar.io/twitter/${author.screen_name}`}
+              alt={`@${author.screen_name}`}
+              class="author-card-avatar"
+              onerror="this.src='/favicons/default.png'"
+              loading="lazy"
+            />
+            <span class="author-card-handle">@{author.screen_name}</span>
+            <span class="author-card-count">{author.articles.length} مقالة</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  </main>
+
+  <style>
+    .authors-page {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: var(--spacing-06) var(--spacing-05) var(--spacing-10);
+    }
+
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: var(--desktop-caption);
+      font-family: var(--monospace);
+      color: var(--content-secondary);
+      margin-bottom: var(--spacing-06);
+    }
+    .breadcrumb a { color: var(--content-secondary); text-decoration: none; }
+    .breadcrumb a:hover { color: var(--content-primary); }
+
+    .authors-header {
+      margin-bottom: var(--spacing-07);
+    }
+    .authors-header h1 {
+      margin: 0 0 var(--spacing-02) 0;
+      font-size: clamp(1.5rem, 3vw, 2rem);
+    }
+    .authors-header p {
+      margin: 0;
+      font-family: var(--monospace);
+      font-size: var(--desktop-body-sm);
+      color: var(--content-secondary);
+    }
+
+    .author-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: var(--spacing-04);
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .author-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: var(--spacing-05) var(--spacing-03);
+      background: var(--background-secondary);
+      border: 0.5px solid var(--border-muted);
+      border-radius: 8px;
+      text-decoration: none;
+      text-align: center;
+      transition: transform 0.15s ease, border-color 0.15s ease;
+    }
+    .author-card:hover {
+      transform: translateY(-2px);
+      border-color: DarkOrange;
+    }
+    .author-card-avatar {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      object-fit: cover;
+      background: var(--background-selected);
+    }
+    .author-card-handle {
+      font-size: var(--desktop-body-sm);
+      font-weight: 600;
+      color: var(--content-primary);
+      direction: ltr;
+    }
+    .author-card-count {
+      font-family: var(--monospace);
+      font-size: 11px;
+      color: var(--content-secondary);
+    }
+  </style>
+</Layout>
