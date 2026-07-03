@@ -6,8 +6,18 @@ import type { ArticlesConfig, Category, Article } from '../src/types/index.ts';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const MAX_SLUG_BYTES = 150; // keeps `<slug>.json` well under the 255-byte filesystem filename limit
+
+function truncateToByteLength(str: string, maxBytes: number): string {
+    let result = str;
+    while (Buffer.byteLength(result, 'utf-8') > maxBytes) {
+        result = result.slice(0, -1);
+    }
+    return result;
+}
+
 function slugify(text: string): string {
-    return text
+    const slug = text
         .toString()
         .replace(/[ً-ٟؐ-ؚۖ-ۜ]/g, '') // strip Arabic diacritics (tashkeel)
         .toLowerCase()
@@ -17,6 +27,8 @@ function slugify(text: string): string {
         .replace(/--+/g, '-')
         .replace(/^-+/, '')
         .replace(/-+$/, '');
+
+    return truncateToByteLength(slug, MAX_SLUG_BYTES).replace(/-+$/, '');
 }
 
 const toolsPath = path.join(__dirname, '../src/data/articles.json');
