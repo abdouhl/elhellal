@@ -24,7 +24,7 @@ export async function getPersonalBlogFeedArticles(): Promise<ArticleWithCategory
                 title: post.data.title,
                 preview_text: post.data.description,
                 original_img_url:
-                    post.data.thumb || post.data.large || getPlaceholderImage(person.nameAr, person.accent),
+                    post.data.thumb || post.data.large || getPlaceholderImage(),
                 screen_name: person.slug,
                 created_at: post.data.pubDate.toISOString().slice(0, 10),
                 slug: post.slug,

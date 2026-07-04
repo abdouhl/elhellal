@@ -73,7 +73,7 @@ if (categoryName) {
         created_at: found.data.pubDate.toISOString().slice(0, 10),
         screen_name: person.slug,
         original_img_url:
-          found.data.large || found.data.thumb || getPlaceholderImage(person.nameAr, person.accent),
+          found.data.large || found.data.thumb || getPlaceholderImage(),
         slug: found.slug,
       };
       category = person.slug;
@@ -147,7 +147,7 @@ const relatedTools = isPersonalPost
   ? personOtherPosts.map((p) => ({
       slug: p.slug,
       title: p.data.title,
-      original_img_url: p.data.large || p.data.thumb || getPlaceholderImage(person!.nameAr, person!.accent),
+      original_img_url: p.data.large || p.data.thumb || getPlaceholderImage(),
       authorLabel: person!.nameAr,
     }))
   : otherTools
