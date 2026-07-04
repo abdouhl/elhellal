@@ -1,15 +1,15 @@
-import type { Tool } from '../types';
+import type { Article } from '../types';
 
 /**
  * Sorting comparators for tool arrays
  */
 export const toolComparators = {
-    nameAsc: (a: Tool, b: Tool): number => a.title.localeCompare(b.title),
-    nameDesc: (a: Tool, b: Tool): number => b.title.localeCompare(a.title),
-    dateNewest: (a: Tool, b: Tool): number =>
-        new Date(b['date-added'] || 0).getTime() - new Date(a['date-added'] || 0).getTime(),
-    dateOldest: (a: Tool, b: Tool): number =>
-        new Date(a['date-added'] || 0).getTime() - new Date(b['date-added'] || 0).getTime(),
+    nameAsc: (a: Article, b: Article): number => a.title.localeCompare(b.title),
+    nameDesc: (a: Article, b: Article): number => b.title.localeCompare(a.title),
+    dateNewest: (a: Article, b: Article): number =>
+        new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
+    dateOldest: (a: Article, b: Article): number =>
+        new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime(),
 } as const;
 
 export type SortKey = keyof typeof toolComparators | 'random';
@@ -20,7 +20,7 @@ export type SortKey = keyof typeof toolComparators | 'random';
  * @param sortKey - Sort key (nameAsc, nameDesc, dateNewest, dateOldest)
  * @returns Sorted array (does not mutate original)
  */
-export function sortTools(tools: Tool[], sortKey: keyof typeof toolComparators): Tool[] {
+export function sortTools(tools: Article[], sortKey: keyof typeof toolComparators): Article[] {
     const comparator = toolComparators[sortKey];
     return [...tools].sort(comparator);
 }

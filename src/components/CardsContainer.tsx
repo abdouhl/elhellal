@@ -5,17 +5,13 @@ import AdCard from './AdCard';
 import EmptyState, { SearchIcon } from './EmptyState';
 import './CardsContainer.css';
 import data from '../data/articles.json';
-import type { Article, Category } from '../types';
+import type { Category, ArticleWithCategory } from '../types';
 import { toolComparators, seededShuffle, type SortKey } from '../utils/sorting';
 import { isRecentlyAdded } from '../utils/dates';
 
 const ITEMS_PER_PAGE = 32;
 // One ad slotted in per 12 articles — frequent enough to matter, sparse enough to stay out of the way.
 const AD_INTERVAL = 12;
-
-interface ArticleWithCategory extends Article {
-    category: string;
-}
 
 const fuseOptions = {
     keys: [
@@ -36,6 +32,7 @@ interface CardsContainerProps {
     randomSeed?: number;
     searchQuery?: string;
     filterNew?: boolean;
+    extraArticles?: ArticleWithCategory[];
 }
 
 export default function CardsContainer({
@@ -44,6 +41,7 @@ export default function CardsContainer({
     randomSeed = 0,
     searchQuery = '',
     filterNew = false,
+    extraArticles = [],
 }: CardsContainerProps) {
     const [displayedCount, setDisplayedCount] = useState(ITEMS_PER_PAGE);
     const [isLoading, setIsLoading] = useState(false);
@@ -76,13 +74,14 @@ export default function CardsContainer({
     }, []);
 
     const allFlatTools = useMemo((): ArticleWithCategory[] => {
-        return (data.articles as Category[]).flatMap((item) =>
+        const base = (data.articles as Category[]).flatMap((item) =>
             item.content.map((tool) => ({
                 ...tool,
                 category: item.category,
             }))
         );
-    }, []);
+        return [...base, ...extraArticles];
+    }, [extraArticles]);
 
     const fuse = useMemo(() => {
         return new Fuse(allFlatTools, fuseOptions);
@@ -98,14 +97,7 @@ export default function CardsContainer({
                 base = base.filter(tool => tool.category === filter);
             }
         } else {
-            base = (data.articles as Category[])
-                .filter((item) => filter === 'all' || filter === item.category)
-                .flatMap((item) =>
-                    item.content.map((tool) => ({
-                        ...tool,
-                        category: item.category,
-                    }))
-                );
+            base = allFlatTools.filter((tool) => filter === 'all' || filter === tool.category);
         }
 
         // Filter for new tools (added within last 30 days)
@@ -122,7 +114,7 @@ export default function CardsContainer({
             const comparator = toolComparators[sort] || toolComparators.nameAsc;
             return [...base].sort(comparator);
         }
-    }, [filter, sort, randomSeed, searchQuery, filterNew, fuse]);
+    }, [filter, sort, randomSeed, searchQuery, filterNew, fuse, allFlatTools]);
 
     useEffect(() => {
         setDisplayedCount(ITEMS_PER_PAGE);
@@ -244,8 +236,11 @@ export default function CardsContainer({
                             screen_name={item.card.screen_name}
                             dateAdded={item.card.created_at}
                             slug={item.card.slug}
+                            internalHref={item.card.internalHref}
                             category={categoryTitleMap[item.card.category] || item.card.category}
                             image={item.card.original_img_url}
+                            authorHref={item.card.authorHref}
+                            authorLabel={item.card.authorName}
                         />
                     )
                 )}

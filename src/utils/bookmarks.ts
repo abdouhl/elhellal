@@ -103,7 +103,10 @@ export interface BookmarkedArticle extends Article {
  * @param allCategories - Array of all categories from tools.json
  * @returns Array of bookmarked tool objects with category
  */
-export function getBookmarkedArticles(allCategories: Category[]): BookmarkedArticle[] {
+export function getBookmarkedArticles(
+    allCategories: Category[],
+    extraArticles: BookmarkedArticle[] = []
+): BookmarkedArticle[] {
     const bookmarks = getBookmarks();
     const bookmarkedArticles: BookmarkedArticle[] = [];
 
@@ -116,6 +119,12 @@ export function getBookmarkedArticles(allCategories: Category[]): BookmarkedArti
                 });
             }
         });
+    });
+
+    extraArticles.forEach(article => {
+        if (article.slug && bookmarks.includes(article.slug)) {
+            bookmarkedArticles.push(article);
+        }
     });
 
     return bookmarkedArticles;

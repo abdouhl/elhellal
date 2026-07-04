@@ -2,11 +2,14 @@
 import Layout from "../layouts/Layout.astro";
 import FavoritesView from "../components/FavoritesView";
 import BreadcrumbSchema from "../components/schema/BreadcrumbSchema.astro";
+import { getPersonalBlogFeedArticles } from "../utils/personalBlogFeed";
 
 const breadcrumbs = [
     { name: "الرئيسية", url: "https://elhellal.com" },
     { name: "المقالات المحفوظة" },
 ];
+
+const personalBlogArticles = await getPersonalBlogFeedArticles();
 ---
 
 <Layout
@@ -18,6 +21,6 @@ const breadcrumbs = [
 >
     <BreadcrumbSchema items={breadcrumbs} />
     <main id="main-content">
-        <FavoritesView client:load />
+        <FavoritesView client:load extraArticles={personalBlogArticles} />
     </main>
 </Layout>

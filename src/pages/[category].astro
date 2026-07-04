@@ -4,6 +4,7 @@ import Dashboard from "../components/Dashboard";
 import ItemListSchema from "../components/schema/ItemListSchema.astro";
 import BreadcrumbSchema from "../components/schema/BreadcrumbSchema.astro";
 import data from "../data/articles.json";
+import { getPersonalBlogFeedArticles } from "../utils/personalBlogFeed";
 
 export function getStaticPaths() {
   // Derive paths from data instead of hardcoding
@@ -18,6 +19,9 @@ const { category } = Astro.params;
 const categoryData = data.articles.find((cat: any) => cat.category === category);
 const categoryTools = categoryData?.content || [];
 const categoryTitle = categoryData?.title || category;
+const personalBlogArticles = (await getPersonalBlogFeedArticles()).filter(
+  (article) => article.category === category
+);
 
 // Breadcrumb data
 const breadcrumbs = [
@@ -38,6 +42,6 @@ const breadcrumbs = [
   <ItemListSchema items={categoryTools} listName={`${categoryTitle} Articles`} />
   <BreadcrumbSchema items={breadcrumbs} />
   <main id="main-content">
-    <Dashboard client:load category={category} transition:persist />
+    <Dashboard client:load category={category} extraArticles={personalBlogArticles} transition:persist />
   </main>
 </Layout>

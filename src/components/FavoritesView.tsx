@@ -9,18 +9,22 @@ import type { Category } from '../types';
 
 type FavoritesSortKey = Exclude<SortKey, 'random'>;
 
-export default function FavoritesView() {
+interface FavoritesViewProps {
+    extraArticles?: BookmarkedArticle[];
+}
+
+export default function FavoritesView({ extraArticles = [] }: FavoritesViewProps) {
     const [bookmarkedArticles, setBookmarkedArticles] = useState<BookmarkedArticle[]>([]);
     const [sortBy, setSortBy] = useState<FavoritesSortKey>('nameAsc');
 
     const loadBookmarks = () => {
-        const tools = getBookmarkedArticles(data.articles as Category[]);
+        const tools = getBookmarkedArticles(data.articles as Category[], extraArticles);
         setBookmarkedArticles(tools);
     };
 
     useEffect(() => {
         loadBookmarks();
-    }, []);
+    }, [extraArticles]);
 
     useEffect(() => {
         const handleBookmarkChange = () => {
@@ -72,17 +76,20 @@ export default function FavoritesView() {
             </div>
 
             <ul role="list" className="link-card-grid">
-                {sortedTools.map(({ id_str, title, preview_text, screen_name, created_at, slug, category, original_img_url }, i) => (
+                {sortedTools.map(({ id_str, title, preview_text, screen_name, created_at, slug, category, original_img_url, internalHref, authorHref, authorName }, i) => (
                     <Card
                         key={`${slug}-${i}`}
-                        href={`https://x.com/${screen_name}/status/${id_str}`}
+                        href={internalHref || `https://x.com/${screen_name}/status/${id_str}`}
                         title={title}
                         body={preview_text}
                         screen_name={screen_name}
                         dateAdded={created_at}
                         slug={slug}
+                        internalHref={internalHref}
                         category={category}
                         image={original_img_url}
+                        authorHref={authorHref}
+                        authorLabel={authorName}
                     />
                 ))}
             </ul>

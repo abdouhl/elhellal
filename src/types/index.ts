@@ -45,12 +45,22 @@ export interface Article {
     whoShouldRead?: string;
     metaDescription?: string;
     keywords?: string[];
+
+    // Personal-blog feed entries (src/content/{omar,layla,youssef}) link straight
+    // to their full article instead of /authors/{screen_name} + /articles/{slug}.
+    authorName?: string;
+    authorHref?: string;
+    internalHref?: string;
 }
 
 export interface Category {
     category: string;
     title: string;
     content: Article[];
+}
+
+export interface ArticleWithCategory extends Article {
+    category: string;
 }
 
 export interface ArticlesConfig {

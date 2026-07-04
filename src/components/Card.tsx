@@ -14,6 +14,12 @@ interface CardProps {
     priority?: boolean;
     /** Shows a numbered rank badge (used by the "الأكثر قراءة" section) */
     rank?: number;
+    /** Overrides the default /authors/{screen_name} link (used by personal-blog cards) */
+    authorHref?: string | undefined;
+    /** Overrides the default @{screen_name} label (used by personal-blog cards) */
+    authorLabel?: string | undefined;
+    /** Overrides the default href/slug-derived link (used to route personal-blog cards to /omar/[slug] etc.) */
+    internalHref?: string | undefined;
 }
 
 const CF_IMAGE_BASE = 'https://img.xarticl.es/cdn-cgi/image';
@@ -42,8 +48,11 @@ export default function Card({
     image,
     priority = false,
     rank,
+    authorHref,
+    authorLabel,
+    internalHref,
 }: CardProps) {
-    const linkUrl = slug ? `/articles/${slug}` : href;
+    const linkUrl = internalHref || (slug ? `/articles/${slug}` : href);
     const isNew = isRecentlyAdded(dateAdded, 30);
     const rawImage = image || 'https://pbs.twimg.com/media/HBYKYqjbcAI9_Jp.jpg';
     const isR2Image = rawImage.startsWith(CF_R2_BASE);
@@ -91,7 +100,9 @@ export default function Card({
                 <strong className="nu-c-helper-text nu-u-mt-1 nu-u-mb-1">{title}</strong>
             </a>
             {screen_name && (
-                <a href={`/authors/${screen_name}`} className="card-author">@{screen_name}</a>
+                <a href={authorHref || `/authors/${screen_name}`} className="card-author">
+                    {authorLabel || `@${screen_name}`}
+                </a>
             )}
             {slug && (
                 <div className="card-bookmark">

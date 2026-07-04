@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import CategoryNav from './CategoryNav';
 import CardsContainer from './CardsContainer';
+import type { ArticleWithCategory } from '../types';
 
 interface DashboardProps {
     category: string;
+    extraArticles?: ArticleWithCategory[];
 }
 
 interface SearchEventDetail {
@@ -14,7 +16,7 @@ interface FilterNewEventDetail {
     filterNew?: boolean;
 }
 
-export default function Dashboard({ category }: DashboardProps) {
+export default function Dashboard({ category, extraArticles = [] }: DashboardProps) {
     const [searchQuery, setSearchQuery] = useState('');
     const [filterNew, setFilterNew] = useState(false);
 
@@ -53,6 +55,7 @@ export default function Dashboard({ category }: DashboardProps) {
                 filter={category}
                 searchQuery={searchQuery}
                 filterNew={filterNew}
+                extraArticles={extraArticles}
             />
         </>
     );

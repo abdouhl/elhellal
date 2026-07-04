@@ -6,9 +6,11 @@ import MostRead from "../components/MostRead";
 import OrganizationSchema from "../components/schema/OrganizationSchema.astro";
 import ItemListSchema from "../components/schema/ItemListSchema.astro";
 import data from "../data/articles.json";
+import { getPersonalBlogFeedArticles } from "../utils/personalBlogFeed";
 
 // Flatten all tools for the homepage ItemList
 const allTools = data.articles.flatMap((category: any) => category.content);
+const personalBlogArticles = await getPersonalBlogFeedArticles();
 ---
 
 <Layout
@@ -23,6 +25,6 @@ const allTools = data.articles.flatMap((category: any) => category.content);
   <ItemListSchema items={allTools} listName="Articles Directory - All Articles" />
   <main id="main-content">
     <MostRead client:load />
-    <Dashboard client:load category="all" transition:persist />
+    <Dashboard client:load category="all" extraArticles={personalBlogArticles} transition:persist />
   </main>
 </Layout>
