@@ -13,6 +13,14 @@ export default defineConfig({
       },
     }
   ), sitemap()],
+  redirects: {
+    '/layla': '/authors/layla',
+    '/omar': '/authors/omar',
+    '/youssef': '/authors/youssef',
+    '/layla/[slug]': '/articles/[slug]',
+    '/omar/[slug]': '/articles/[slug]',
+    '/youssef/[slug]': '/articles/[slug]',
+  },
   //output: "server",
   adapter: cloudflare()
 });

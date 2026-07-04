@@ -3,7 +3,7 @@ import Layout from "../../layouts/Layout.astro";
 import BreadcrumbSchema from "../../components/schema/BreadcrumbSchema.astro";
 import { getAuthors } from "../../utils/authors";
 
-const authors = getAuthors();
+const authors = await getAuthors();
 
 const breadcrumbs = [
   { name: "الرئيسية", url: "https://elhellal.com" },
@@ -37,14 +37,20 @@ const breadcrumbs = [
       {authors.map((author) => (
         <li>
           <a href={`/authors/${author.screen_name}`} class="author-card">
-            <img
-              src={author.profileImage || `https://unavatar.io/twitter/${author.screen_name}`}
-              alt={`@${author.screen_name}`}
-              class="author-card-avatar"
-              onerror="this.src='/favicons/default.png'"
-              loading="lazy"
-            />
-            <span class="author-card-handle">@{author.screen_name}</span>
+            {author.isPersonal ? (
+              <span class="author-card-initial" style={`background:${author.accent}`}>
+                {author.displayName?.trim().charAt(0)}
+              </span>
+            ) : (
+              <img
+                src={author.profileImage || `https://unavatar.io/twitter/${author.screen_name}`}
+                alt={`@${author.screen_name}`}
+                class="author-card-avatar"
+                onerror="this.src='/favicons/default.png'"
+                loading="lazy"
+              />
+            )}
+            <span class="author-card-handle" style={author.isPersonal ? "" : "direction:ltr"}>{author.isPersonal ? author.displayName : `@${author.screen_name}`}</span>
             <span class="author-card-count">{author.articles.length} مقالة</span>
           </a>
         </li>
@@ -118,11 +124,21 @@ const breadcrumbs = [
       object-fit: cover;
       background: var(--background-selected);
     }
+    .author-card-initial {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: 700;
+      font-size: 1.25rem;
+    }
     .author-card-handle {
       font-size: var(--desktop-body-sm);
       font-weight: 600;
       color: var(--content-primary);
-      direction: ltr;
     }
     .author-card-count {
       font-family: var(--monospace);

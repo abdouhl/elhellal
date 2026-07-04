@@ -18,7 +18,7 @@ interface CardProps {
     authorHref?: string | undefined;
     /** Overrides the default @{screen_name} label (used by personal-blog cards) */
     authorLabel?: string | undefined;
-    /** Overrides the default href/slug-derived link (used to route personal-blog cards to /omar/[slug] etc.) */
+    /** Overrides the default href/slug-derived link */
     internalHref?: string | undefined;
 }
 

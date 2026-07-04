@@ -8,16 +8,28 @@ import data from "../../data/articles.json";
 import "../../components/CardsContainer.css";
 
 export async function getStaticPaths() {
-  return getAuthors().map((author) => ({
+  return (await getAuthors()).map((author) => ({
     params: { author: author.screen_name },
-    props: { screen_name: author.screen_name, profileImage: author.profileImage, articles: author.articles },
+    props: {
+      screen_name: author.screen_name,
+      profileImage: author.profileImage,
+      articles: author.articles,
+      displayName: author.displayName,
+      tagline: author.tagline,
+      accent: author.accent,
+      isPersonal: author.isPersonal,
+    },
   }));
 }
 
-const { screen_name, profileImage, articles } = Astro.props as {
+const { screen_name, profileImage, articles, displayName, tagline, accent, isPersonal } = Astro.props as {
   screen_name: string;
   profileImage?: string;
   articles: AuthorArticle[];
+  displayName?: string;
+  tagline?: string;
+  accent?: string;
+  isPersonal?: boolean;
 };
 
 const categoryTitleMap: Record<string, string> = {};
@@ -27,23 +39,24 @@ const sorted = [...articles].sort(
   (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
 );
 
+const authorLabel = isPersonal ? displayName! : `@${screen_name}`;
 const canonicalUrl = `https://elhellal.com/authors/${screen_name}/`;
 const breadcrumbs = [
   { name: "الرئيسية", url: "https://elhellal.com" },
   { name: "الكتّاب", url: "https://elhellal.com/authors" },
-  { name: `@${screen_name}` },
+  { name: authorLabel },
 ];
 ---
 
 <Layout
-  site={`الهلال - @${screen_name}`}
+  site={`الهلال - ${authorLabel}`}
   title="الهلال"
   tagline="دليل منتقى لأفضل المقالات العربية على الإنترنت"
-  pageTitle={`مقالات @${screen_name} | الهلال`}
-  pageDescription={`تصفح ${sorted.length} مقالة منشورة بواسطة @${screen_name} على الهلال.`}
+  pageTitle={`مقالات ${authorLabel} | الهلال`}
+  pageDescription={`تصفح ${sorted.length} مقالة منشورة بواسطة ${authorLabel} على الهلال.`}
   canonicalUrl={canonicalUrl}
-  ogTitle={`مقالات @${screen_name} | الهلال`}
-  ogDescription={`${sorted.length} مقالة بواسطة @${screen_name}`}
+  ogTitle={`مقالات ${authorLabel} | الهلال`}
+  ogDescription={`${sorted.length} مقالة بواسطة ${authorLabel}`}
   ogUrl={canonicalUrl}
   ogType="profile"
 >
@@ -56,19 +69,26 @@ const breadcrumbs = [
       <span aria-hidden="true">›</span>
       <a href="/authors">الكتّاب</a>
       <span aria-hidden="true">›</span>
-      <span>@{screen_name}</span>
+      <span>{authorLabel}</span>
     </nav>
 
     <header class="author-header">
-      <img
-        src={profileImage || `https://unavatar.io/twitter/${screen_name}`}
-        alt={`@${screen_name}`}
-        class="author-avatar-lg"
-        onerror="this.src='/favicons/default.png'"
-        loading="eager"
-      />
+      {isPersonal ? (
+        <span class="author-avatar-lg author-avatar-initial" style={`background:${accent}`}>
+          {displayName?.trim().charAt(0)}
+        </span>
+      ) : (
+        <img
+          src={profileImage || `https://unavatar.io/twitter/${screen_name}`}
+          alt={`@${screen_name}`}
+          class="author-avatar-lg"
+          onerror="this.src='/favicons/default.png'"
+          loading="eager"
+        />
+      )}
       <div>
-        <h1>@{screen_name}</h1>
+        <h1 style={isPersonal ? `color:${accent}` : ""}>{authorLabel}</h1>
+        {isPersonal && tagline && <p class="author-tagline">{tagline}</p>}
         <p class="author-count">{sorted.length} مقالة</p>
       </div>
     </header>
@@ -128,12 +148,29 @@ const breadcrumbs = [
       background: var(--background-selected);
       flex-shrink: 0;
     }
+    .author-avatar-initial {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: 700;
+      font-size: 1.5rem;
+    }
     .author-header h1 {
       margin: 0;
       color: DarkOrange;
       font-size: clamp(1.25rem, 3vw, 1.75rem);
       direction: ltr;
       text-align: right;
+    }
+    .author-header:has(.author-avatar-initial) h1 {
+      direction: rtl;
+      text-align: right;
+    }
+    .author-tagline {
+      margin: 2px 0 0;
+      font-size: var(--desktop-caption);
+      color: var(--content-secondary);
     }
     .author-count {
       margin: 4px 0 0;

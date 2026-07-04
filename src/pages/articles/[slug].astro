@@ -7,15 +7,27 @@ import BookmarkButton from "../../components/BookmarkButton";
 import AdUnit from "../../components/AdUnit.astro";
 import articlesConfig from "../../data/articles.json";
 import { getQualifyingTagSlugSet, slugifyTag } from "../../utils/tags";
+import { getCollection } from "astro:content";
+import { personalBlogs, type PersonalBlogPerson } from "../../data/personal-blogs";
+import { getPlaceholderImage } from "../../utils/placeholderImage";
 
 const qualifyingTagSlugs = getQualifyingTagSlugSet();
+const PERSONAL_COLLECTIONS = ["omar", "layla", "youssef"] as const;
 
 export async function getStaticPaths() {
   const slugMapData = await import("../../data/slug-map.json");
-  const paths = Object.keys(slugMapData.default).map((slug) => ({
+  const jsonPaths = Object.keys(slugMapData.default).map((slug) => ({
     params: { slug },
   }));
-  return paths;
+
+  const personalPostLists = await Promise.all(
+    PERSONAL_COLLECTIONS.map((c) => getCollection(c))
+  );
+  const personalPaths = personalPostLists.flat().map((post) => ({
+    params: { slug: post.slug },
+  }));
+
+  return [...jsonPaths, ...personalPaths];
 }
 
 export const prerender = true;
@@ -25,19 +37,55 @@ const { slug } = Astro.params;
 const categoryList = (slugMap as Record<string, string[]>)[slug as string];
 const categoryName = categoryList?.[0];
 
-if (!categoryName) {
-  throw new Error(`Article not found: ${slug}`);
+let isPersonalPost = false;
+let person: PersonalBlogPerson | undefined;
+let PersonContent: any;
+let personOtherPosts: any[] = [];
+let tool: any;
+let category = "";
+let categoryTools: { default: any[] } = { default: [] };
+
+if (categoryName) {
+  categoryTools = await import(`../../data/articles/${categoryName}.json`);
+  const found = categoryTools.default.find((x: any) => x.slug === slug) || null;
+
+  if (!found) {
+    throw new Error(`Article not found: ${slug}`);
+  }
+
+  tool = found;
+  category = categoryName;
+} else {
+  for (const key of PERSONAL_COLLECTIONS) {
+    const posts = await getCollection(key);
+    const found = posts.find((p) => p.slug === slug);
+    if (found) {
+      isPersonalPost = true;
+      person = personalBlogs[key];
+      const rendered = await found.render();
+      PersonContent = rendered.Content;
+      personOtherPosts = posts
+        .filter((p) => p.slug !== slug)
+        .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf())
+        .slice(0, 3);
+      tool = {
+        title: found.data.title,
+        preview_text: found.data.description,
+        created_at: found.data.pubDate.toISOString().slice(0, 10),
+        screen_name: person.slug,
+        original_img_url:
+          found.data.large || found.data.thumb || getPlaceholderImage(person.nameAr, person.accent),
+        slug: found.slug,
+      };
+      category = person.slug;
+      break;
+    }
+  }
+
+  if (!isPersonalPost) {
+    throw new Error(`Article not found: ${slug}`);
+  }
 }
-
-const categoryTools = await import(`../../data/articles/${categoryName}.json`);
-const found = categoryTools.default.find((x: any) => x.slug === slug) || null;
-
-if (!found) {
-  throw new Error(`Article not found: ${slug}`);
-}
-
-const tool = found;
-const category = categoryName;
 
 const formatDate = (dateStr: string) => {
   try {
@@ -54,22 +102,29 @@ const formatDate = (dateStr: string) => {
 const formattedDate = formatDate(tool.created_at);
 const canonicalUrl = `https://elhellal.com/articles/${tool.slug}/`;
 const faviconUrl = `/favicons/${slug}.png`;
-const fallbackPath = category === "all" ? "/" : `/${category}`;
-const tweetUrl = `https://x.com/${tool.screen_name}/status/${tool.id_str}`;
-const readUrl = tool.url || tweetUrl;
-const sourceHost = tool.url ? new URL(tool.url).hostname.replace(/^www\./, '') : null;
+const fallbackPath = isPersonalPost ? `/authors/${person!.slug}` : (category === "all" ? "/" : `/${category}`);
+const tweetUrl = isPersonalPost ? undefined : `https://x.com/${tool.screen_name}/status/${tool.id_str}`;
+const readUrl = isPersonalPost ? undefined : (tool.url || tweetUrl);
+const sourceHost = !isPersonalPost && tool.url ? new URL(tool.url).hostname.replace(/^www\./, '') : null;
 const isSubstack = !!sourceHost && sourceHost.endsWith('substack.com');
-const authorUrl = isSubstack
-    ? `https://${tool.screen_name}.substack.com`
-    : tool.url
-      ? new URL(tool.url).origin
-      : `https://x.com/${tool.screen_name}`;
+const authorHref = isPersonalPost ? `/authors/${person!.slug}` : `/authors/${tool.screen_name}`;
+const authorDisplayName = isPersonalPost ? person!.nameAr : `@${tool.screen_name}`;
+const authorUrl = isPersonalPost
+    ? authorHref
+    : isSubstack
+      ? `https://${tool.screen_name}.substack.com`
+      : tool.url
+        ? new URL(tool.url).origin
+        : `https://x.com/${tool.screen_name}`;
+const authorSubLabel = isPersonalPost ? person!.tagline : (isSubstack ? 'Substack' : (sourceHost ?? 'عرض على X'));
 
 let meta: any = {};
-try {
-  const toolMetadata = await import(`../../data/article-metadata/${slug}.json`);
-  meta = toolMetadata.default;
-} catch (e) {}
+if (!isPersonalPost) {
+  try {
+    const toolMetadata = await import(`../../data/article-metadata/${slug}.json`);
+    meta = toolMetadata.default;
+  } catch (e) {}
+}
 
 const seoTitle = meta.title || tool.title;
 const seoDescription = meta.description || tool.metaDescription || tool.preview_text;
@@ -81,26 +136,44 @@ const encodedShareText = encodeURIComponent(
   `اكتشف "${tool.title}" — مقالة رائعة وجدتها على الهلال! ${canonicalUrl}`
 );
 const encodedCanonicalUrl = encodeURIComponent(canonicalUrl);
-const xShareUrl = `https://x.com/intent/post?text=${encodedShareText}&url=${encodedCanonicalUrl}&via=${tool.screen_name}`;
+const xShareUrl = isPersonalPost
+  ? `https://x.com/intent/post?text=${encodedShareText}&url=${encodedCanonicalUrl}`
+  : `https://x.com/intent/post?text=${encodedShareText}&url=${encodedCanonicalUrl}&via=${tool.screen_name}`;
 const linkedinShareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodedCanonicalUrl}`;
 const redditShareUrl = `https://www.reddit.com/submit?url=${encodedCanonicalUrl}&title=${encodedShareText}`;
 
 const allCategoryTools = categoryTools.default || [];
-const otherTools = allCategoryTools.filter((t: any) => t.slug !== slug);
-const relatedTools = otherTools.sort(() => Math.random() - 0.5).slice(0, 3);
+const otherTools = isPersonalPost ? [] : allCategoryTools.filter((t: any) => t.slug !== slug);
+const relatedTools = isPersonalPost
+  ? personOtherPosts.map((p) => ({
+      slug: p.slug,
+      title: p.data.title,
+      original_img_url: p.data.large || p.data.thumb || getPlaceholderImage(person!.nameAr, person!.accent),
+      authorLabel: person!.nameAr,
+    }))
+  : otherTools
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 3)
+      .map((t: any) => ({
+        slug: t.slug,
+        title: t.title,
+        original_img_url: t.original_img_url,
+        authorLabel: t.screen_name ? `@${t.screen_name}` : undefined,
+      }));
 
-const categoryObj = (articlesConfig as any).articles?.find((c: any) => c.category === categoryName);
-const categoryTitle = categoryObj?.title || (category.charAt(0).toUpperCase() + category.slice(1));
+const categoryObj = isPersonalPost ? null : (articlesConfig as any).articles?.find((c: any) => c.category === categoryName);
+const categoryTitle = isPersonalPost ? person!.nameAr : (categoryObj?.title || (category.charAt(0).toUpperCase() + category.slice(1)));
+const categoryHref = isPersonalPost ? `/authors/${person!.slug}` : `/${category}`;
 const breadcrumbs = [
   { name: "الرئيسية", url: "https://elhellal.com" },
-  { name: categoryTitle, url: `https://elhellal.com/${category}` },
+  { name: categoryTitle, url: `https://elhellal.com${categoryHref}` },
   { name: tool.title },
 ];
 
-const tldr: string | undefined = tool.tldr;
-const whyThisMatters: string | undefined = tool.whyThisMatters;
-const whoShouldRead: string | undefined = tool.whoShouldRead;
-const keywords: string[] | undefined = tool.keywords;
+const tldr: string | undefined = isPersonalPost ? undefined : tool.tldr;
+const whyThisMatters: string | undefined = isPersonalPost ? undefined : tool.whyThisMatters;
+const whoShouldRead: string | undefined = isPersonalPost ? undefined : tool.whoShouldRead;
+const keywords: string[] | undefined = isPersonalPost ? undefined : tool.keywords;
 const keywordsString = keywords?.join(', ');
 ---
 
@@ -124,14 +197,27 @@ const keywordsString = keywords?.join(', ');
   pageFavicon={faviconUrl}
   keywords={keywordsString}
 >
-  <SoftwareApplicationSchema
-    name={tool.title}
-    description={tool.preview_text}
-    url={tool.url}
-    tag={tool.tag}
-    dateAdded={tool.created_at}
-    category={category}
-  />
+  {isPersonalPost ? (
+    <script type="application/ld+json" set:html={JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      headline: tool.title,
+      description: tool.preview_text,
+      image: tool.original_img_url,
+      datePublished: tool.created_at,
+      author: { "@type": "Person", name: person!.nameAr, url: `https://elhellal.com/authors/${person!.slug}/` },
+      mainEntityOfPage: { "@type": "WebPage", "@id": canonicalUrl },
+    })} />
+  ) : (
+    <SoftwareApplicationSchema
+      name={tool.title}
+      description={tool.preview_text}
+      url={tool.url}
+      tag={tool.tag}
+      dateAdded={tool.created_at}
+      category={category}
+    />
+  )}
   <BreadcrumbSchema items={breadcrumbs} />
 
   <main id="main-content" class="article-page">
@@ -140,7 +226,7 @@ const keywordsString = keywords?.join(', ');
     <nav class="breadcrumb" aria-label="مسار التنقل">
       <a href="/">الرئيسية</a>
       <span aria-hidden="true">›</span>
-      <a href={`/${category}`}>{categoryTitle}</a>
+      <a href={categoryHref}>{categoryTitle}</a>
       <span aria-hidden="true">›</span>
       <span>{tool.title}</span>
     </nav>
@@ -161,9 +247,9 @@ const keywordsString = keywords?.join(', ');
             onerror="this.closest('.article-cover').style.display='none'"
           />
           <div class="article-cover-tags">
-            <a href={`/${category}`} class="cover-tag">{categoryTitle}</a>
-            {tool.screen_name && (
-              <span class="cover-tag">@{tool.screen_name}</span>
+            <a href={categoryHref} class="cover-tag">{categoryTitle}</a>
+            {!isPersonalPost && tool.screen_name && (
+              <span class="cover-tag">{authorDisplayName}</span>
             )}
           </div>
         </div>
@@ -179,11 +265,11 @@ const keywordsString = keywords?.join(', ');
                 <>
                   <span class="meta-dot">·</span>
                   <a
-                    href={`/authors/${tool.screen_name}`}
+                    href={authorHref}
                     class="meta-author"
                     itemprop="author"
                   >
-                    @{tool.screen_name}
+                    {authorDisplayName}
                   </a>
                 </>
               )}
@@ -213,6 +299,13 @@ const keywordsString = keywords?.join(', ');
               <p class="article-description">{meta.description}</p>
             )}
           </section>
+
+          <!-- Full article body — personal-blog posts render their own markdown content -->
+          {isPersonalPost && PersonContent && (
+            <div class="article-prose" itemprop="articleBody">
+              <PersonContent />
+            </div>
+          )}
 
           <!-- Core Structure — renders only when fields are present -->
           {(tldr || whyThisMatters || whoShouldRead) && (
@@ -261,27 +354,29 @@ const keywordsString = keywords?.join(', ');
 
           <!-- CTA -->
           <div class="article-cta">
-            {readUrl ? (
-              <a
-                href={readUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                class="btn-read"
-                itemprop="url"
-              >
-                {isSubstack ? (
-                  <Fragment>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256">
-                      <path d="M224,104a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,104Zm8,56a8,8,0,0,1-8,8H32a8,8,0,0,1,0-16H224A8,8,0,0,1,232,160ZM40,72H216a8,8,0,0,0,0-16H40a8,8,0,0,0,0,16Z"/>
-                    </svg>
-                    اقرأ المقال
-                  </Fragment>
-                ) : (
-                  'اقرأ المقال'
-                )}
-              </a>
-            ) : (
-              <span class="btn-read btn-disabled">لا يوجد رابط</span>
+            {!isPersonalPost && (
+              readUrl ? (
+                <a
+                  href={readUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="btn-read"
+                  itemprop="url"
+                >
+                  {isSubstack ? (
+                    <Fragment>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256">
+                        <path d="M224,104a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,104Zm8,56a8,8,0,0,1-8,8H32a8,8,0,0,1,0-16H224A8,8,0,0,1,232,160ZM40,72H216a8,8,0,0,0,0-16H40a8,8,0,0,0,0,16Z"/>
+                      </svg>
+                      اقرأ المقال
+                    </Fragment>
+                  ) : (
+                    'اقرأ المقال'
+                  )}
+                </a>
+              ) : (
+                <span class="btn-read btn-disabled">لا يوجد رابط</span>
+              )
             )}
             <BookmarkButton client:load slug={slug} title={tool.title} variant="default" />
           </div>
@@ -323,28 +418,40 @@ const keywordsString = keywords?.join(', ');
         <div class="sidebar-card">
           <p class="sidebar-label">الكاتب</p>
           <div class="author-row">
-            <img
-              src={tool.profile_image_url_https || `https://unavatar.io/twitter/${tool.screen_name}`}
-              alt={`@${tool.screen_name}`}
-              class="author-avatar"
-              onerror="this.src='/favicons/default.png'"
-              loading="lazy"
-            />
+            {isPersonalPost ? (
+              <span class="author-avatar author-avatar-initial" style={`background:${person!.accent}`}>
+                {person!.nameAr.trim().charAt(0)}
+              </span>
+            ) : (
+              <img
+                src={tool.profile_image_url_https || `https://unavatar.io/twitter/${tool.screen_name}`}
+                alt={`@${tool.screen_name}`}
+                class="author-avatar"
+                onerror="this.src='/favicons/default.png'"
+                loading="lazy"
+              />
+            )}
             <div>
               <a
-                href={`/authors/${tool.screen_name}`}
+                href={authorHref}
                 class="author-handle"
               >
-                @{tool.screen_name}
+                {authorDisplayName}
               </a>
-              <a
-                href={authorUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                class="author-sub"
-              >
-                {isSubstack ? 'Substack' : (sourceHost ?? 'عرض على X')}
-              </a>
+              {isPersonalPost ? (
+                <a href={authorHref} class="author-sub">
+                  {authorSubLabel}
+                </a>
+              ) : (
+                <a
+                  href={authorUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="author-sub"
+                >
+                  {authorSubLabel}
+                </a>
+              )}
             </div>
           </div>
         </div>
@@ -354,8 +461,8 @@ const keywordsString = keywords?.join(', ');
           <p class="sidebar-label">تفاصيل</p>
           <dl class="detail-list">
             <div class="detail-row">
-              <dt>التصنيف</dt>
-              <dd><a href={`/${category}`} class="detail-link">{categoryTitle}</a></dd>
+              <dt>{isPersonalPost ? 'الكاتب' : 'التصنيف'}</dt>
+              <dd><a href={categoryHref} class="detail-link">{categoryTitle}</a></dd>
             </div>
             <div class="detail-row">
               <dt>تاريخ النشر</dt>
@@ -400,7 +507,7 @@ const keywordsString = keywords?.join(', ');
     <!-- Related articles -->
     {relatedTools.length > 0 && (
       <section class="related-section" aria-label="Related articles">
-        <h2 class="related-heading">المزيد في {categoryTitle}</h2>
+        <h2 class="related-heading">{isPersonalPost ? `مقالات أخرى لـ ${categoryTitle}` : `المزيد في ${categoryTitle}`}</h2>
         <div class="related-grid">
           {relatedTools.map((t: any) => (
             <a href={`/articles/${t.slug}`} class="related-card">
@@ -416,8 +523,8 @@ const keywordsString = keywords?.join(', ');
               </div>
               <div class="related-body">
                 <strong class="related-title">{t.title}</strong>
-                {t.screen_name && (
-                  <span class="related-author">@{t.screen_name}</span>
+                {t.authorLabel && (
+                  <span class="related-author">{t.authorLabel}</span>
                 )}
               </div>
             </a>
@@ -642,6 +749,39 @@ const keywordsString = keywords?.join(', ');
       color: rgba(255,255,255,0.5);
     }
 
+    /* ── Personal-blog full article body ──────────────── */
+    .article-prose {
+      font-size: var(--desktop-body);
+      line-height: 1.9;
+      color: #d0d0d0;
+    }
+    .article-prose :global(h2) {
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin: 2rem 0 1rem;
+      color: #f0f0f0;
+    }
+    .article-prose :global(h3) {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin: 1.5rem 0 0.75rem;
+      color: #f0f0f0;
+    }
+    .article-prose :global(p) { margin: 0 0 1.25rem; }
+    .article-prose :global(a) { color: DarkOrange; text-decoration: underline; }
+    .article-prose :global(blockquote) {
+      border-inline-start: 3px solid DarkOrange;
+      padding-inline-start: 1rem;
+      margin: 1.5rem 0;
+      color: rgba(255,255,255,0.6);
+    }
+    .article-prose :global(ul),
+    .article-prose :global(ol) {
+      padding-inline-start: 1.5rem;
+      margin: 0 0 1.25rem;
+    }
+    .article-prose :global(li) { margin-bottom: 0.5rem; }
+
     /* ── In-article ad ─────────────────────────────────── */
     /* :global() needed — className is forwarded into the AdUnit.astro child,
        whose scoped styles don't share this page's scope hash. */
@@ -810,6 +950,14 @@ const keywordsString = keywords?.join(', ');
       object-fit: cover;
       background: var(--background-selected);
       flex-shrink: 0;
+    }
+    .author-avatar-initial {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: 700;
+      font-size: 1rem;
     }
     .author-handle {
       font-weight: 600;

@@ -20,17 +20,16 @@ export async function getPersonalBlogFeedArticles(): Promise<ArticleWithCategory
             const posts = await getCollection(collection);
 
             return posts.map((post): ArticleWithCategory => ({
-                id_str: `personal-${collection}-${post.slug}`,
+                id_str: post.slug,
                 title: post.data.title,
                 preview_text: post.data.description,
                 original_img_url:
                     post.data.thumb || post.data.large || getPlaceholderImage(person.nameAr, person.accent),
                 screen_name: person.slug,
                 created_at: post.data.pubDate.toISOString().slice(0, 10),
-                slug: `personal-${collection}-${post.slug}`,
-                internalHref: `/${collection}/${post.slug}`,
+                slug: post.slug,
                 authorName: person.nameAr,
-                authorHref: `/${collection}`,
+                authorHref: `/authors/${collection}`,
                 category: CATEGORY_BY_PERSON[collection],
             }));
         })

@@ -1,5 +1,7 @@
+import { getCollection } from 'astro:content';
 import data from '../data/articles.json';
 import type { Article, Category } from '../types';
+import { personalBlogs } from '../data/personal-blogs';
 
 export interface AuthorArticle extends Article {
     category: string;
@@ -8,6 +10,11 @@ export interface AuthorArticle extends Article {
 export interface AuthorEntry {
     screen_name: string;
     profileImage?: string;
+    /** Set for personal-blog writers (Layla/Omar/Youssef) instead of an X/Substack handle */
+    displayName?: string;
+    tagline?: string;
+    accent?: string;
+    isPersonal?: boolean;
     articles: AuthorArticle[];
 }
 
@@ -35,8 +42,36 @@ export function buildAuthorIndex(): Map<string, AuthorEntry> {
     return map;
 }
 
-export function getAuthors(): AuthorEntry[] {
-    return [...buildAuthorIndex().values()].sort((a, b) => b.articles.length - a.articles.length);
+async function getPersonalAuthorEntries(): Promise<AuthorEntry[]> {
+    const entries = await Promise.all(
+        Object.values(personalBlogs).map(async (person): Promise<AuthorEntry> => {
+            const posts = await getCollection(person.collection);
+            return {
+                screen_name: person.slug,
+                displayName: person.nameAr,
+                tagline: person.tagline,
+                accent: person.accent,
+                isPersonal: true,
+                articles: posts.map((post): AuthorArticle => ({
+                    id_str: post.slug,
+                    screen_name: person.slug,
+                    title: post.data.title,
+                    preview_text: post.data.description,
+                    created_at: post.data.pubDate.toISOString().slice(0, 10),
+                    slug: post.slug,
+                    original_img_url: post.data.large || post.data.thumb,
+                    category: person.tagline,
+                })),
+            };
+        })
+    );
+    return entries;
+}
+
+export async function getAuthors(): Promise<AuthorEntry[]> {
+    const substackAuthors = [...buildAuthorIndex().values()];
+    const personalAuthors = await getPersonalAuthorEntries();
+    return [...substackAuthors, ...personalAuthors].sort((a, b) => b.articles.length - a.articles.length);
 }
 
 export function getAuthorSlugSet(): Set<string> {
