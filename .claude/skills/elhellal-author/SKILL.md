@@ -60,14 +60,22 @@ license: MIT
 
 ### House style (observed across all published posts — deviate only with a reason)
 
-- **Length**: 520-590 words including headings. This is a deliberate, tight
-  constraint — a compact essay, not an SEO wall of text. Don't pad it.
+- **Length**: 600-700 words including headings (updated 2026-07-04 — the
+  original 15 posts ran 520-590, but the user asked for articles to run longer
+  and more developed going forward while keeping everything else about the
+  format the same). Still a tight essay, not an SEO wall of text — the extra
+  length buys 1-2 more H2 sections or deeper development of existing ones, not
+  padding.
 - **Structure**: cold-open paragraph (a hook stat/fact reframed into a tension
-  or question) → 2-4 `##` H2 sections, no numbering, no bullet lists, no bolded
-  "Key Takeaways" box, no FAQ block → closing paragraph that resolves back to
-  the opening tension, usually ending on an implication or a rhetorical
+  or question) → 3-5 `##` H2 sections, no numbering, no bullet lists, no bolded
+  "Key Takeaways" box, no FAQ block, no tables → closing paragraph that resolves
+  back to the opening tension, usually ending on an implication or a rhetorical
   question. No CTA, no "in conclusion", no meta-commentary about the article
-  itself.
+  itself. A user once pasted a generic 1800-3000 word SEO template (FAQ, tables,
+  meta-keyword blocks) asking for it site-wide — declined, since the content
+  schema has no fields for that metadata and the frontend isn't styled for
+  tables/FAQ; if asked again, confirm before restructuring anything that
+  drastically.
 - **Title**: hook clause + colon + question, e.g. "٤٦٪ من الشيفرة يكتبها
   الذكاء الاصطناعي الآن: ماذا تغيّر فعليا في هندسة البرمجيات؟"
 - **Frontmatter `description`**: exactly 2 sentences — the core stat/finding,
@@ -109,7 +117,11 @@ If a new author was created via Command 2, use their bio/tagline the same way.
 4. Edit `src/utils/personalBlogFeed.ts`: add the new slug to the
    `CATEGORY_BY_PERSON` type and mapping. Check current per-category article
    counts in `src/data/articles.json` and point at a thin, topically-relevant
-   category that isn't already claimed by `omar`/`layla`/`youssef`.
+   category that isn't already claimed by an existing author. (The `collections`
+   list this file iterates over now imports `PERSONAL_COLLECTIONS` directly from
+   `personal-blogs.ts` — it used to be a second hardcoded array that silently
+   fell out of sync and dropped new authors from the homepage feed; that's fixed,
+   so this step is now just the `CATEGORY_BY_PERSON` map.)
 5. Create `src/content/<slug>/` and write the first post there (Command 1
    flow). Don't leave the collection empty without reason.
 6. Nothing else needs to change — `src/pages/authors/[author].astro`,
