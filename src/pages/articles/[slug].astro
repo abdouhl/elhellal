@@ -8,11 +8,10 @@ import AdUnit from "../../components/AdUnit.astro";
 import articlesConfig from "../../data/articles.json";
 import { getQualifyingTagSlugSet, slugifyTag } from "../../utils/tags";
 import { getCollection } from "astro:content";
-import { personalBlogs, type PersonalBlogPerson } from "../../data/personal-blogs";
+import { personalBlogs, PERSONAL_COLLECTIONS, type PersonalBlogPerson } from "../../data/personal-blogs";
 import { getPlaceholderImage } from "../../utils/placeholderImage";
 
 const qualifyingTagSlugs = getQualifyingTagSlugSet();
-const PERSONAL_COLLECTIONS = ["omar", "layla", "youssef"] as const;
 
 export async function getStaticPaths() {
   const slugMapData = await import("../../data/slug-map.json");

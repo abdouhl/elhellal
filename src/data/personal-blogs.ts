@@ -8,6 +8,8 @@ export interface PersonalBlogPerson {
     accent: string;
 }
 
+export const PERSONAL_COLLECTIONS = ['omar', 'layla', 'youssef'] as const;
+
 export const personalBlogs: Record<string, PersonalBlogPerson> = {
     omar: {
         slug: 'omar',
