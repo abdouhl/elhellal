@@ -1,18 +1,19 @@
 import { getCollection } from 'astro:content';
-import { personalBlogs } from '../data/personal-blogs';
+import { personalBlogs, PERSONAL_COLLECTIONS } from '../data/personal-blogs';
 import { getPlaceholderImage } from './placeholderImage';
 import type { ArticleWithCategory } from '../types';
 
 // Personal blog topics map onto existing (otherwise thin) articles.json categories
 // so they surface in the feed under nav tabs that already exist — no new category needed.
-const CATEGORY_BY_PERSON: Record<'omar' | 'layla' | 'youssef', string> = {
+const CATEGORY_BY_PERSON: Record<'omar' | 'layla' | 'youssef' | 'yacine', string> = {
     omar: 'technology',
     layla: 'environment',
     youssef: 'economics',
+    yacine: 'investing',
 };
 
 export async function getPersonalBlogFeedArticles(): Promise<ArticleWithCategory[]> {
-    const collections = ['omar', 'layla', 'youssef'] as const;
+    const collections = PERSONAL_COLLECTIONS;
 
     const results = await Promise.all(
         collections.map(async (collection) => {

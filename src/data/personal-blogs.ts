@@ -1,6 +1,6 @@
 export interface PersonalBlogPerson {
-    slug: 'omar' | 'layla' | 'youssef';
-    collection: 'omar' | 'layla' | 'youssef';
+    slug: 'omar' | 'layla' | 'youssef' | 'yacine';
+    collection: 'omar' | 'layla' | 'youssef' | 'yacine';
     nameAr: string;
     nameLatin: string;
     tagline: string;
@@ -8,7 +8,7 @@ export interface PersonalBlogPerson {
     accent: string;
 }
 
-export const PERSONAL_COLLECTIONS = ['omar', 'layla', 'youssef'] as const;
+export const PERSONAL_COLLECTIONS = ['omar', 'layla', 'youssef', 'yacine'] as const;
 
 export const personalBlogs: Record<string, PersonalBlogPerson> = {
     omar: {
@@ -37,5 +37,14 @@ export const personalBlogs: Record<string, PersonalBlogPerson> = {
         tagline: 'الاقتصاد · السياسات العامة',
         bio: 'باحث في الاقتصاد والسياسات العامة، مهتم بقضايا التنمية الاقتصادية وريادة الأعمال، وأقرأ في التاريخ والأدب العربي بقدر ما أقرأ في التقارير الاقتصادية.',
         accent: '#b45309',
+    },
+    yacine: {
+        slug: 'yacine',
+        collection: 'yacine',
+        nameAr: 'ياسين بن سعيد',
+        nameLatin: 'YACINE BENSAÏD',
+        tagline: 'البلوكتشين · العقود الذكية',
+        bio: 'مهندس عقود ذكية جزائري متخصص في تطوير البلوكتشين. مهتم بالبيتكوين والإيثيريوم والتمويل اللامركزي والاستثمار في العملات الرقمية، وأتابع عن قرب تقاطع الأمن السيبراني والذكاء الاصطناعي مع عالم Web3 والمصادر المفتوحة.',
+        accent: '#7c3aed',
     },
 };

@@ -12,4 +12,5 @@ export const collections = {
     omar: defineCollection({ type: 'content', schema: personalBlogSchema }),
     layla: defineCollection({ type: 'content', schema: personalBlogSchema }),
     youssef: defineCollection({ type: 'content', schema: personalBlogSchema }),
+    yacine: defineCollection({ type: 'content', schema: personalBlogSchema }),
 };
