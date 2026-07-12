@@ -9,7 +9,10 @@ import type { Category, ArticleWithCategory } from '../types';
 import { toolComparators, seededShuffle, type SortKey } from '../utils/sorting';
 import { isRecentlyAdded } from '../utils/dates';
 
-const ITEMS_PER_PAGE = 32;
+// Server-rendered up front so Googlebot's static snapshot (it doesn't scroll
+// to trigger the infinite-scroll loader below) sees far more real article
+// links per category/tag/author hub page, not just the first screenful.
+const ITEMS_PER_PAGE = 100;
 // One ad slotted in per 12 articles — frequent enough to matter, sparse enough to stay out of the way.
 const AD_INTERVAL = 12;
 

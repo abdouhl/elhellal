@@ -3,6 +3,7 @@ import Layout from "../../layouts/Layout.astro";
 import Card from "../../components/Card";
 import BreadcrumbSchema from "../../components/schema/BreadcrumbSchema.astro";
 import ItemListSchema from "../../components/schema/ItemListSchema.astro";
+import PersonSchema from "../../components/schema/PersonSchema.astro";
 import { getAuthors, type AuthorArticle } from "../../utils/authors";
 import data from "../../data/articles.json";
 import "../../components/CardsContainer.css";
@@ -89,6 +90,13 @@ const latestDate = sorted[0]
   ogUrl={canonicalUrl}
   ogType="profile"
 >
+  <PersonSchema
+    name={authorLabel}
+    url={canonicalUrl}
+    description={isPersonal ? bio : tagline}
+    image={isPersonal ? undefined : (profileImage || `https://unavatar.io/twitter/${screen_name}`)}
+    sameAs={isPersonal ? undefined : profileUrl}
+  />
   <ItemListSchema items={sorted} listName={`@${screen_name} Articles`} />
   <BreadcrumbSchema items={breadcrumbs} />
 

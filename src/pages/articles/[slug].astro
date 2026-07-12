@@ -1,7 +1,7 @@
 ---
 import Layout from "../../layouts/Layout.astro";
 import slugMap from "../../data/slug-map.json";
-import SoftwareApplicationSchema from "../../components/schema/SoftwareApplicationSchema.astro";
+import ArticleSchema from "../../components/schema/ArticleSchema.astro";
 import BreadcrumbSchema from "../../components/schema/BreadcrumbSchema.astro";
 import BookmarkButton from "../../components/BookmarkButton";
 import AdUnit from "../../components/AdUnit.astro";
@@ -199,27 +199,15 @@ const keywordsString = keywords?.join(', ');
   pageFavicon={faviconUrl}
   keywords={keywordsString}
 >
-  {isPersonalPost ? (
-    <script type="application/ld+json" set:html={JSON.stringify({
-      "@context": "https://schema.org",
-      "@type": "BlogPosting",
-      headline: tool.title,
-      description: tool.preview_text,
-      image: tool.original_img_url,
-      datePublished: tool.created_at,
-      author: { "@type": "Person", name: person!.nameAr, url: `https://elhellal.com/authors/${person!.slug}/` },
-      mainEntityOfPage: { "@type": "WebPage", "@id": canonicalUrl },
-    })} />
-  ) : (
-    <SoftwareApplicationSchema
-      name={tool.title}
-      description={tool.preview_text}
-      url={tool.url}
-      tag={tool.tag}
-      dateAdded={tool.created_at}
-      category={category}
-    />
-  )}
+  <ArticleSchema
+    headline={tool.title}
+    description={tool.preview_text}
+    url={canonicalUrl}
+    image={tool.original_img_url}
+    datePublished={tool.created_at}
+    authorName={isPersonalPost ? person!.nameAr : authorDisplayName}
+    authorUrl={isPersonalPost ? `https://elhellal.com/authors/${person!.slug}/` : authorUrl}
+  />
   <BreadcrumbSchema items={breadcrumbs} />
 
   <main id="main-content" class="article-page">
@@ -489,28 +477,9 @@ const keywordsString = keywords?.join(', ');
           </dl>
         </div>
 
-        <!-- AdSense slot — shows Binance banner when no ad is served -->
+        <!-- Sidebar ad (elhellal square) -->
         <div class="adsense-slot" aria-label="Advertisement">
-          <a
-            href="https://www.binance.com/register?ref=BMNSQVZ9"
-            target="_blank"
-            rel="noopener noreferrer sponsored"
-            class="binance-banner-link"
-            aria-label="Explore Crypto on Binance"
-          >
-            <img
-              src="/binance-2.png"
-              alt="Explore Crypto with me on Binance"
-              class="binance-banner binance-banner--desktop"
-              loading="lazy"
-            />
-            <img
-              src="/binance-3.png"
-              alt="Explore Crypto with me on Binance"
-              class="binance-banner binance-banner--mobile"
-              loading="lazy"
-            />
-          </a>
+          <AdUnit slot="2951250905" />
         </div>
 
       </aside>
@@ -1031,28 +1000,14 @@ const keywordsString = keywords?.join(', ');
     }
     .detail-link:hover { color: var(--accent); }
 
-    /* ── AdSense slot / Binance banner ────────────────── */
+    /* ── Sidebar ad slot ──────────────────────────────── */
     .adsense-slot {
       min-height: 0;
+      padding: var(--spacing-04);
       background: var(--background-secondary);
       border: 0.5px solid var(--border-muted);
       border-radius: 8px;
       overflow: hidden;
-    }
-    .binance-banner-link {
-      display: block;
-      line-height: 0;
-    }
-    .binance-banner {
-      width: 100%;
-      height: auto;
-      display: block;
-    }
-    .binance-banner--mobile  { display: none; }
-    .binance-banner--desktop { display: block; }
-    @media (max-width: 768px) {
-      .binance-banner--desktop { display: none; }
-      .binance-banner--mobile  { display: block; }
     }
 
     /* ── Related section ──────────────────────────────── */

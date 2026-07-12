@@ -20,11 +20,12 @@ const itemListElements = items.slice(0, 100).map((tool, index) => ({
     "@type": "ListItem",
     position: index + 1,
     item: {
-        "@type": "SoftwareApplication",
+        "@type": "Article",
         name: tool.title,
-        url: `https://www.elhellal.com/articles/${tool.slug}`,
+        url: `https://elhellal.com/articles/${tool.slug}`,
         description: tool.preview_text,
-        applicationCategory: "MultimediaApplication",
+        ...(tool.created_at ? { datePublished: tool.created_at } : {}),
+        ...(tool.screen_name ? { author: { "@type": "Person", name: `@${tool.screen_name}` } } : {}),
     },
 }));
 

@@ -1,0 +1,33 @@
+---
+interface Props {
+    headline: string;
+    description: string;
+    url: string;
+    image?: string;
+    datePublished?: string;
+    authorName?: string;
+    authorUrl?: string;
+}
+
+const { headline, description, url, image, datePublished, authorName, authorUrl } = Astro.props;
+
+const schema: any = {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    headline,
+    description,
+    mainEntityOfPage: { "@type": "WebPage", "@id": url },
+};
+
+if (image) schema.image = image;
+if (datePublished) schema.datePublished = datePublished;
+if (authorName) {
+    schema.author = {
+        "@type": "Person",
+        name: authorName,
+        ...(authorUrl ? { url: authorUrl } : {}),
+    };
+}
+---
+
+<script type="application/ld+json" set:html={JSON.stringify(schema)} />

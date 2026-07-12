@@ -33,6 +33,7 @@ export interface Props {
     keywords?: string;
     showSearch?: boolean;
     searchPlaceholder?: string;
+    noindex?: boolean;
 }
 
 const {
@@ -55,6 +56,7 @@ const {
     keywords,
     showSearch = false,
     searchPlaceholder = "ابحث بالعنوان أو التصنيف أو الكاتب...",
+    noindex = false,
 } = Astro.props;
 ---
 
@@ -100,6 +102,7 @@ const {
             }
         </title>
         <meta name="author" content="@abdou_hll" />
+        {noindex && <meta name="robots" content="noindex, follow" />}
         <meta
             name="description"
             content={pageDescription ||

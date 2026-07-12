@@ -12,7 +12,9 @@ export default defineConfig({
         forward: ["dataLayer.push"],
       },
     }
-  ), sitemap()],
+  ), sitemap({
+    filter: (page) => !page.includes('/saved') && !page.includes('/404'),
+  })],
   redirects: {
     '/layla': '/authors/layla',
     '/omar': '/authors/omar',
