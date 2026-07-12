@@ -3,5 +3,5 @@
  * image in their frontmatter.
  */
 export function getPlaceholderImage(): string {
-    return '/thumbs/placeholder.png';
+    return '/thumbs/placeholder.webp';
 }

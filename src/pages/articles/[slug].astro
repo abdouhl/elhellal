@@ -196,6 +196,7 @@ const keywordsString = keywords?.join(', ');
   twitterTitle={seoTitle}
   twitterDescription={seoDescription}
   twitterImage={seoOgImage}
+  twitterCreator={!isPersonalPost && tool.screen_name ? `@${tool.screen_name}` : undefined}
   pageFavicon={faviconUrl}
   keywords={keywordsString}
 >
@@ -692,7 +693,7 @@ const keywordsString = keywords?.join(', ');
       gap: 6px;
       font-size: var(--desktop-caption);
       font-family: var(--monospace);
-      color: rgba(255,255,255,0.4);
+      color: rgba(255,255,255,0.55);
     }
     .meta-dot { opacity: 0.4; }
     .meta-author {
@@ -725,7 +726,7 @@ const keywordsString = keywords?.join(', ');
     .keyword-tag--static {
       background: rgba(255,255,255,0.04);
       border-color: rgba(255,255,255,0.1);
-      color: rgba(255,255,255,0.4);
+      color: rgba(255,255,255,0.6);
       cursor: default;
     }
 
@@ -841,7 +842,7 @@ const keywordsString = keywords?.join(', ');
       content: "–";
       position: absolute;
       right: 0;
-      color: rgba(255,255,255,0.25);
+      color: rgba(255,255,255,0.45);
     }
 
     /* CTA */
@@ -882,7 +883,7 @@ const keywordsString = keywords?.join(', ');
     .share-label {
       font-size: var(--desktop-caption);
       font-family: var(--monospace);
-      color: rgba(255,255,255,0.35);
+      color: rgba(255,255,255,0.55);
       text-transform: uppercase;
       letter-spacing: 0.06em;
     }
@@ -1085,7 +1086,7 @@ const keywordsString = keywords?.join(', ');
     .related-author {
       font-size: 11px;
       font-family: var(--monospace);
-      color: rgba(255,255,255,0.35);
+      color: rgba(255,255,255,0.55);
     }
 
     /* ── Page nav ─────────────────────────────────────── */
