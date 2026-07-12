@@ -1,6 +1,7 @@
 import './Card.css';
 import BookmarkButton from './BookmarkButton';
 import { isRecentlyAdded } from '../utils/dates';
+import { getPlaceholderImage } from '../utils/placeholderImage';
 
 interface CardProps {
     href: string;
@@ -54,7 +55,7 @@ export default function Card({
 }: CardProps) {
     const linkUrl = internalHref || (slug ? `/articles/${slug}` : href);
     const isNew = isRecentlyAdded(dateAdded, 30);
-    const rawImage = image || 'https://pbs.twimg.com/media/HBYKYqjbcAI9_Jp.jpg';
+    const rawImage = image || getPlaceholderImage();
     const isR2Image = rawImage.startsWith(CF_R2_BASE);
 
     const coverImage = isR2Image

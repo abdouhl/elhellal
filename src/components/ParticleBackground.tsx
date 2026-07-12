@@ -23,10 +23,14 @@ export default function ParticleBackground() {
         const canvas = canvasRef.current;
         if (!canvas) return;
 
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            return;
+        }
+
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        let animationFrameId: number;
+        let animationFrameId: number | null = null;
         let particles: Particle[] = [];
         const mouse: Mouse = { x: null, y: null, radius: 150 };
 
@@ -122,15 +126,38 @@ export default function ParticleBackground() {
             mouse.y = null;
         };
 
+        const startAnimation = () => {
+            if (animationFrameId !== null) return;
+            animationFrameId = requestAnimationFrame(animate);
+        };
+
+        const stopAnimation = () => {
+            if (animationFrameId !== null) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+        };
+
         resizeCanvas();
-        animate();
+
+        // Pauses the draw loop once the hero scrolls out of view — it would
+        // otherwise keep burning CPU/battery on every page for the whole visit.
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting) startAnimation();
+                else stopAnimation();
+            },
+            { threshold: 0 }
+        );
+        observer.observe(canvas);
 
         window.addEventListener('resize', resizeCanvas);
         canvas.addEventListener('mousemove', handleMouseMove);
         canvas.addEventListener('mouseleave', handleMouseLeave);
 
         return () => {
-            cancelAnimationFrame(animationFrameId);
+            stopAnimation();
+            observer.disconnect();
             window.removeEventListener('resize', resizeCanvas);
             canvas.removeEventListener('mousemove', handleMouseMove);
             canvas.removeEventListener('mouseleave', handleMouseLeave);

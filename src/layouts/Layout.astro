@@ -106,6 +106,7 @@ const {
                 "دليل منتقى لأفضل المقالات العربية على الإنترنت"}
         />
         <link rel="sitemap" href="/sitemap-index.xml" />
+        <link rel="alternate" type="application/rss+xml" title="الهلال — أفضل المقالات العربية" href="/rss.xml" />
         <link rel="canonical" href={canonicalUrl || `https://elhellal.com${Astro.url.pathname}`} />
         {ogTitle && <meta property="og:title" content={ogTitle} />}
         {ogType && <meta property="og:type" content={ogType} />}
@@ -225,6 +226,8 @@ const {
                 <a href="/cookies" class="nu-u-link--subtle">ملفات الارتباط</a>
                 <span class="footer-separator" aria-hidden="true">·</span>
                 <a href="/sitemap-index.xml" class="nu-u-link--subtle">خريطة الموقع</a>
+                <span class="footer-separator" aria-hidden="true">·</span>
+                <a href="/rss.xml" class="nu-u-link--subtle">RSS</a>
             </nav>
             <p class="footer-copy">
                 ABDERAHMANE HELLAL 2026 ©

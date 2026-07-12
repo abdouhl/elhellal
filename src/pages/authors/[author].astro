@@ -16,18 +16,20 @@ export async function getStaticPaths() {
       articles: author.articles,
       displayName: author.displayName,
       tagline: author.tagline,
+      bio: author.bio,
       accent: author.accent,
       isPersonal: author.isPersonal,
     },
   }));
 }
 
-const { screen_name, profileImage, articles, displayName, tagline, accent, isPersonal } = Astro.props as {
+const { screen_name, profileImage, articles, displayName, tagline, bio, accent, isPersonal } = Astro.props as {
   screen_name: string;
   profileImage?: string;
   articles: AuthorArticle[];
   displayName?: string;
   tagline?: string;
+  bio?: string;
   accent?: string;
   isPersonal?: boolean;
 };
@@ -46,6 +48,33 @@ const breadcrumbs = [
   { name: "الكتّاب", url: "https://elhellal.com/authors" },
   { name: authorLabel },
 ];
+
+// Top categories this author writes in — surfaces their range and doubles as
+// internal links back into category pages.
+const categoryCounts = new Map<string, number>();
+articles.forEach((a) => {
+  const label = categoryTitleMap[a.category] || a.category;
+  categoryCounts.set(label, (categoryCounts.get(label) || 0) + 1);
+});
+const topCategories = [...categoryCounts.entries()]
+  .sort((a, b) => b[1] - a[1])
+  .slice(0, 5)
+  .map(([label, count]) => ({ label, count }));
+
+// External profile link (Substack/source site/X) — same derivation used on the article page.
+const firstUrl = !isPersonal ? articles.find((a) => a.url)?.url : undefined;
+const sourceHost = firstUrl ? new URL(firstUrl).hostname.replace(/^www\./, '') : null;
+const isSubstack = !!sourceHost && sourceHost.endsWith('substack.com');
+const profileUrl = isSubstack
+  ? `https://${screen_name}.substack.com`
+  : firstUrl
+    ? new URL(firstUrl).origin
+    : `https://x.com/${screen_name}`;
+const profileLinkLabel = isSubstack ? 'Substack' : (sourceHost ?? 'عرض على X');
+
+const latestDate = sorted[0]
+  ? new Date(sorted[0].created_at).toLocaleDateString("ar", { year: "numeric", month: "long", day: "numeric" })
+  : null;
 ---
 
 <Layout
@@ -72,25 +101,53 @@ const breadcrumbs = [
       <span>{authorLabel}</span>
     </nav>
 
-    <header class="author-header">
-      {isPersonal ? (
-        <span class="author-avatar-lg author-avatar-initial" style={`background:${accent}`}>
-          {displayName?.trim().charAt(0)}
-        </span>
-      ) : (
-        <img
-          src={profileImage || `https://unavatar.io/twitter/${screen_name}`}
-          alt={`@${screen_name}`}
-          class="author-avatar-lg"
-          onerror="this.src='/favicons/default.png'"
-          loading="eager"
-        />
-      )}
-      <div>
-        <h1 style={isPersonal ? `color:${accent}` : ""}>{authorLabel}</h1>
-        {isPersonal && tagline && <p class="author-tagline">{tagline}</p>}
-        <p class="author-count">{sorted.length} مقالة</p>
+    <header class="author-header" style={isPersonal ? `--author-accent:${accent}` : ""}>
+      <div class="author-header-top">
+        {isPersonal ? (
+          <span class="author-avatar-lg author-avatar-initial" style={`background:${accent}`}>
+            {displayName?.trim().charAt(0)}
+          </span>
+        ) : (
+          <img
+            src={profileImage || `https://unavatar.io/twitter/${screen_name}`}
+            alt={`@${screen_name}`}
+            class="author-avatar-lg"
+            onerror="this.src='/favicons/default.png'"
+            loading="eager"
+          />
+        )}
+        <div class="author-identity">
+          <h1 style={isPersonal ? `color:${accent}` : ""}>{authorLabel}</h1>
+          {isPersonal && tagline && <p class="author-tagline">{tagline}</p>}
+          <div class="author-stats">
+            <span class="author-stat">{sorted.length} مقالة</span>
+            {latestDate && (
+              <>
+                <span class="stat-dot" aria-hidden="true">·</span>
+                <span class="author-stat">آخر نشر {latestDate}</span>
+              </>
+            )}
+          </div>
+        </div>
+        {!isPersonal && (
+          <a href={profileUrl} target="_blank" rel="noopener noreferrer" class="author-profile-link">
+            {profileLinkLabel}
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 256 256">
+              <path d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z"/>
+            </svg>
+          </a>
+        )}
       </div>
+
+      {isPersonal && bio && <p class="author-bio">{bio}</p>}
+
+      {topCategories.length > 0 && (
+        <div class="author-categories" aria-label="التصنيفات">
+          {topCategories.map((c) => (
+            <span class="author-category-pill">{c.label} <span class="pill-count">{c.count}</span></span>
+          ))}
+        </div>
+      )}
     </header>
 
     <ul role="list" class="link-card-grid">
@@ -105,6 +162,7 @@ const breadcrumbs = [
           slug={tool.slug}
           category={categoryTitleMap[tool.category] || tool.category}
           image={tool.original_img_url}
+          internalHref={tool.internalHref}
         />
       ))}
     </ul>
@@ -135,18 +193,40 @@ const breadcrumbs = [
     .breadcrumb a:hover { color: var(--content-primary); }
 
     .author-header {
+      --author-accent: DarkOrange;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-04);
+      margin-bottom: var(--spacing-08);
+      padding: var(--spacing-06);
+      background: var(--background-secondary);
+      border: 0.5px solid var(--border-muted);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .author-header::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      height: 120px;
+      background: radial-gradient(circle at 15% -20%, color-mix(in srgb, var(--author-accent) 35%, transparent), transparent 65%);
+      pointer-events: none;
+    }
+    .author-header-top {
+      position: relative;
       display: flex;
       align-items: center;
-      gap: var(--spacing-04);
-      margin-bottom: var(--spacing-07);
+      gap: var(--spacing-05);
     }
     .author-avatar-lg {
-      width: 64px;
-      height: 64px;
+      width: 88px;
+      height: 88px;
       border-radius: 50%;
       object-fit: cover;
       background: var(--background-selected);
       flex-shrink: 0;
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--author-accent) 45%, transparent);
     }
     .author-avatar-initial {
       display: flex;
@@ -154,12 +234,16 @@ const breadcrumbs = [
       justify-content: center;
       color: #fff;
       font-weight: 700;
-      font-size: 1.5rem;
+      font-size: 2rem;
+    }
+    .author-identity {
+      flex: 1;
+      min-width: 0;
     }
     .author-header h1 {
       margin: 0;
       color: DarkOrange;
-      font-size: clamp(1.25rem, 3vw, 1.75rem);
+      font-size: clamp(1.35rem, 3.2vw, 1.9rem);
       direction: ltr;
       text-align: right;
     }
@@ -168,15 +252,69 @@ const breadcrumbs = [
       text-align: right;
     }
     .author-tagline {
-      margin: 2px 0 0;
-      font-size: var(--desktop-caption);
+      margin: 4px 0 0;
+      font-size: var(--desktop-body-sm);
       color: var(--content-secondary);
     }
-    .author-count {
-      margin: 4px 0 0;
+    .author-stats {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: var(--spacing-02);
       font-family: var(--monospace);
       font-size: var(--desktop-caption);
       color: var(--content-secondary);
+      flex-wrap: wrap;
+    }
+    .stat-dot { opacity: 0.5; }
+    .author-profile-link {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      background: var(--author-accent);
+      color: var(--background-high-contrast);
+      font-weight: 600;
+      font-size: var(--desktop-body-sm);
+      text-decoration: none;
+      border-radius: 6px;
+      transition: filter 0.15s;
+    }
+    .author-profile-link:hover { filter: brightness(1.1); }
+    .author-bio {
+      position: relative;
+      margin: 0;
+      max-width: 65ch;
+      font-size: var(--desktop-body-sm);
+      line-height: 1.7;
+      color: var(--content-secondary);
+    }
+    .author-categories {
+      position: relative;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .author-category-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      background: rgba(255,255,255,0.05);
+      border: 0.5px solid var(--border-muted);
+      border-radius: 20px;
+      font-family: var(--monospace);
+      font-size: 11px;
+      color: var(--content-secondary);
+    }
+    .pill-count {
+      color: var(--author-accent);
+      font-weight: 600;
+    }
+    @media (max-width: 560px) {
+      .author-header-top { flex-wrap: wrap; }
+      .author-profile-link { margin-inline-start: auto; }
     }
 
     .page-nav {
