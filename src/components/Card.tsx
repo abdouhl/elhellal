@@ -53,7 +53,8 @@ export default function Card({
     authorLabel,
     internalHref,
 }: CardProps) {
-    const linkUrl = internalHref || (slug ? `/articles/${slug}` : href);
+    //const linkUrl = internalHref || (slug ? `/articles/${slug}` : href);
+    const linkUrl = internalHref || (slug ? `/articles/${encodeURIComponent(slug)}/` : href);
     const isNew = isRecentlyAdded(dateAdded, 30);
     const rawImage = image || getPlaceholderImage();
     const isR2Image = rawImage.startsWith(CF_R2_BASE);
