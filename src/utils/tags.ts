@@ -19,7 +19,10 @@ export function normalizeTag(raw: string): string {
 }
 
 export function slugifyTag(raw: string): string {
-    return normalizeTag(raw).replace(/\s+/g, '-');
+    return normalizeTag(raw)
+        .replace(/\//g, '-')                 // "/" would otherwise split the route into two segments (e.g. P/E-Ratio)
+        .replace(/\s+/g, '-')                // spaces -> hyphen
+        .replace(/[^\p{L}\p{N}-]/gu, '');     // strip anything else unsafe; \p{L}/\p{N} keep Arabic + other unicode letters/numbers
 }
 
 let cachedIndex: Map<string, TagEntry> | null = null;
@@ -34,6 +37,7 @@ export function buildTagIndex(): Map<string, TagEntry> {
                 const label = normalizeTag(kw);
                 if (!label) return;
                 const slug = slugifyTag(kw);
+                if (!slug) return; // a tag that normalizes to nothing (e.g. only symbols) shouldn't get a route
                 if (!map.has(slug)) {
                     map.set(slug, { slug, label, articles: [] });
                 }
