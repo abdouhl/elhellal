@@ -102,7 +102,7 @@ const formatDate = (dateStr: string) => {
 };
 
 const formattedDate = formatDate(tool.created_at);
-const canonicalUrl = `https://elhellal.com/articles/${tool.slug}/`;
+const canonicalUrl = `https://elhellal.com/articles/${encodeURIComponent(tool.slug)}/`;
 const faviconUrl = `/favicons/${slug}.png`;
 const fallbackPath = isPersonalPost ? `/authors/${person!.slug}` : (category === "all" ? "/" : `/${category}`);
 const tweetUrl = isPersonalPost ? undefined : `https://x.com/${tool.screen_name}/status/${tool.id_str}`;
@@ -492,7 +492,7 @@ const keywordsString = keywords?.join(', ');
         <h2 class="related-heading">{isPersonalPost ? `مقالات أخرى لـ ${categoryTitle}` : `المزيد في ${categoryTitle}`}</h2>
         <div class="related-grid">
           {relatedTools.map((t: any) => (
-            <a href={`/articles/${t.slug}`} class="related-card">
+            <a href={`/articles/${encodeURIComponent(t.slug)}/`} class="related-card">
               <div class="related-cover">
                 <img
                   src={t.original_img_url || `/favicons/${t.slug}.png`}

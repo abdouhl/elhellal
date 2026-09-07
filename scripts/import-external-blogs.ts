@@ -140,7 +140,25 @@ function deriveSlugFromUrl(url: string): string {
         .toLowerCase();
 }
 
-const cliUrls = process.argv.slice(2);
+/** Cleans up a pasted URL/domain into something `new URL()` can parse:
+ *  - unwraps markdown link syntax, e.g. "[www.foo.com](https://www.foo.com)" -> "https://www.foo.com"
+ *    (happens when a chat UI auto-links bare domains and the user copies the rendered markdown)
+ *  - strips stray trailing punctuation left over from pasting a list
+ *  - adds a missing "https://" scheme for bare domains like "badwi.com/blog" or "smallpages.blog"
+ *  Returns null if the result still isn't a valid URL, so the caller can skip it instead of crashing. */
+function normalizeUrlArg(raw: string): string | null {
+    let s = raw.trim();
+    const mdMatch = s.match(/\[([^\]]*)\]\(([^)]+)\)/);
+    if (mdMatch) s = mdMatch[2]!.trim();
+    s = s.replace(/[),.]+$/, '');
+    if (!/^https?:\/\//i.test(s)) s = `https://${s}`;
+    try {
+        new URL(s); // validate
+        return s;
+    } catch {
+        return null;
+    }
+}
 
 const knownJobs: BlogJob[] = Object.values(externalBlogs).map(b => ({
     slug: b.slug,
@@ -151,9 +169,27 @@ const knownJobs: BlogJob[] = Object.values(externalBlogs).map(b => ({
 
 const knownUrlSet = new Set(knownJobs.map(j => j.url.replace(/\/$/, '')));
 
-const cliJobs: BlogJob[] = cliUrls
-    .filter(u => !knownUrlSet.has(u.replace(/\/$/, '')))
-    .map(u => ({ slug: deriveSlugFromUrl(u), name: deriveSlugFromUrl(u), url: u }));
+const cliJobs: BlogJob[] = [];
+const seenCliUrls = new Set<string>();
+const unparseableArgs: string[] = [];
+
+for (const raw of process.argv.slice(2)) {
+    const url = normalizeUrlArg(raw);
+    if (!url) { unparseableArgs.push(raw); continue; }
+
+    const key = url.replace(/\/$/, '');
+    if (knownUrlSet.has(key) || seenCliUrls.has(key)) continue; // already known, or duplicate in this run
+    seenCliUrls.add(key);
+
+    const slug = deriveSlugFromUrl(url);
+    cliJobs.push({ slug, name: slug, url });
+}
+
+if (unparseableArgs.length > 0) {
+    console.log(`⚠️  Skipping ${unparseableArgs.length} arg(s) that aren't valid URLs even after cleanup:`);
+    for (const a of unparseableArgs) console.log(`   ${a}`);
+    console.log('');
+}
 
 const jobs: BlogJob[] = [...knownJobs, ...cliJobs];
 
@@ -232,17 +268,21 @@ const COMMON_FEED_PATHS = ['feed/', 'feed', 'rss/', 'rss', 'rss.xml', 'atom.xml'
 async function discoverFeedUrl(blogUrl: string): Promise<string | null> {
     const base = blogUrl.replace(/\/$/, '');
 
-    // 1. Try common feed paths directly — covers the vast majority of blogs fast.
-    for (const p of COMMON_FEED_PATHS) {
+    // 1. Try all common feed paths concurrently — covers the vast majority of blogs,
+    // and doing this in parallel matters once you're checking 100+ sites in one run.
+    const attempts = COMMON_FEED_PATHS.map(async (p) => {
         const candidate = p.startsWith('?') ? `${base}/${p}` : `${base}/${p}`;
         try {
-            const res = await fetch(candidate, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(10000) });
+            const res = await fetch(candidate, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(8000) });
             if (res.ok) {
                 const text = await res.text();
                 if (/<rss[\s>]|<feed[\s>]/i.test(text.slice(0, 500))) return candidate;
             }
-        } catch { /* try next path */ }
-    }
+        } catch { /* this path didn't work, others might */ }
+        return null;
+    });
+    const found = (await Promise.all(attempts)).find(r => r !== null);
+    if (found) return found;
 
     // 2. Fall back to <link rel="alternate" type="...+xml"> autodiscovery on the homepage.
     try {

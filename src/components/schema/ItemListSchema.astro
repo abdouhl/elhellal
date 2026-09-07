@@ -22,7 +22,7 @@ const itemListElements = items.slice(0, 100).map((tool, index) => ({
     item: {
         "@type": "Article",
         name: tool.title,
-        url: `https://elhellal.com/articles/${tool.slug}`,
+        url: `https://elhellal.com/articles/${encodeURIComponent(tool.slug)}/`,
         description: tool.preview_text,
         ...(tool.created_at ? { datePublished: tool.created_at } : {}),
         ...(tool.screen_name ? { author: { "@type": "Person", name: `@${tool.screen_name}` } } : {}),

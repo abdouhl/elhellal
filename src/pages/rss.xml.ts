@@ -37,7 +37,7 @@ export async function GET(context: APIContext) {
       title: item.title,
       description: item.description,
       pubDate: new Date(item.pubDate),
-      link: `/articles/${item.slug}/`,
+      link: `/articles/${encodeURIComponent(item.slug)}/`,
       categories: item.category ? [item.category] : undefined,
     })),
     customData: `<language>ar</language>`,

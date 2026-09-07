@@ -24,7 +24,7 @@ const recentItems = (data.articles as Category[])
             <ul class="ticker-track" id="newsTickerTrack">
                 {[...recentItems, ...recentItems].map((item, i) => (
                     <li class="ticker-item" aria-hidden={i >= recentItems.length ? "true" : undefined}>
-                        <a href={`/articles/${item.slug}`} tabindex={i >= recentItems.length ? -1 : undefined}>
+                        <a href={`/articles/${encodeURIComponent(item.slug)}/`} tabindex={i >= recentItems.length ? -1 : undefined}>
                             {item.title}
                         </a>
                     </li>
