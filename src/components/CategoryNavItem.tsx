@@ -1,6 +1,6 @@
 import { navigate } from 'astro:transitions/client';
 import { useState, useEffect, useRef, useMemo } from 'react';
-import data from '../data/articles.json';
+import data from '../data/articles.client.json';
 import './CategoryNavItem.css';
 import type { Category } from '../types';
 
