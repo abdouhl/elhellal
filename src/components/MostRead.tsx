@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Card from './Card';
 import './MostRead.css';
-import data from '../data/articles.json';
+import data from '../data/articles.client.json';
 import type { Article, Category } from '../types';
 import { VIEWS_API_BASE } from '../config/views';
 

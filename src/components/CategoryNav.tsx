@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import './CategoryNav.css';
-import data from '../data/articles.json';
+import data from '../data/articles.client.json';
 import CategoryNavItem from './CategoryNavItem';
 import type { Category } from '../types';
 

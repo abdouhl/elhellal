@@ -4,7 +4,7 @@ import Card from './Card';
 import AdCard from './AdCard';
 import EmptyState, { SearchIcon } from './EmptyState';
 import './CardsContainer.css';
-import data from '../data/articles.json';
+import data from '../data/articles.client.json';
 import type { Category, ArticleWithCategory } from '../types';
 import { toolComparators, seededShuffle, type SortKey } from '../utils/sorting';
 import { isRecentlyAdded } from '../utils/dates';

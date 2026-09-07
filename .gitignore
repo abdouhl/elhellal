@@ -35,6 +35,7 @@ lerna-debug.log*
 src/data/articles/
 src/data/article-metadata/
 src/data/slug-map.json
+src/data/articles.client.json
 
 # private import scripts
 scripts/import-substack.ts

@@ -4,7 +4,7 @@ import { toolComparators, type SortKey } from '../utils/sorting';
 import Card from './Card';
 import EmptyState, { BookmarkIcon } from './EmptyState';
 import './CardsContainer.css';
-import data from '../data/articles.json';
+import data from '../data/articles.client.json';
 import type { Category } from '../types';
 
 type FavoritesSortKey = Exclude<SortKey, 'random'>;
