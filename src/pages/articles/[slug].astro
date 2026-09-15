@@ -283,7 +283,7 @@ const keywordsString = keywords?.join(', ');
               {keywords.map((kw: string) => {
                 const tagSlug = slugifyTag(kw);
                 return qualifyingTagSlugs.has(tagSlug) ? (
-                  <a href={`/tags/${tagSlug}`} class="keyword-tag">{kw}</a>
+                  <a href={`/tags/${encodeURIComponent(tagSlug)}`} class="keyword-tag">{kw}</a>
                 ) : (
                   <span class="keyword-tag keyword-tag--static" title="لا توجد صفحة كافية من المقالات لهذا الوسم بعد">{kw}</span>
                 );

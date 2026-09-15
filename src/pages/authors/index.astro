@@ -36,7 +36,7 @@ const breadcrumbs = [
     <ul role="list" class="author-grid">
       {authors.map((author) => (
         <li>
-          <a href={`/authors/${author.screen_name}`} class="author-card">
+          <a href={`/authors/${encodeURIComponent(author.screen_name)}`} class="author-card">
             {author.isPersonal ? (
               <span class="author-card-initial" style={`background:${author.accent}`}>
                 {author.displayName?.trim().charAt(0)}

@@ -1,0 +1,247 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import QuoteCard from "../../../components/QuoteCard";
+import BreadcrumbSchema from "../../../components/schema/BreadcrumbSchema.astro";
+import QuoteSchema from "../../../components/schema/QuoteSchema.astro";
+import PersonSchema from "../../../components/schema/PersonSchema.astro";
+import { getQuotes } from "../../../utils/quotes";
+import { slugifyTag } from "../../../utils/tags";
+import "../../../components/CardsContainer.css";
+
+export async function getStaticPaths() {
+  return getQuotes().map((quote) => ({
+    params: { author: quote.authorSlug, id: quote.id },
+    props: { quote },
+  }));
+}
+
+const { quote } = Astro.props;
+
+const authorUrl = `https://elhellal.com/quotes/${encodeURIComponent(quote.authorSlug)}/`;
+const canonicalUrl = `${authorUrl}${encodeURIComponent(quote.id)}/`;
+
+const otherQuotes = getQuotes()
+  .filter((q) => q.authorSlug === quote.authorSlug && q.id !== quote.id)
+  .slice(0, 6);
+
+const previewText = quote.text.length > 60 ? `${quote.text.slice(0, 60)}…` : quote.text;
+const breadcrumbs = [
+  { name: "الرئيسية", url: "https://elhellal.com" },
+  { name: "الاقتباسات", url: "https://elhellal.com/quotes" },
+  { name: quote.author, url: authorUrl },
+  { name: previewText },
+];
+
+const pageDescription = quote.book
+  ? `اقتباس لـ${quote.author} من كتاب "${quote.book}": ${previewText}`
+  : `اقتباس لـ${quote.author}: ${previewText}`;
+---
+
+<Layout
+  site={`الهلال - اقتباس لـ${quote.author}`}
+  title="الهلال"
+  tagline="دليل منتقى لأفضل المقالات العربية على الإنترنت"
+  pageTitle={`"${previewText}" — ${quote.author} | الهلال`}
+  pageDescription={pageDescription}
+  canonicalUrl={canonicalUrl}
+  ogTitle={`اقتباس لـ${quote.author}`}
+  ogDescription={quote.text}
+  ogUrl={canonicalUrl}
+  ogType="article"
+>
+  <PersonSchema name={quote.author} url={authorUrl} image={quote.authorImage} />
+  <QuoteSchema quotes={[quote]} url={canonicalUrl} />
+  <BreadcrumbSchema items={breadcrumbs} />
+
+  <main id="main-content" class="single-quote-page">
+    <nav class="breadcrumb" aria-label="مسار التنقل">
+      <a href="/">الرئيسية</a>
+      <span aria-hidden="true">›</span>
+      <a href="/quotes">الاقتباسات</a>
+      <span aria-hidden="true">›</span>
+      <a href={`/quotes/${encodeURIComponent(quote.authorSlug)}/`}>{quote.author}</a>
+    </nav>
+
+    <article class="single-quote-card">
+      <span class="single-quote-mark" aria-hidden="true">&rdquo;</span>
+      <blockquote class="single-quote-text">{quote.text}</blockquote>
+
+      <div class="single-quote-attribution">
+        {quote.authorImage ? (
+          <img src={quote.authorImage} alt={quote.author} class="single-quote-avatar" loading="eager" />
+        ) : (
+          <span class="single-quote-avatar single-quote-avatar-fallback" aria-hidden="true">
+            {quote.author.trim().charAt(0)}
+          </span>
+        )}
+        <div>
+          <a href={`/quotes/${encodeURIComponent(quote.authorSlug)}/`} class="single-quote-author">{quote.author}</a>
+          {quote.book && (
+            <a href={quote.bookSlug ? `/quotes/book/${encodeURIComponent(quote.bookSlug)}/` : undefined} class="single-quote-book">
+              {quote.book}
+            </a>
+          )}
+        </div>
+      </div>
+
+      {quote.tags && quote.tags.length > 0 && (
+        <div class="single-quote-tags">
+          {quote.tags.map((tag) => (
+            <a href={`/quotes/tag/${encodeURIComponent(slugifyTag(tag))}/`} class="single-quote-tag">#{tag}</a>
+          ))}
+        </div>
+      )}
+    </article>
+
+    {otherQuotes.length > 0 && (
+      <section class="more-quotes">
+        <h2>المزيد من اقتباسات {quote.author}</h2>
+        <ul role="list" class="link-card-grid">
+          {otherQuotes.map((q) => (
+            <QuoteCard client:visible quote={q} />
+          ))}
+        </ul>
+      </section>
+    )}
+
+    <div class="page-nav">
+      <a href={`/quotes/${encodeURIComponent(quote.authorSlug)}/`} class="back-link">كل اقتباسات {quote.author} ←</a>
+    </div>
+  </main>
+
+  <style>
+    .single-quote-page {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: var(--spacing-06) var(--spacing-05) var(--spacing-10);
+    }
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: var(--desktop-caption);
+      font-family: var(--monospace);
+      color: var(--content-secondary);
+      margin-bottom: var(--spacing-06);
+      flex-wrap: wrap;
+    }
+    .breadcrumb a { color: var(--content-secondary); text-decoration: none; }
+    .breadcrumb a:hover { color: var(--content-primary); }
+
+    .single-quote-card {
+      position: relative;
+      padding: 48px 32px 32px;
+      border-radius: 16px;
+      background:
+        radial-gradient(circle at 100% 0%, rgba(255, 140, 0, 0.12), transparent 55%),
+        linear-gradient(160deg, #18140f, #101010 65%);
+      border: 0.5px solid rgba(255, 140, 0, 0.22);
+      box-shadow: 0px 4px 24px rgba(0, 0, 0, 0.4);
+      overflow: hidden;
+    }
+    .single-quote-mark {
+      position: absolute;
+      top: 6px;
+      right: 24px;
+      font-size: 110px;
+      line-height: 1;
+      font-family: Georgia, 'Times New Roman', serif;
+      background: linear-gradient(180deg, rgba(255, 166, 64, 0.4), rgba(255, 140, 0, 0.06));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      pointer-events: none;
+    }
+    .single-quote-text {
+      position: relative;
+      margin: 0 0 28px;
+      padding: 0;
+      border: none;
+      color: #f5f0ea;
+      font-size: clamp(1.15rem, 2.4vw, 1.5rem);
+      font-weight: 700;
+      line-height: 1.8;
+      text-align: right;
+    }
+    .single-quote-attribution {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding-top: 20px;
+      border-top: 0.5px solid rgba(255, 255, 255, 0.1);
+    }
+    .single-quote-avatar {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
+      box-shadow: 0 0 0 3px rgba(255, 140, 0, 0.35);
+    }
+    .single-quote-avatar-fallback {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: DarkOrange;
+      background: rgba(255, 140, 0, 0.12);
+      font-weight: 700;
+      font-size: 20px;
+    }
+    .single-quote-author {
+      display: block;
+      font-family: var(--monospace);
+      font-weight: 700;
+      font-size: 15px;
+      color: DarkOrange;
+      text-decoration: none;
+    }
+    .single-quote-author:hover { color: #ff9d33; }
+    .single-quote-book {
+      display: block;
+      margin-top: 2px;
+      font-family: var(--monospace);
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.45);
+      text-decoration: none;
+    }
+    .single-quote-book:hover { color: rgba(255, 255, 255, 0.7); }
+
+    .single-quote-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 20px;
+    }
+    .single-quote-tag {
+      padding: 4px 12px;
+      background: rgba(255, 140, 0, 0.08);
+      border: 0.5px solid rgba(255, 140, 0, 0.25);
+      color: DarkOrange;
+      border-radius: 20px;
+      font-size: 12px;
+      text-decoration: none;
+    }
+    .single-quote-tag:hover { background: rgba(255, 140, 0, 0.18); }
+
+    .more-quotes {
+      margin-top: var(--spacing-08);
+    }
+    .more-quotes h2 {
+      margin: 0 0 var(--spacing-04) 0;
+      font-size: clamp(1.05rem, 2.2vw, 1.3rem);
+      color: DarkOrange;
+    }
+
+    .page-nav {
+      margin-top: var(--spacing-07);
+      padding-top: var(--spacing-05);
+      border-top: 0.5px solid var(--border-muted);
+    }
+    .back-link {
+      font-size: var(--desktop-body-sm);
+      color: var(--content-secondary);
+      text-decoration: none;
+    }
+    .back-link:hover { color: var(--content-primary); }
+  </style>
+</Layout>

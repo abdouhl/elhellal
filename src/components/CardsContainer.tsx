@@ -2,10 +2,12 @@ import { useMemo, useState, useEffect, useRef } from 'react';
 import Fuse from 'fuse.js';
 import Card from './Card';
 import AdCard from './AdCard';
+import QuoteCard from './QuoteCard';
 import EmptyState, { SearchIcon } from './EmptyState';
 import './CardsContainer.css';
 import data from '../data/articles.client.json';
-import type { Category, ArticleWithCategory } from '../types';
+import { getQuotes } from '../utils/quotes';
+import type { Category, ArticleWithCategory, FlatQuote } from '../types';
 import { toolComparators, seededShuffle, type SortKey } from '../utils/sorting';
 import { isRecentlyAdded } from '../utils/dates';
 
@@ -15,6 +17,8 @@ import { isRecentlyAdded } from '../utils/dates';
 const ITEMS_PER_PAGE = 100;
 // One ad slotted in per 12 articles — frequent enough to matter, sparse enough to stay out of the way.
 const AD_INTERVAL = 12;
+// One quote slotted in per 8 articles, offset from AD_INTERVAL so the two never land on the same card.
+const QUOTE_INTERVAL = 8;
 
 const fuseOptions = {
     keys: [
@@ -190,22 +194,37 @@ export default function CardsContainer({
 
     const displayedCards = filteredCards.slice(0, displayedCount);
 
-    // Intersperse an ad card every AD_INTERVAL real cards. Indices are a stable
-    // prefix of displayedCards, so ad positions don't shift as infinite scroll
-    // appends more items — avoids remounting (and re-initializing) earlier ads.
+    // Deterministic pool of quotes to draw from — reshuffled only when the quote
+    // set itself changes, not on every render.
+    const quotePool = useMemo(() => seededShuffle(getQuotes(), 7), []);
+
+    // Intersperse an ad card every AD_INTERVAL real cards, and a quote card every
+    // QUOTE_INTERVAL real cards (skipped if it would land on the same slot as an
+    // ad). Indices are a stable prefix of displayedCards, so positions don't
+    // shift as infinite scroll appends more items — avoids remounting (and
+    // re-initializing) earlier ads/quotes.
     const gridItems = useMemo(() => {
         const items: Array<
             | { type: 'card'; key: string; card: ArticleWithCategory }
             | { type: 'ad'; key: string }
+            | { type: 'quote'; key: string; quote: FlatQuote }
         > = [];
+        let quoteCount = 0;
         displayedCards.forEach((card, i) => {
             items.push({ type: 'card', key: `${card.title}-${i}`, card });
-            if ((i + 1) % AD_INTERVAL === 0 && i !== displayedCards.length - 1) {
+            const isLast = i === displayedCards.length - 1;
+            const isAdSlot = (i + 1) % AD_INTERVAL === 0;
+            const isQuoteSlot = (i + 1) % QUOTE_INTERVAL === 0;
+            if (isAdSlot && !isLast) {
                 items.push({ type: 'ad', key: `ad-${i}` });
+            } else if (isQuoteSlot && !isLast && quotePool.length > 0) {
+                const quote = quotePool[quoteCount % quotePool.length]!;
+                items.push({ type: 'quote', key: `quote-${i}`, quote });
+                quoteCount++;
             }
         });
         return items;
-    }, [displayedCards]);
+    }, [displayedCards, quotePool]);
 
     // Check if searching with no results in a specific category
     const isSearchingInCategory = searchQuery && searchQuery.length >= 2 && filter !== 'all';
@@ -230,6 +249,8 @@ export default function CardsContainer({
                 {gridItems.map((item) =>
                     item.type === 'ad' ? (
                         <AdCard key={item.key} />
+                    ) : item.type === 'quote' ? (
+                        <QuoteCard key={item.key} quote={item.quote} />
                     ) : (
                         <Card
                             key={item.key}

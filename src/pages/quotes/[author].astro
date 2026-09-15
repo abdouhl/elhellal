@@ -1,0 +1,128 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import QuoteCard from "../../components/QuoteCard";
+import BreadcrumbSchema from "../../components/schema/BreadcrumbSchema.astro";
+import QuoteSchema from "../../components/schema/QuoteSchema.astro";
+import PersonSchema from "../../components/schema/PersonSchema.astro";
+import { getQuoteAuthors } from "../../utils/quotes";
+import "../../components/CardsContainer.css";
+
+export async function getStaticPaths() {
+  return getQuoteAuthors().map((entry) => ({
+    params: { author: entry.slug },
+    props: { author: entry.author, authorImage: entry.authorImage, quotes: entry.quotes },
+  }));
+}
+
+const { author, authorImage, quotes } = Astro.props;
+
+const canonicalUrl = `https://elhellal.com/quotes/${encodeURIComponent(Astro.params.author)}/`;
+const breadcrumbs = [
+  { name: "الرئيسية", url: "https://elhellal.com" },
+  { name: "الاقتباسات", url: "https://elhellal.com/quotes" },
+  { name: author },
+];
+---
+
+<Layout
+  site={`الهلال - اقتباسات ${author}`}
+  title="الهلال"
+  tagline="دليل منتقى لأفضل المقالات العربية على الإنترنت"
+  pageTitle={`اقتباسات ${author} | الهلال`}
+  pageDescription={`${quotes.length} اقتباساً لـ${author} مترجماً إلى العربية.`}
+  canonicalUrl={canonicalUrl}
+  ogTitle={`اقتباسات ${author} | الهلال`}
+  ogDescription={`${quotes.length} اقتباساً لـ${author}`}
+  ogUrl={canonicalUrl}
+  ogType="profile"
+>
+  <PersonSchema name={author} url={canonicalUrl} image={authorImage} />
+  <QuoteSchema quotes={quotes} url={canonicalUrl} />
+  <BreadcrumbSchema items={breadcrumbs} />
+
+  <main id="main-content" class="quote-detail-page">
+    <nav class="breadcrumb" aria-label="مسار التنقل">
+      <a href="/">الرئيسية</a>
+      <span aria-hidden="true">›</span>
+      <a href="/quotes">الاقتباسات</a>
+      <span aria-hidden="true">›</span>
+      <span>{author}</span>
+    </nav>
+
+    <header class="quote-detail-header">
+      {authorImage && <img src={authorImage} alt={author} class="quote-author-photo" loading="eager" />}
+      <div>
+        <h1>{author}</h1>
+        <p class="quote-detail-count">{quotes.length} اقتباساً</p>
+      </div>
+    </header>
+
+    <ul role="list" class="link-card-grid">
+      {quotes.map((quote) => (
+        <QuoteCard client:visible quote={quote} />
+      ))}
+    </ul>
+
+    <div class="page-nav">
+      <a href="/quotes" class="back-link">كل الاقتباسات ←</a>
+    </div>
+  </main>
+
+  <style>
+    .quote-detail-page {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: var(--spacing-06) var(--spacing-05) var(--spacing-10);
+    }
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: var(--desktop-caption);
+      font-family: var(--monospace);
+      color: var(--content-secondary);
+      margin-bottom: var(--spacing-06);
+      flex-wrap: wrap;
+    }
+    .breadcrumb a { color: var(--content-secondary); text-decoration: none; }
+    .breadcrumb a:hover { color: var(--content-primary); }
+
+    .quote-detail-header {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-04);
+      margin-bottom: var(--spacing-06);
+    }
+    .quote-detail-header h1 {
+      margin: 0;
+      color: DarkOrange;
+      font-size: clamp(1.25rem, 3vw, 1.75rem);
+    }
+    .quote-detail-count {
+      margin: 0;
+      font-family: var(--monospace);
+      font-size: var(--desktop-caption);
+      color: var(--content-secondary);
+    }
+    .quote-author-photo {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      object-fit: cover;
+      box-shadow: 0 0 0 3px rgba(255, 140, 0, 0.35);
+      flex-shrink: 0;
+    }
+
+    .page-nav {
+      margin-top: var(--spacing-07);
+      padding-top: var(--spacing-05);
+      border-top: 0.5px solid var(--border-muted);
+    }
+    .back-link {
+      font-size: var(--desktop-body-sm);
+      color: var(--content-secondary);
+      text-decoration: none;
+    }
+    .back-link:hover { color: var(--content-primary); }
+  </style>
+</Layout>

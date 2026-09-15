@@ -1,0 +1,115 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import QuoteCard from "../../../components/QuoteCard";
+import BreadcrumbSchema from "../../../components/schema/BreadcrumbSchema.astro";
+import QuoteSchema from "../../../components/schema/QuoteSchema.astro";
+import { getQuoteTags } from "../../../utils/quotes";
+import "../../../components/CardsContainer.css";
+
+export async function getStaticPaths() {
+  return getQuoteTags().map((entry) => ({
+    params: { tag: entry.slug },
+    props: { label: entry.label, quotes: entry.quotes },
+  }));
+}
+
+const { label, quotes } = Astro.props;
+
+const canonicalUrl = `https://elhellal.com/quotes/tag/${encodeURIComponent(Astro.params.tag)}/`;
+const breadcrumbs = [
+  { name: "الرئيسية", url: "https://elhellal.com" },
+  { name: "الاقتباسات", url: "https://elhellal.com/quotes" },
+  { name: label },
+];
+---
+
+<Layout
+  site={`الهلال - اقتباسات عن ${label}`}
+  title="الهلال"
+  tagline="دليل منتقى لأفضل المقالات العربية على الإنترنت"
+  pageTitle={`اقتباسات عن ${label} | الهلال`}
+  pageDescription={`${quotes.length} اقتباساً مترجماً إلى العربية عن "${label}".`}
+  canonicalUrl={canonicalUrl}
+  ogTitle={`اقتباسات عن ${label} | الهلال`}
+  ogDescription={`${quotes.length} اقتباساً عن ${label}`}
+  ogUrl={canonicalUrl}
+  ogType="website"
+>
+  <QuoteSchema quotes={quotes} url={canonicalUrl} />
+  <BreadcrumbSchema items={breadcrumbs} />
+
+  <main id="main-content" class="quote-detail-page">
+    <nav class="breadcrumb" aria-label="مسار التنقل">
+      <a href="/">الرئيسية</a>
+      <span aria-hidden="true">›</span>
+      <a href="/quotes">الاقتباسات</a>
+      <span aria-hidden="true">›</span>
+      <span>{label}</span>
+    </nav>
+
+    <header class="quote-detail-header">
+      <h1>#{label}</h1>
+      <p class="quote-detail-count">{quotes.length} اقتباساً</p>
+    </header>
+
+    <ul role="list" class="link-card-grid">
+      {quotes.map((quote) => (
+        <QuoteCard client:visible quote={quote} />
+      ))}
+    </ul>
+
+    <div class="page-nav">
+      <a href="/quotes" class="back-link">كل الاقتباسات ←</a>
+    </div>
+  </main>
+
+  <style>
+    .quote-detail-page {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: var(--spacing-06) var(--spacing-05) var(--spacing-10);
+    }
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: var(--desktop-caption);
+      font-family: var(--monospace);
+      color: var(--content-secondary);
+      margin-bottom: var(--spacing-06);
+      flex-wrap: wrap;
+    }
+    .breadcrumb a { color: var(--content-secondary); text-decoration: none; }
+    .breadcrumb a:hover { color: var(--content-primary); }
+
+    .quote-detail-header {
+      display: flex;
+      align-items: baseline;
+      gap: var(--spacing-03);
+      margin-bottom: var(--spacing-06);
+    }
+    .quote-detail-header h1 {
+      margin: 0;
+      color: DarkOrange;
+      font-size: clamp(1.25rem, 3vw, 1.75rem);
+    }
+    .quote-detail-count {
+      margin: 0;
+      font-family: var(--monospace);
+      font-size: var(--desktop-caption);
+      color: var(--content-secondary);
+    }
+
+    .page-nav {
+      margin-top: var(--spacing-07);
+      padding-top: var(--spacing-05);
+      border-top: 0.5px solid var(--border-muted);
+    }
+    .back-link {
+      font-size: var(--desktop-body-sm);
+      color: var(--content-secondary);
+      text-decoration: none;
+    }
+    .back-link:hover { color: var(--content-primary); }
+  </style>
+</Layout>

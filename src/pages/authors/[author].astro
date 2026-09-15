@@ -43,7 +43,7 @@ const sorted = [...articles].sort(
 );
 
 const authorLabel = isPersonal ? displayName! : `@${screen_name}`;
-const canonicalUrl = `https://elhellal.com/authors/${screen_name}/`;
+const canonicalUrl = `https://elhellal.com/authors/${encodeURIComponent(screen_name)}/`;
 const breadcrumbs = [
   { name: "الرئيسية", url: "https://elhellal.com" },
   { name: "الكتّاب", url: "https://elhellal.com/authors" },

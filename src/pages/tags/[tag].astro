@@ -23,7 +23,7 @@ const sorted = [...articles].sort(
   (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
 );
 
-const canonicalUrl = `https://elhellal.com/tags/${Astro.params.tag}/`;
+const canonicalUrl = `https://elhellal.com/tags/${encodeURIComponent(Astro.params.tag)}/`;
 const breadcrumbs = [
   { name: "الرئيسية", url: "https://elhellal.com" },
   { name: "الوسوم", url: "https://elhellal.com/tags" },

@@ -1,0 +1,124 @@
+.quote-card {
+    padding: 26px 20px 16px;
+    justify-content: space-between;
+    min-height: 240px;
+    background:
+        radial-gradient(circle at 100% 0%, rgba(255, 140, 0, 0.10), transparent 55%),
+        linear-gradient(160deg, #18140f, #101010 65%);
+    border: 0.5px solid rgba(255, 140, 0, 0.2);
+}
+
+.quote-card-body {
+    display: block;
+    text-decoration: none;
+    padding: 0;
+    margin: 0;
+    color: inherit;
+}
+
+.quote-mark {
+    position: absolute;
+    top: 2px;
+    right: 16px;
+    font-size: 68px;
+    line-height: 1;
+    font-family: Georgia, 'Times New Roman', serif;
+    background: linear-gradient(180deg, rgba(255, 166, 64, 0.4), rgba(255, 140, 0, 0.08));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    pointer-events: none;
+}
+
+.quote-text {
+    margin: 22px 0 18px;
+    padding: 0;
+    border: none;
+    color: #f5f0ea;
+    font-size: 16.5px;
+    font-weight: 600;
+    line-height: 1.7;
+    text-align: right;
+    display: -webkit-box;
+    -webkit-line-clamp: 5;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    transition: color 0.15s ease;
+}
+
+.quote-card:is(:hover, :focus-within) .quote-text {
+    color: #ffffff;
+}
+
+.quote-attribution {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-top: 14px;
+    margin-top: auto;
+    border-top: 0.5px solid rgba(255, 255, 255, 0.08);
+}
+
+.quote-author-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: var(--background-selected);
+    box-shadow: 0 0 0 2px rgba(255, 140, 0, 0.35);
+}
+
+.quote-author-avatar-fallback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: DarkOrange;
+    background: rgba(255, 140, 0, 0.12);
+    font-weight: 700;
+    font-size: 14px;
+}
+
+.quote-attribution-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+}
+
+.quote-author {
+    font-family: var(--monospace);
+    font-size: 12.5px;
+    font-weight: 700;
+    color: DarkOrange;
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.quote-author:hover {
+    color: #ff9d33;
+}
+
+.quote-book {
+    font-family: var(--monospace);
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.4);
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.quote-book:hover {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.quote-book-cover {
+    width: 30px;
+    height: 44px;
+    object-fit: cover;
+    border-radius: 3px;
+    flex-shrink: 0;
+    margin-inline-start: auto;
+    box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.5), 0 0 0 0.5px rgba(255, 255, 255, 0.1);
+}

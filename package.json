@@ -36,6 +36,7 @@
     "test:run": "vitest run",
     "check-data": "bun run scripts/check-data.ts",
     "update-metadata": "bun run scripts/update-metadata.ts",
+    "import-quotes": "bun run scripts/import-goodreads-quotes.ts",
     "generate-pins": "bun run scripts/generate-pinterest-pin.ts",
     "deploy:views": "wrangler deploy --config workers/views/wrangler.jsonc"
   },

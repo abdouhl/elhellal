@@ -79,3 +79,43 @@ export interface MetadataEntry {
 export type MetadataMap = Record<string, MetadataEntry>;
 
 export type SlugMap = Record<string, string[]>;
+
+export interface QuoteItem {
+    id: string;                 // stable hash of authorSlug+cleaned text, used for dedup across scraper re-runs
+    text: string;                // final Arabic text — verbatim original wording (just cleaned) if source was already Arabic, else AI-translated
+    tags?: string[];              // goodreads topic tags, translated to Arabic
+    likes?: number;
+}
+
+export interface QuoteBook {
+    slug: string;
+    title: string;             // Arabic book title
+    cover?: string;             // book cover image URL
+    quotes: QuoteItem[];
+}
+
+export interface QuoteAuthor {
+    slug: string;               // goodreads author slug (e.g. "1069006.Naval_Ravikant"), used for /quotes/[author]
+    name: string;                // Arabic author name
+    image?: string;               // goodreads author photo URL
+    quotes: QuoteItem[];          // quotes not tagged with a specific book
+    books: QuoteBook[];
+}
+
+export interface QuotesConfig {
+    authors: QuoteAuthor[];
+}
+
+/** Flattened view of a single quote with its author/book context inlined — used by pages/components that render one quote at a time. */
+export interface FlatQuote {
+    id: string;
+    text: string;
+    tags?: string[];
+    likes?: number;
+    author: string;
+    authorSlug: string;
+    authorImage?: string;
+    book?: string;
+    bookSlug?: string;
+    bookCover?: string;
+}
