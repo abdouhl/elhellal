@@ -24,6 +24,42 @@ export interface QuoteTagEntry {
     quotes: FlatQuote[];
 }
 
+// Common grammatical/functional words that happen to start with "ال" (relative
+// pronouns, "إلى"/"الآن" written without hamza, etc.) — real topics, not these.
+const AL_WORD_STOPWORDS = new Set([
+    'الذي', 'الذى', 'التي', 'التى', 'الذين', 'اللذان', 'اللتان', 'اللذين', 'اللتين',
+    'اللواتي', 'اللواتى', 'اللاتي', 'اللائي',
+    'الى', 'إلى', 'الآن', 'الان', 'اللهم', 'الا', 'إلا',
+]);
+
+/** Strips Arabic diacritics (tashkeel) and tatweel so "العِلْم" and "العلم" merge into one topic. */
+function stripArabicDiacritics(s: string): string {
+    return s.replace(/[ً-ْٰـ]/g, '');
+}
+
+/**
+ * Every distinct word in a quote that starts with the Arabic definite article
+ * "ال" is treated as an implicit topic — e.g. "العلم", "الحياة", "الحب" —
+ * feeding the same tag pages ("اقتباسات عن العلم") as the curated `tags`
+ * field, without requiring every quote to have been manually tagged.
+ */
+export function extractAlTopicWords(text: string): string[] {
+    const words = stripArabicDiacritics(text)
+        .split(/[\s،.!؟:؛"'“”()«»\-–—]+/)
+        .map((w) => w.replace(/^[^ء-ي]+|[^ء-ي]+$/g, ''));
+
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const w of words) {
+        if (!w.startsWith('ال') || w.length < 4) continue;
+        if (AL_WORD_STOPWORDS.has(w)) continue;
+        if (seen.has(w)) continue; // one occurrence per quote is enough
+        seen.add(w);
+        out.push(w);
+    }
+    return out;
+}
+
 /** Below this many quotes, a book/tag page would be thinner than a single quote — skip it. */
 export const MIN_QUOTES_PER_BOOK = 1;
 export const MIN_QUOTES_PER_TAG = 3;
@@ -141,17 +177,26 @@ export function buildQuoteTagIndex(): Map<string, QuoteTagEntry> {
     if (cachedTagIndex) return cachedTagIndex;
 
     const map = new Map<string, QuoteTagEntry>();
+    const addTag = (quote: FlatQuote, rawTag: string) => {
+        const label = normalizeTag(rawTag);
+        if (!label) return;
+        const slug = slugifyTag(rawTag);
+        if (!slug) return;
+        if (!map.has(slug)) {
+            map.set(slug, { slug, label, quotes: [] });
+        }
+        const entry = map.get(slug)!;
+        // A quote can reach the same tag via both its curated `tags` field and
+        // an extracted "ال" word (e.g. tagged "الحب" and also containing the
+        // word "الحب") — don't list it twice on that tag's page.
+        if (!entry.quotes.some((q) => q.id === quote.id)) {
+            entry.quotes.push(quote);
+        }
+    };
+
     getQuotes().forEach((quote) => {
-        (quote.tags || []).forEach((rawTag) => {
-            const label = normalizeTag(rawTag);
-            if (!label) return;
-            const slug = slugifyTag(rawTag);
-            if (!slug) return;
-            if (!map.has(slug)) {
-                map.set(slug, { slug, label, quotes: [] });
-            }
-            map.get(slug)!.quotes.push(quote);
-        });
+        (quote.tags || []).forEach((rawTag) => addTag(quote, rawTag));
+        extractAlTopicWords(quote.text).forEach((word) => addTag(quote, word));
     });
 
     cachedTagIndex = map;
