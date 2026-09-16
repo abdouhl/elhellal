@@ -25,6 +25,7 @@ const otherQuotes = getQuotes()
   .slice(0, 6);
 
 const previewText = quote.text.length > 60 ? `${quote.text.slice(0, 60)}…` : quote.text;
+const heroSizeTier = quote.text.length <= 50 ? "xl" : quote.text.length <= 100 ? "lg" : quote.text.length <= 170 ? "md" : "sm";
 const breadcrumbs = [
   { name: "الرئيسية", url: "https://elhellal.com" },
   { name: "الاقتباسات", url: "https://elhellal.com/quotes" },
@@ -64,7 +65,7 @@ const pageDescription = quote.book
 
     <article class="single-quote-card">
       <span class="single-quote-mark" aria-hidden="true">&rdquo;</span>
-      <blockquote class="single-quote-text">{quote.text}</blockquote>
+      <blockquote class={`single-quote-text single-quote-text-${heroSizeTier}`}>{quote.text}</blockquote>
 
       <div class="single-quote-attribution">
         {quote.authorImage ? (
@@ -158,11 +159,16 @@ const pageDescription = quote.book
       padding: 0;
       border: none;
       color: #f5f0ea;
-      font-size: clamp(1.15rem, 2.4vw, 1.5rem);
       font-weight: 700;
       line-height: 1.8;
       text-align: right;
     }
+    /* Auto-sizing: a one-line quote gets a poster-sized treatment; a long
+       passage steps down so it stays comfortable to read. */
+    .single-quote-text-xl { font-size: clamp(1.6rem, 4vw, 2.4rem); line-height: 1.5; }
+    .single-quote-text-lg { font-size: clamp(1.35rem, 3.2vw, 1.9rem); line-height: 1.65; }
+    .single-quote-text-md { font-size: clamp(1.15rem, 2.4vw, 1.5rem); }
+    .single-quote-text-sm { font-size: clamp(1rem, 1.8vw, 1.2rem); line-height: 1.85; }
     .single-quote-attribution {
       display: flex;
       align-items: center;

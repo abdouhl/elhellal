@@ -92,6 +92,21 @@ function isArabicText(s: string): boolean {
     return arabic > latin;
 }
 
+/**
+ * Goodreads serves book/author photos via i.gr-assets.com at a small, cropped
+ * size no matter what _SX###_/_UX###_ suffix is requested — the crop is baked
+ * into that host's cache. The same asset is also mirrored uncropped, at its
+ * full native resolution, on Amazon's own CDN under an "i" folder with no
+ * size suffix at all. Swap to that instead of asking i.gr-assets.com for a
+ * "bigger" size it can't actually deliver.
+ */
+function toHiResGoodreadsImage(url: string): string {
+    const m = url.match(/^https:\/\/i\.gr-assets\.com\/images\/S\/compressed\.photo\.goodreads\.com\/(books|authors)\/(\d+)[a-z]\/(\d+)\./);
+    if (!m) return url;
+    const [, type, photoId, assetId] = m;
+    return `https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/${type}/${photoId}i/${assetId}.jpg`;
+}
+
 // ─── Goodreads fetch + parse ───────────────────────────────────────────────────
 
 interface ScrapedQuote {
@@ -124,7 +139,8 @@ function extractAuthorInfo(root: ReturnType<typeof parse>): AuthorInfo | null {
     const img = root.querySelector('.leftContainer a.quoteAvatar img');
     const name = img?.getAttribute('alt')?.trim();
     if (!name) return null;
-    const image = img?.getAttribute('src') || undefined;
+    const rawImage = img?.getAttribute('src');
+    const image = rawImage ? toHiResGoodreadsImage(rawImage) : undefined;
     return { name, ...(image ? { image } : {}) };
 }
 
@@ -213,8 +229,7 @@ async function fetchBookCover(bookHref: string): Promise<string | undefined> {
         const root = parse(html);
         const img = root.querySelector('a.leftAlignedImage:not(.quoteAvatar) img');
         const src = img?.getAttribute('src');
-        // Goodreads serves a tiny _SX50_ thumbnail by default — ask for a larger render.
-        return src?.replace(/\.\_SX\d+\_\./, '._SX318_.') || undefined;
+        return src ? toHiResGoodreadsImage(src) : undefined;
     } catch {
         return undefined;
     }
@@ -331,10 +346,25 @@ function saveQuotes(quotesConfig: QuotesConfig): void {
     fs.writeFileSync(QUOTES_PATH, JSON.stringify(quotesConfig, null, 2) + '\n');
 }
 
-function findOrCreateAuthor(config: QuotesConfig, slug: string, name: string, image: string | undefined): QuoteAuthor {
-    let author = config.authors.find((a) => a.slug === slug);
+/**
+ * Builds the URL-facing author slug from the (Arabic) name rather than
+ * Goodreads' own slug (e.g. "4603829._"), which is an opaque numeric ID and
+ * makes for useless, unreadable, un-SEO-friendly URLs. Falls back to the
+ * Goodreads slug only if the name doesn't yield anything usable, and
+ * disambiguates the rare case of two different authors sharing a name.
+ */
+function slugForAuthor(config: QuotesConfig, name: string, goodreadsSlug: string): string {
+    const base = slugifyTag(name) || goodreadsSlug;
+    if (!config.authors.some((a) => a.slug === base)) return base;
+    const disambiguator = goodreadsSlug.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6);
+    return `${base}-${disambiguator}`;
+}
+
+function findOrCreateAuthor(config: QuotesConfig, goodreadsSlug: string, name: string, image: string | undefined): QuoteAuthor {
+    let author = config.authors.find((a) => a.goodreadsSlug === goodreadsSlug);
     if (!author) {
-        author = { slug, name, ...(image ? { image } : {}), quotes: [], books: [] };
+        const slug = slugForAuthor(config, name, goodreadsSlug);
+        author = { slug, goodreadsSlug, name, ...(image ? { image } : {}), quotes: [], books: [] };
         config.authors.push(author);
     } else {
         author.name = name;
@@ -373,7 +403,7 @@ async function main() {
     }
 
     const existingIds = collectExistingIds(quotesConfig);
-    const knownAuthorSlugs = new Set(quotesConfig.authors.map((a) => a.slug));
+    const knownAuthorSlugs = new Set(quotesConfig.authors.map((a) => a.goodreadsSlug));
     const cliSlugs = process.argv.slice(2);
     const authorSlugs = [...new Set([...cliSlugs, ...knownAuthorSlugs])];
 

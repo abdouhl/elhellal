@@ -47,7 +47,10 @@ const breadcrumbs = [
 
     {authors.length > 0 && (
       <section class="quotes-browse">
-        <h2>تصفح حسب الكاتب</h2>
+        <div class="quotes-browse-heading">
+          <h2>تصفح حسب الكاتب</h2>
+          <a href="/quotes/authors" class="see-all-link">كل الكتّاب ←</a>
+        </div>
         <ul role="list" class="browse-cloud">
           {authors.slice(0, 40).map((a) => (
             <li>
@@ -86,7 +89,10 @@ const breadcrumbs = [
 
     {tags.length > 0 && (
       <section class="quotes-browse">
-        <h2>تصفح حسب الموضوع</h2>
+        <div class="quotes-browse-heading">
+          <h2>تصفح حسب الموضوع</h2>
+          <a href="/quotes/tags" class="see-all-link">كل المواضيع ←</a>
+        </div>
         <ul role="list" class="browse-cloud">
           {tags.slice(0, 60).map((t) => (
             <li>

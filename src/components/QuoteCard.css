@@ -1,11 +1,14 @@
 .quote-card {
-    padding: 26px 20px 16px;
+    position: relative;
+    padding: 28px 22px 16px;
     justify-content: space-between;
-    min-height: 240px;
-    background:
-        radial-gradient(circle at 100% 0%, rgba(255, 140, 0, 0.10), transparent 55%),
-        linear-gradient(160deg, #18140f, #101010 65%);
-    border: 0.5px solid rgba(255, 140, 0, 0.2);
+    min-height: 260px;
+    border-radius: 14px;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.quote-card:is(:hover, :focus-within) {
+    transform: translateY(-3px);
 }
 
 .quote-card-body {
@@ -14,6 +17,53 @@
     padding: 0;
     margin: 0;
     color: inherit;
+}
+
+/* ── Copy-to-clipboard icon button — hidden until the card is hovered/focused, BrainyQuote-style ── */
+.quote-copy-btn {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    background: rgba(255, 255, 255, 0.06);
+    border: 0.5px solid rgba(255, 255, 255, 0.14);
+    border-radius: 50%;
+    color: rgba(255, 255, 255, 0.55);
+    cursor: pointer;
+    opacity: 0;
+    transform: translateY(-2px);
+    transition: opacity 0.15s ease, transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.quote-card:is(:hover, :focus-within) .quote-copy-btn {
+    opacity: 1;
+    transform: translateY(0);
+}
+.quote-copy-btn:hover {
+    background: rgba(255, 140, 0, 0.18);
+    color: DarkOrange;
+}
+.quote-copy-btn--done {
+    opacity: 1;
+    color: #4ade80;
+    background: rgba(74, 222, 128, 0.14);
+}
+
+/* ── Author-quote card: bold quote mark, orange/warm identity ────────── */
+.quote-card--author {
+    background:
+        radial-gradient(circle at 100% 0%, rgba(255, 140, 0, 0.10), transparent 55%),
+        linear-gradient(160deg, #18140f, #101010 65%);
+    border: 0.5px solid rgba(255, 140, 0, 0.2);
+}
+.quote-card--author:is(:hover, :focus-within) {
+    border-color: rgba(255, 140, 0, 0.45);
+    box-shadow: 0 10px 28px rgba(255, 140, 0, 0.12);
 }
 
 .quote-mark {
@@ -31,23 +81,49 @@
 }
 
 .quote-text {
-    margin: 22px 0 18px;
+    margin: 22px 0 14px;
     padding: 0;
     border: none;
     color: #f5f0ea;
-    font-size: 16.5px;
-    font-weight: 600;
-    line-height: 1.7;
+    font-weight: 700;
+    line-height: 1.65;
     text-align: right;
     display: -webkit-box;
-    -webkit-line-clamp: 5;
     -webkit-box-orient: vertical;
     overflow: hidden;
     transition: color 0.15s ease;
 }
 
-.quote-card:is(:hover, :focus-within) .quote-text {
+/* Auto-sizing tiers (BrainyQuote-style): the shorter the quote, the bigger and
+   bolder its treatment — a one-liner gets a poster-sized font instead of
+   looking lost in a card built for a paragraph. */
+.quote-text-xl { font-size: 23px; line-height: 1.55; -webkit-line-clamp: 4; }
+.quote-text-lg { font-size: 19px; line-height: 1.6; -webkit-line-clamp: 5; }
+.quote-text-md { font-size: 16.5px; line-height: 1.7; -webkit-line-clamp: 5; }
+.quote-text-sm { font-size: 14px; line-height: 1.65; font-weight: 600; -webkit-line-clamp: 7; }
+
+.quote-card--author:is(:hover, :focus-within) .quote-text {
     color: #ffffff;
+}
+
+.quote-topics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+.quote-topic {
+    padding: 2px 9px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 0.5px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.45);
+    border-radius: 20px;
+    font-family: var(--monospace);
+    font-size: 10px;
+}
+.quote-card--book .quote-topic {
+    border-color: rgba(45, 212, 191, 0.2);
+    color: rgba(94, 234, 212, 0.7);
 }
 
 .quote-attribution {
@@ -67,6 +143,11 @@
     flex-shrink: 0;
     background: var(--background-selected);
     box-shadow: 0 0 0 2px rgba(255, 140, 0, 0.35);
+}
+.quote-author-avatar--sm {
+    width: 26px;
+    height: 26px;
+    box-shadow: 0 0 0 2px rgba(45, 212, 191, 0.4);
 }
 
 .quote-author-avatar-fallback {
@@ -100,25 +181,106 @@
     color: #ff9d33;
 }
 
-.quote-book {
+.quote-kind {
+    font-family: var(--monospace);
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.35);
+}
+
+/* ── Book-quote card: cover art + badge, cool teal identity ──────────── */
+.quote-card--book {
+    background:
+        radial-gradient(circle at 100% 0%, rgba(45, 212, 191, 0.12), transparent 55%),
+        linear-gradient(160deg, #101816, #0c0f0f 65%);
+    border: 0.5px solid rgba(45, 212, 191, 0.22);
+}
+.quote-card--book:is(:hover, :focus-within) {
+    border-color: rgba(45, 212, 191, 0.5);
+    box-shadow: 0 10px 28px rgba(45, 212, 191, 0.12);
+}
+
+.quote-book-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.quote-book-thumb {
+    width: 40px;
+    height: 58px;
+    object-fit: cover;
+    border-radius: 3px;
+    flex-shrink: 0;
+    box-shadow: 0px 3px 10px rgba(0, 0, 0, 0.5), 0 0 0 0.5px rgba(255, 255, 255, 0.12);
+}
+.quote-book-thumb-fallback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(45, 212, 191, 0.12);
+    font-size: 18px;
+}
+
+.quote-book-heading {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+.quote-book-badge {
+    align-self: flex-start;
+    padding: 2px 8px;
+    background: rgba(45, 212, 191, 0.14);
+    border: 0.5px solid rgba(45, 212, 191, 0.35);
+    color: #2dd4bf;
+    border-radius: 10px;
+    font-family: var(--monospace);
+    font-size: 10px;
+    font-weight: 700;
+}
+.quote-book-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #f5f0ea;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.quote-text--book {
+    margin: 16px 0 14px;
+}
+/* Book cards spend more header space on the cover/title, so each size tier
+   runs a notch smaller than its author-card counterpart to still fit. */
+.quote-card--book .quote-text-xl { font-size: 20px; line-height: 1.5; -webkit-line-clamp: 3; }
+.quote-card--book .quote-text-lg { font-size: 17px; line-height: 1.55; -webkit-line-clamp: 4; }
+.quote-card--book .quote-text-md { font-size: 15px; line-height: 1.6; -webkit-line-clamp: 4; }
+.quote-card--book .quote-text-sm { font-size: 13px; line-height: 1.6; -webkit-line-clamp: 6; }
+
+.quote-card--book:is(:hover, :focus-within) .quote-text--book {
+    color: #ffffff;
+}
+
+.quote-attribution--book {
+    gap: 8px;
+}
+.quote-author--book {
+    color: #2dd4bf;
+    flex: 1;
+    min-width: 0;
+}
+.quote-author--book:hover {
+    color: #5eead4;
+}
+.quote-book-link {
+    flex-shrink: 0;
     font-family: var(--monospace);
     font-size: 11px;
     color: rgba(255, 255, 255, 0.4);
     text-decoration: none;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
-.quote-book:hover {
+.quote-book-link:hover {
     color: rgba(255, 255, 255, 0.7);
-}
-
-.quote-book-cover {
-    width: 30px;
-    height: 44px;
-    object-fit: cover;
-    border-radius: 3px;
-    flex-shrink: 0;
-    margin-inline-start: auto;
-    box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.5), 0 0 0 0.5px rgba(255, 255, 255, 0.1);
 }

@@ -95,7 +95,8 @@ export interface QuoteBook {
 }
 
 export interface QuoteAuthor {
-    slug: string;               // goodreads author slug (e.g. "1069006.Naval_Ravikant"), used for /quotes/[author]
+    slug: string;               // human-readable slug generated from the Arabic name, used for /quotes/[author]
+    goodreadsSlug: string;       // original Goodreads author slug (e.g. "1069006.Naval_Ravikant") — only used to re-fetch/dedupe against Goodreads, never in a URL
     name: string;                // Arabic author name
     image?: string;               // goodreads author photo URL
     quotes: QuoteItem[];          // quotes not tagged with a specific book
