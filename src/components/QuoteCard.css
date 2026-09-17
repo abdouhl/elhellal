@@ -19,39 +19,67 @@
     color: inherit;
 }
 
-/* ── Copy-to-clipboard icon button — hidden until the card is hovered/focused, BrainyQuote-style ── */
-.quote-copy-btn {
+/* ── Action bar: copy text, copy link, share to WhatsApp/X/Facebook ──
+   Quietly visible at rest (so touch devices without :hover can find it),
+   brightens fully on hover/focus, BrainyQuote-style. ── */
+.quote-actions {
     position: absolute;
     top: 14px;
     left: 14px;
     z-index: 2;
     display: flex;
     align-items: center;
+    gap: 6px;
+    opacity: 0.55;
+    transform: translateY(-2px);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.quote-card:is(:hover, :focus-within) .quote-actions {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.quote-action-btn {
+    display: flex;
+    align-items: center;
     justify-content: center;
-    width: 30px;
-    height: 30px;
+    width: 26px;
+    height: 26px;
     padding: 0;
     background: rgba(255, 255, 255, 0.06);
     border: 0.5px solid rgba(255, 255, 255, 0.14);
     border-radius: 50%;
-    color: rgba(255, 255, 255, 0.55);
+    color: rgba(255, 255, 255, 0.6);
     cursor: pointer;
-    opacity: 0;
-    transform: translateY(-2px);
-    transition: opacity 0.15s ease, transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+    text-decoration: none;
+    transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
 }
-.quote-card:is(:hover, :focus-within) .quote-copy-btn {
-    opacity: 1;
-    transform: translateY(0);
-}
-.quote-copy-btn:hover {
+.quote-action-btn:hover {
     background: rgba(255, 140, 0, 0.18);
     color: DarkOrange;
+    transform: scale(1.08);
 }
-.quote-copy-btn--done {
-    opacity: 1;
+.quote-action-btn--done {
     color: #4ade80;
     background: rgba(74, 222, 128, 0.14);
+}
+.quote-action-btn--whatsapp:hover {
+    background: rgba(37, 211, 102, 0.18);
+    color: #25d366;
+}
+.quote-action-btn--x:hover {
+    background: rgba(255, 255, 255, 0.16);
+    color: #ffffff;
+}
+.quote-action-btn--facebook:hover {
+    background: rgba(24, 119, 242, 0.18);
+    color: #1877f2;
+}
+
+@media (max-width: 640px) {
+    .quote-actions {
+        opacity: 0.8;
+    }
 }
 
 /* ── Author-quote card: bold quote mark, orange/warm identity ────────── */

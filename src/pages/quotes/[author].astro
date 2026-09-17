@@ -1,12 +1,13 @@
 ---
 import Layout from "../../layouts/Layout.astro";
-import QuoteListItem from "../../components/QuoteListItem.astro";
+import QuoteCard from "../../components/QuoteCard";
 import AdUnit from "../../components/AdUnit.astro";
 import BreadcrumbSchema from "../../components/schema/BreadcrumbSchema.astro";
 import QuoteSchema from "../../components/schema/QuoteSchema.astro";
 import PersonSchema from "../../components/schema/PersonSchema.astro";
 import { getQuoteAuthors, getQuoteBooks, getQuoteTags } from "../../utils/quotes";
 import { normalizeTag, slugifyTag } from "../../utils/tag-slug";
+import "../../components/CardsContainer.css";
 
 export async function getStaticPaths() {
   return getQuoteAuthors().map((entry) => ({
@@ -140,9 +141,9 @@ const pageDescription = authorBooks.length > 0
     <AdUnit slot="8525183818" format="fluid" layout="in-article" className="quote-page-ad" />
 
     <section aria-label={`كل اقتباسات ${author}`}>
-      <ul role="list" class="quote-list">
+      <ul role="list" class="link-card-grid">
         {quotes.map((quote) => (
-          <QuoteListItem quote={quote} showAuthor={false} showBook={true} />
+          <QuoteCard client:visible quote={quote} />
         ))}
       </ul>
     </section>
@@ -331,13 +332,6 @@ const pageDescription = authorBooks.length > 0
     :global(.quote-page-ad) {
       margin-bottom: var(--spacing-07);
       padding-top: var(--spacing-05);
-      border-top: 0.5px solid var(--border-muted);
-    }
-
-    .quote-list {
-      list-style: none;
-      margin: 0;
-      padding: 0;
       border-top: 0.5px solid var(--border-muted);
     }
 
