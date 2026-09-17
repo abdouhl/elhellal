@@ -1,6 +1,6 @@
 import data from '../data/quotes.json';
 import type { QuotesConfig, QuoteAuthor, FlatQuote } from '../types';
-import { normalizeTag, slugifyTag } from './tags';
+import { normalizeTag, slugifyTag } from './tag-slug';
 
 export interface QuoteAuthorEntry {
     slug: string;

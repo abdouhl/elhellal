@@ -1,12 +1,11 @@
 ---
 import Layout from "../../../layouts/Layout.astro";
-import QuoteCard from "../../../components/QuoteCard";
+import QuoteListItem from "../../../components/QuoteListItem.astro";
 import AdUnit from "../../../components/AdUnit.astro";
 import BreadcrumbSchema from "../../../components/schema/BreadcrumbSchema.astro";
 import QuoteSchema from "../../../components/schema/QuoteSchema.astro";
 import BookSchema from "../../../components/schema/BookSchema.astro";
 import { getQuoteBooks } from "../../../utils/quotes";
-import "../../../components/CardsContainer.css";
 
 export async function getStaticPaths() {
   return getQuoteBooks().map((entry) => ({
@@ -81,9 +80,9 @@ const breadcrumbs = [
     <AdUnit slot="8525183818" format="fluid" layout="in-article" className="quote-page-ad" />
 
     <section aria-label={`اقتباسات من كتاب ${book}`}>
-      <ul role="list" class="link-card-grid">
+      <ul role="list" class="quote-list">
         {quotes.map((quote) => (
-          <QuoteCard client:visible quote={quote} />
+          <QuoteListItem quote={quote} showAuthor={false} showBook={false} />
         ))}
       </ul>
     </section>
@@ -214,6 +213,13 @@ const breadcrumbs = [
     :global(.quote-page-ad) {
       margin-bottom: var(--spacing-07);
       padding-top: var(--spacing-05);
+      border-top: 0.5px solid var(--border-muted);
+    }
+
+    .quote-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
       border-top: 0.5px solid var(--border-muted);
     }
 

@@ -1,6 +1,9 @@
 import data from '../data/articles.json';
 import type { Article, Category } from '../types';
 
+export { normalizeTag, slugifyTag } from './tag-slug';
+import { normalizeTag, slugifyTag } from './tag-slug';
+
 export interface TaggedArticle extends Article {
     category: string;
 }
@@ -13,17 +16,6 @@ export interface TagEntry {
 
 /** Below this many articles, a tag page would be thinner than the article itself — skip it. */
 export const MIN_TAG_ARTICLES = 3;
-
-export function normalizeTag(raw: string): string {
-    return raw.trim().replace(/_/g, ' ').replace(/\s+/g, ' ');
-}
-
-export function slugifyTag(raw: string): string {
-    return normalizeTag(raw)
-        .replace(/\//g, '-')                 // "/" would otherwise split the route into two segments (e.g. P/E-Ratio)
-        .replace(/\s+/g, '-')                // spaces -> hyphen
-        .replace(/[^\p{L}\p{N}-]/gu, '');     // strip anything else unsafe; \p{L}/\p{N} keep Arabic + other unicode letters/numbers
-}
 
 let cachedIndex: Map<string, TagEntry> | null = null;
 

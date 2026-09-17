@@ -7,7 +7,7 @@ import BreadcrumbSchema from "../../../components/schema/BreadcrumbSchema.astro"
 import QuoteSchema from "../../../components/schema/QuoteSchema.astro";
 import PersonSchema from "../../../components/schema/PersonSchema.astro";
 import { getQuotes, getQuoteById } from "../../../utils/quotes";
-import { slugifyTag } from "../../../utils/tags";
+import { slugifyTag } from "../../../utils/tag-slug";
 import "../../../components/CardsContainer.css";
 
 const { author: authorParam, id } = Astro.params;
