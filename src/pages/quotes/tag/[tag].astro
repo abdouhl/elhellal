@@ -1,21 +1,23 @@
 ---
+export const prerender = false;
+
 import Layout from "../../../layouts/Layout.astro";
 import QuoteCard from "../../../components/QuoteCard";
 import AdUnit from "../../../components/AdUnit.astro";
 import BreadcrumbSchema from "../../../components/schema/BreadcrumbSchema.astro";
 import QuoteSchema from "../../../components/schema/QuoteSchema.astro";
-import { getQuoteTags } from "../../../utils/quotes";
+import { buildQuoteTagIndex, MIN_QUOTES_PER_TAG } from "../../../utils/quotes";
 import "../../../components/CardsContainer.css";
 
-export async function getStaticPaths() {
-  return getQuoteTags().map((entry) => ({
-    params: { tag: entry.slug },
-    props: { label: entry.label, quotes: entry.quotes },
-  }));
+const tagSlug = Astro.params.tag as string;
+const entry = buildQuoteTagIndex().get(tagSlug);
+
+if (!entry || entry.quotes.length < MIN_QUOTES_PER_TAG) {
+  Astro.response.status = 404;
+  return Astro.rewrite("/404");
 }
 
-const { label, quotes } = Astro.props;
-const tagSlug = Astro.params.tag as string;
+const { label, quotes } = entry;
 
 const canonicalUrl = `https://elhellal.com/quotes/tag/${encodeURIComponent(tagSlug)}/`;
 

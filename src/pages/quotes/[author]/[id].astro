@@ -1,21 +1,31 @@
 ---
+export const prerender = false;
+
 import Layout from "../../../layouts/Layout.astro";
 import QuoteCard from "../../../components/QuoteCard";
 import BreadcrumbSchema from "../../../components/schema/BreadcrumbSchema.astro";
 import QuoteSchema from "../../../components/schema/QuoteSchema.astro";
 import PersonSchema from "../../../components/schema/PersonSchema.astro";
-import { getQuotes } from "../../../utils/quotes";
+import { getQuotes, getQuoteById } from "../../../utils/quotes";
 import { slugifyTag } from "../../../utils/tags";
 import "../../../components/CardsContainer.css";
 
-export async function getStaticPaths() {
-  return getQuotes().map((quote) => ({
-    params: { author: quote.authorSlug, id: quote.id },
-    props: { quote },
-  }));
+const { author: authorParam, id } = Astro.params;
+const quote = getQuoteById(id as string);
+
+if (!quote) {
+  Astro.response.status = 404;
+  return Astro.rewrite("/404");
 }
 
-const { quote } = Astro.props;
+// Canonicalize to the quote's real author slug so the same quote isn't
+// servable under an unrelated author path.
+if (quote.authorSlug !== authorParam) {
+  return Astro.redirect(
+    `/quotes/${encodeURIComponent(quote.authorSlug)}/${encodeURIComponent(quote.id)}/`,
+    301
+  );
+}
 
 const authorUrl = `https://elhellal.com/quotes/${encodeURIComponent(quote.authorSlug)}/`;
 const canonicalUrl = `${authorUrl}${encodeURIComponent(quote.id)}/`;
