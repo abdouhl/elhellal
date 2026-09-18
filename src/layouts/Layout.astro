@@ -895,18 +895,55 @@ const {
         // Create throttled scroll handler once
         const throttledNavScroll = throttle(handleNavScroll, 80);
 
-        // Fills any <ins class="adsbygoogle"> not yet rendered — one push() per
-        // waiting slot. Exposed on window so client:load React islands (e.g. the
-        // in-feed ad cards added by infinite scroll) can trigger it themselves.
+        // Lazy-fills <ins class="adsbygoogle"> slots: each one is only requested
+        // once it is within ~300px of the viewport, so below-the-fold ads don't
+        // compete with first paint and the ads that do load are actually seen
+        // (viewability drives what advertisers bid).
+        //
+        // adsbygoogle.push({}) fills the *first unprocessed* <ins> in document
+        // order, not a specific one — so when a slot becomes visible we push once
+        // for every unrequested slot up to and including it.
+        const requestAdsUpTo = (target) => {
+            const slots = Array.from(
+                document.querySelectorAll("ins.adsbygoogle"),
+            );
+            const last = slots.indexOf(target);
+            for (let i = 0; i <= last; i++) {
+                const ins = slots[i];
+                if (
+                    ins.getAttribute("data-adsbygoogle-status") ||
+                    ins.dataset.adRequested
+                ) {
+                    continue;
+                }
+                ins.dataset.adRequested = "1";
+                (window.adsbygoogle = window.adsbygoogle || []).push({});
+            }
+        };
+
+        let adObserver = null;
         const loadAds = () => {
             try {
-                document
-                    .querySelectorAll("ins.adsbygoogle")
-                    .forEach((ins) => {
-                        if (!ins.getAttribute("data-adsbygoogle-status")) {
-                            (window.adsbygoogle = window.adsbygoogle || []).push({});
-                        }
-                    });
+                const waiting = document.querySelectorAll(
+                    "ins.adsbygoogle:not([data-ad-requested]):not([data-adsbygoogle-status])",
+                );
+                if (!("IntersectionObserver" in window)) {
+                    waiting.forEach(requestAdsUpTo);
+                    return;
+                }
+                adObserver =
+                    adObserver ||
+                    new IntersectionObserver(
+                        (entries) => {
+                            entries.forEach((entry) => {
+                                if (!entry.isIntersecting) return;
+                                adObserver.unobserve(entry.target);
+                                requestAdsUpTo(entry.target);
+                            });
+                        },
+                        { rootMargin: "300px 0px" },
+                    );
+                waiting.forEach((ins) => adObserver.observe(ins));
             } catch (e) {}
         };
         window.__elhellalLoadAds = loadAds;

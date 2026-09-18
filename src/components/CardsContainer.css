@@ -40,6 +40,11 @@
   color: rgba(255, 255, 255, 0.3);
 }
 
+/* No fill → remove the card so the grid doesn't show an empty placeholder. */
+.ad-card:has(ins.adsbygoogle[data-ad-status="unfilled"]) {
+  display: none;
+}
+
 .ad-card .adsbygoogle {
   /* Fluid format computes its own height based on container width — don't
      stretch it, just give it full width to size against. */
