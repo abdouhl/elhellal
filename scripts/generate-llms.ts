@@ -22,11 +22,11 @@ const files = readdirSync(articlesDir).filter((f) => f.endsWith(".json"));
 const lines: string[] = [];
 
 // Header block
-lines.push("# xarticl.es");
+lines.push("# الهلال (elhellal.com)");
 lines.push("");
-lines.push("> A curated collection of long-form articles organized by topic.");
+lines.push("> A curated collection of the best Arabic Substack articles, organized by topic.");
 lines.push("");
-lines.push(`> Site: https://xarticl.es`);
+lines.push(`> Site: https://elhellal.com`);
 lines.push("");
 
 let totalArticles = 0;
@@ -48,7 +48,7 @@ for (const file of files) {
   lines.push("");
 
   for (const article of articles) {
-    const url = `https://xarticl.es/${category}/${article.slug}`;
+    const url = `https://elhellal.com/articles/${encodeURIComponent(article.slug)}/`;
 
     lines.push(`- [${article.title}](${url})`);
 
