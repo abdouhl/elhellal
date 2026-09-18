@@ -42,7 +42,7 @@ const sorted = [...articles].sort(
   (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
 );
 
-const authorLabel = isPersonal ? displayName! : `@${screen_name}`;
+const authorLabel = displayName || `@${screen_name}`;
 const canonicalUrl = `https://elhellal.com/authors/${encodeURIComponent(screen_name)}/`;
 const breadcrumbs = [
   { name: "الرئيسية", url: "https://elhellal.com" },
@@ -118,14 +118,14 @@ const latestDate = sorted[0]
         ) : (
           <img
             src={profileImage || `https://unavatar.io/twitter/${screen_name}`}
-            alt={`@${screen_name}`}
+            alt={authorLabel}
             class="author-avatar-lg"
             onerror="this.src='/favicons/default.png'"
             loading="eager"
           />
         )}
         <div class="author-identity">
-          <h1 style={isPersonal ? `color:${accent}` : ""}>{authorLabel}</h1>
+          <h1 style={isPersonal ? `color:${accent}` : ""} dir={displayName ? "rtl" : "ltr"}>{authorLabel}</h1>
           {isPersonal && tagline && <p class="author-tagline">{tagline}</p>}
           <div class="author-stats">
             <span class="author-stat">{sorted.length} مقالة</span>
@@ -252,12 +252,11 @@ const latestDate = sorted[0]
       margin: 0;
       color: DarkOrange;
       font-size: clamp(1.35rem, 3.2vw, 1.9rem);
-      direction: ltr;
-      text-align: right;
-    }
-    .author-header:has(.author-avatar-initial) h1 {
       direction: rtl;
       text-align: right;
+    }
+    .author-header h1[dir="ltr"] {
+      direction: ltr;
     }
     .author-tagline {
       margin: 4px 0 0;

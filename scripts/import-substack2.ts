@@ -40,6 +40,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import type { ArticlesConfig, Article } from '../src/types/index.ts';
 import { personalBlogs } from '../src/data/personal-blogs.ts';
+import { fetchAuthorName, loadAuthorNames, saveAuthorNames } from './lib/author-names.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -267,8 +268,11 @@ interface ImportItem {
     image: string;
 }
 
-/** Paginates https://{user}.substack.com/api/v1/archive until an empty page comes back */
-async function fetchArchive(substackUser: string): Promise<ArchiveEntry[]> {
+/** Paginates https://{user}.substack.com/api/v1/archive until an empty page comes back
+ *  or a post already present in articles.json is reached (archive is sorted
+ *  newest-first, so anything older was already imported on a previous run too —
+ *  no need to keep paging or process the rest of this author's archive). */
+async function fetchArchive(substackUser: string, allExistingIds: Set<string>): Promise<ArchiveEntry[]> {
     const base = `https://${substackUser}.substack.com`;
     const all: ArchiveEntry[] = [];
     let offset = 0;
@@ -277,6 +281,7 @@ async function fetchArchive(substackUser: string): Promise<ArchiveEntry[]> {
     const seenSlugs = new Set<string>();
     let page = 0;
     const MAX_PAGES = 500; // safety cap — 500 * 12 = 6000 posts, far past any realistic archive
+    let hitKnownArticle = false;
 
     while (true) {
         page++;
@@ -307,7 +312,19 @@ async function fetchArchive(substackUser: string): Promise<ArchiveEntry[]> {
         }
         for (const e of newEntries) seenSlugs.add(e.slug);
 
-        all.push(...newEntries);
+        for (const e of newEntries) {
+            if (allExistingIds.has(urlToId(e.canonical_url))) {
+                hitKnownArticle = true;
+                break;
+            }
+            all.push(e);
+        }
+
+        if (hitKnownArticle) {
+            console.log(`   ⏭  hit an already-imported post — stopping archive scan for this author`);
+            break;
+        }
+
         console.log(`   📄 page ${page}: offset=${offset} got=${entries.length} (${all.length} total so far)`);
 
         offset += entries.length;
@@ -329,8 +346,8 @@ async function fetchFullPostBody(substackUser: string, slug: string): Promise<st
 }
 
 /** Returns every newsletter post for an author, with full body text where the post is free. */
-async function getAllSubstackPosts(substackUser: string): Promise<ImportItem[]> {
-    const entries = await fetchArchive(substackUser);
+async function getAllSubstackPosts(substackUser: string, allExistingIds: Set<string>): Promise<ImportItem[]> {
+    const entries = await fetchArchive(substackUser, allExistingIds);
     console.log(`   📚 ${entries.length} newsletter posts in archive — fetching full bodies now\n`);
     const items: ImportItem[] = [];
 
@@ -591,12 +608,30 @@ async function main() {
     let failedUsers = 0;
     let sinceLastSave = 0;
 
+    const authorNames = loadAuthorNames();
+    let authorNamesFetched = 0;
+
     for (const substackUser of substackUsers) {
+        // Scrape the publication's real display name once per author (cached
+        // in src/data/author-names.json) so the article card and author pages
+        // can show it instead of the raw @handle.
+        if (!(substackUser in authorNames)) {
+            const name = await fetchAuthorName(substackUser);
+            if (name) {
+                authorNames[substackUser] = name;
+                saveAuthorNames(authorNames);
+                authorNamesFetched++;
+                console.log(`   🏷️  [${substackUser}] Author name: ${name}`);
+            } else {
+                console.log(`   ⚠️  [${substackUser}] Couldn't resolve an author name — will fall back to @handle`);
+            }
+        }
+
         console.log(`\n📡 [${substackUser}] Fetching full archive\n`);
 
         let items: ImportItem[];
         try {
-            items = await getAllSubstackPosts(substackUser);
+            items = await getAllSubstackPosts(substackUser, allExistingIds);
         } catch (err: any) {
             console.error(`❌ [${substackUser}] Archive error: ${err.message}`);
             failedUsers++;
@@ -655,6 +690,7 @@ async function main() {
     console.log('\n─────────────────────────────────────────');
     console.log(`✅ Added    ${added} articles`);
     console.log(`⏭  Skipped  ${skipped} duplicates`);
+    console.log(`🏷️  Names   ${authorNamesFetched} new author name(s) scraped`);
     if (failedUsers > 0) console.log(`❌ Failed   ${failedUsers} user feed(s)`);
     console.log('─────────────────────────────────────────');
     console.log('\n💡 Run: bun run prepare-data\n');

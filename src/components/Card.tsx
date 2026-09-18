@@ -2,6 +2,7 @@ import './Card.css';
 import BookmarkButton from './BookmarkButton';
 import { isRecentlyAdded } from '../utils/dates';
 import { getPlaceholderImage } from '../utils/placeholderImage';
+import authorNames from '../data/author-names.json';
 
 interface CardProps {
     href: string;
@@ -103,7 +104,7 @@ export default function Card({
             </a>
             {screen_name && (
                 <a href={authorHref || `/authors/${encodeURIComponent(screen_name)}/`} className="card-author">
-                    {authorLabel || `@${screen_name}`}
+                    {authorLabel || (authorNames as Record<string, string>)[screen_name] || `@${screen_name}`}
                 </a>
             )}
             {slug && (

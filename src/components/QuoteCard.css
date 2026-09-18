@@ -3,12 +3,19 @@
     padding: 28px 22px 16px;
     justify-content: space-between;
     min-height: 260px;
-    border-radius: 14px;
-    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+    background-color: #111111;
+    border-radius: 12px;
+    box-shadow:
+        0px 0px 0px 0.5px rgba(255, 255, 255, 0.08),
+        0px 4px 16px rgba(0, 0, 0, 0.4);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .quote-card:is(:hover, :focus-within) {
-    transform: translateY(-3px);
+    transform: translateY(-2px);
+    box-shadow:
+        0px 0px 0px 1px rgba(255, 255, 255, 0.15),
+        0px 8px 24px rgba(0, 0, 0, 0.5);
 }
 
 .quote-card-body {
@@ -82,18 +89,7 @@
     }
 }
 
-/* ── Author-quote card: bold quote mark, orange/warm identity ────────── */
-.quote-card--author {
-    background:
-        radial-gradient(circle at 100% 0%, rgba(255, 140, 0, 0.10), transparent 55%),
-        linear-gradient(160deg, #18140f, #101010 65%);
-    border: 0.5px solid rgba(255, 140, 0, 0.2);
-}
-.quote-card--author:is(:hover, :focus-within) {
-    border-color: rgba(255, 140, 0, 0.45);
-    box-shadow: 0 10px 28px rgba(255, 140, 0, 0.12);
-}
-
+/* ── Author-quote card: bold quote mark, same flat shell as the article card ── */
 .quote-mark {
     position: absolute;
     top: 2px;
@@ -130,7 +126,7 @@
 .quote-text-md { font-size: 16.5px; line-height: 1.7; -webkit-line-clamp: 5; }
 .quote-text-sm { font-size: 14px; line-height: 1.65; font-weight: 600; -webkit-line-clamp: 7; }
 
-.quote-card--author:is(:hover, :focus-within) .quote-text {
+.quote-card:is(:hover, :focus-within) .quote-text {
     color: #ffffff;
 }
 
@@ -148,10 +144,6 @@
     border-radius: 20px;
     font-family: var(--monospace);
     font-size: 10px;
-}
-.quote-card--book .quote-topic {
-    border-color: rgba(45, 212, 191, 0.2);
-    color: rgba(94, 234, 212, 0.7);
 }
 
 .quote-attribution {
@@ -175,7 +167,7 @@
 .quote-author-avatar--sm {
     width: 26px;
     height: 26px;
-    box-shadow: 0 0 0 2px rgba(45, 212, 191, 0.4);
+    box-shadow: 0 0 0 2px rgba(255, 140, 0, 0.35);
 }
 
 .quote-author-avatar-fallback {
@@ -215,18 +207,7 @@
     color: rgba(255, 255, 255, 0.35);
 }
 
-/* ── Book-quote card: cover art + badge, cool teal identity ──────────── */
-.quote-card--book {
-    background:
-        radial-gradient(circle at 100% 0%, rgba(45, 212, 191, 0.12), transparent 55%),
-        linear-gradient(160deg, #101816, #0c0f0f 65%);
-    border: 0.5px solid rgba(45, 212, 191, 0.22);
-}
-.quote-card--book:is(:hover, :focus-within) {
-    border-color: rgba(45, 212, 191, 0.5);
-    box-shadow: 0 10px 28px rgba(45, 212, 191, 0.12);
-}
-
+/* ── Book-quote card: cover art + badge, same DarkOrange identity as the article card ── */
 .quote-book-header {
     display: flex;
     align-items: flex-start;
@@ -245,7 +226,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(45, 212, 191, 0.12);
+    background: rgba(255, 140, 0, 0.12);
     font-size: 18px;
 }
 
@@ -258,9 +239,9 @@
 .quote-book-badge {
     align-self: flex-start;
     padding: 2px 8px;
-    background: rgba(45, 212, 191, 0.14);
-    border: 0.5px solid rgba(45, 212, 191, 0.35);
-    color: #2dd4bf;
+    background: rgba(255, 80, 0, 0.2);
+    border: 0.5px solid rgba(255, 80, 0, 0.3);
+    color: #ff7a40;
     border-radius: 10px;
     font-family: var(--monospace);
     font-size: 10px;
@@ -287,20 +268,16 @@
 .quote-card--book .quote-text-md { font-size: 15px; line-height: 1.6; -webkit-line-clamp: 4; }
 .quote-card--book .quote-text-sm { font-size: 13px; line-height: 1.6; -webkit-line-clamp: 6; }
 
-.quote-card--book:is(:hover, :focus-within) .quote-text--book {
-    color: #ffffff;
-}
-
 .quote-attribution--book {
     gap: 8px;
 }
 .quote-author--book {
-    color: #2dd4bf;
+    color: DarkOrange;
     flex: 1;
     min-width: 0;
 }
 .quote-author--book:hover {
-    color: #5eead4;
+    color: #ff9d33;
 }
 .quote-book-link {
     flex-shrink: 0;
@@ -310,7 +287,7 @@
     text-decoration: none;
 }
 .quote-book-link:hover {
-    color: rgba(255, 255, 255, 0.7);
+    color: DarkOrange;
 }
 
 /* ── Dense list rows (quotes.net-style) — used on author/book/tag listing

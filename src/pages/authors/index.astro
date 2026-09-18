@@ -34,27 +34,30 @@ const breadcrumbs = [
     </header>
 
     <ul role="list" class="author-grid">
-      {authors.map((author) => (
-        <li>
-          <a href={`/authors/${encodeURIComponent(author.screen_name)}/`} class="author-card">
-            {author.isPersonal ? (
-              <span class="author-card-initial" style={`background:${author.accent}`}>
-                {author.displayName?.trim().charAt(0)}
-              </span>
-            ) : (
-              <img
-                src={author.profileImage || `https://unavatar.io/twitter/${author.screen_name}`}
-                alt={`@${author.screen_name}`}
-                class="author-card-avatar"
-                onerror="this.src='/favicons/default.png'"
-                loading="lazy"
-              />
-            )}
-            <span class="author-card-handle" style={author.isPersonal ? "" : "direction:ltr"}>{author.isPersonal ? author.displayName : `@${author.screen_name}`}</span>
-            <span class="author-card-count">{author.articles.length} مقالة</span>
-          </a>
-        </li>
-      ))}
+      {authors.map((author) => {
+        const label = author.displayName || `@${author.screen_name}`;
+        return (
+          <li>
+            <a href={`/authors/${encodeURIComponent(author.screen_name)}/`} class="author-card">
+              {author.isPersonal ? (
+                <span class="author-card-initial" style={`background:${author.accent}`}>
+                  {label.trim().charAt(0)}
+                </span>
+              ) : (
+                <img
+                  src={author.profileImage || `https://unavatar.io/twitter/${author.screen_name}`}
+                  alt={label}
+                  class="author-card-avatar"
+                  onerror="this.src='/favicons/default.png'"
+                  loading="lazy"
+                />
+              )}
+              <span class="author-card-handle" style={author.displayName ? "" : "direction:ltr"}>{label}</span>
+              <span class="author-card-count">{author.articles.length} مقالة</span>
+            </a>
+          </li>
+        );
+      })}
     </ul>
   </main>
 

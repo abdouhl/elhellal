@@ -2,6 +2,7 @@ import { getCollection } from 'astro:content';
 import data from '../data/articles.json';
 import type { Article, Category } from '../types';
 import { personalBlogs } from '../data/personal-blogs';
+import authorNames from '../data/author-names.json';
 
 export interface AuthorArticle extends Article {
     category: string;
@@ -143,7 +144,11 @@ export function buildAuthorIndex(): Map<string, AuthorEntry> {
         cat.content.forEach((article) => {
             if (!article.screen_name) return;
             if (!map.has(article.screen_name)) {
-                map.set(article.screen_name, { screen_name: article.screen_name, articles: [] });
+                map.set(article.screen_name, {
+                    screen_name: article.screen_name,
+                    displayName: (authorNames as Record<string, string>)[article.screen_name],
+                    articles: [],
+                });
             }
             const entry = map.get(article.screen_name)!;
             entry.articles.push({ ...article, category: cat.category });

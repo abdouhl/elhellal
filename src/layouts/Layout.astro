@@ -192,6 +192,30 @@ const {
                     </div>
 
                     <div class="header-actions">
+                        <div class="social-links">
+                            <a
+                                href="https://www.pinterest.com/elhellalcom/"
+                                class="social-link"
+                                aria-label="بينترست"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                                    <path d="M12 0C5.373 0 0 5.372 0 12c0 5.084 3.163 9.426 7.627 11.174-.105-.949-.2-2.405.042-3.441.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.03-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 0 1 .083.345l-.333 1.36c-.053.222-.174.269-.402.163-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.632-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12 24c6.627 0 12-5.373 12-12 0-6.628-5.373-12-12-12z"/>
+                                </svg>
+                            </a>
+                            <a
+                                href="https://www.tiktok.com/@elhellal"
+                                class="social-link"
+                                aria-label="تيك توك"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                                    <path d="M16.6 5.82c-1.007-.98-1.671-2.152-1.913-3.53H12.35v13.75c0 1.94-1.578 3.517-3.517 3.517a3.52 3.52 0 0 1-3.518-3.517 3.52 3.52 0 0 1 3.518-3.517c.35 0 .687.052 1.006.148V9.315a6.156 6.156 0 0 0-1.006-.083C5.128 9.232 2 12.36 2 16.164 2 19.967 5.128 23.1 8.833 23.1c3.704 0 6.833-3.132 6.833-6.936V9.398a9.128 9.128 0 0 0 5.334 1.712V8.363a5.98 5.98 0 0 1-4.4-2.543z"/>
+                                </svg>
+                            </a>
+                        </div>
                         <button
                             class="new-filter-toggle"
                             id="new-filter-toggle"
@@ -457,6 +481,39 @@ const {
         gap: var(--spacing-03);
         align-items: center;
         justify-content: flex-end;
+    }
+
+    .social-links {
+        display: flex;
+        gap: var(--spacing-02);
+        align-items: center;
+        margin-right: var(--spacing-03);
+    }
+
+    .social-link {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--spacing-08);
+        height: var(--spacing-08);
+        color: var(--content-secondary);
+        border-radius: var(--spacing-00);
+        transition:
+            color 0.2s ease,
+            transform 0.1s ease;
+    }
+
+    .social-link:hover {
+        color: var(--accent);
+    }
+
+    .social-link:active {
+        transform: scale(0.9);
+    }
+
+    .social-link:focus {
+        outline: 1px solid var(--button-primary);
+        outline-offset: 2px;
     }
 
     .header-search-row {
