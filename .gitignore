@@ -43,3 +43,6 @@ scripts/generate-pinterest-pin.ts
 
 # generated pinterest pins (local storage mode)
 public/pins/
+
+# generated TikTok slideshow images (manual-upload only, never served by the site)
+/tiktok-slides/

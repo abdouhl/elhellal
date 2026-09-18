@@ -38,6 +38,7 @@
     "update-metadata": "bun run scripts/update-metadata.ts",
     "import-quotes": "bun run scripts/import-goodreads-quotes.ts",
     "generate-pins": "bun run scripts/generate-pinterest-pin.ts",
+    "tiktok-slides": "bun run scripts/generate-tiktok-slideshow.ts",
     "deploy:views": "wrangler deploy --config workers/views/wrangler.jsonc"
   },
   "dependencies": {
