@@ -1,0 +1,636 @@
+---
+// Local-only design preview: recreates the Tumblr "For You" dashboard layout,
+// wired to real elhellal content and real site features (bookmarks, ads,
+// navigation). No "Follow"/social affordances — this site has no accounts.
+// Never built/served in production.
+import data from "../data/articles.json";
+import { getQuotes } from "../utils/quotes";
+import BookmarkButton from "../components/BookmarkButton";
+import AdUnit from "../components/AdUnit.astro";
+import type { Category, Article, FlatQuote } from "../types";
+
+export const prerender = false;
+
+if (!import.meta.env.DEV) {
+    return Astro.redirect("/", 302);
+}
+
+const CF_IMAGE_BASE = "https://img.xarticl.es/cdn-cgi/image";
+const CF_R2_BASE = "https://img.xarticl.es";
+
+function cfImage(src: string, opts: Record<string, string | number>): string {
+    const params = Object.entries(opts)
+        .map(([k, v]) => `${k}=${v}`)
+        .join(",");
+    const path = src.startsWith(CF_R2_BASE) ? src.slice(CF_R2_BASE.length) : src;
+    return `${CF_IMAGE_BASE}/${params}${path}`;
+}
+
+function cover(src: string | undefined, w: number, h: number): string {
+    if (!src) return "/thumbs/placeholder.webp";
+    return src.startsWith(CF_R2_BASE) ? cfImage(src, { width: w, height: h, fit: "cover", format: "auto", quality: 80 }) : src;
+}
+
+function quoteSizeTier(text: string): "xl" | "lg" | "md" | "sm" {
+    const len = text.length;
+    if (len <= 50) return "xl";
+    if (len <= 100) return "lg";
+    if (len <= 170) return "md";
+    return "sm";
+}
+
+const allArticles: (Article & { category: string })[] = (data.articles as Category[]).flatMap((cat) =>
+    cat.content.map((a) => ({ ...a, category: cat.category }))
+);
+const withImages = allArticles.filter((a) => a.original_img_url);
+
+const articleFeed = [...withImages]
+    .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""))
+    .slice(0, 16);
+
+const allQuotes = getQuotes();
+const quoteStep = Math.max(1, Math.floor(allQuotes.length / 6));
+const quoteSample: FlatQuote[] = [];
+for (let i = 0; i < allQuotes.length && quoteSample.length < 6; i += quoteStep) {
+    quoteSample.push(allQuotes[i]);
+}
+
+type FeedItem = { kind: "article"; article: Article & { category: string } } | { kind: "quote"; quote: FlatQuote };
+const feedItems: FeedItem[] = [];
+let quoteCursor = 0;
+articleFeed.forEach((article, idx) => {
+    feedItems.push({ kind: "article", article });
+    if ((idx + 1) % 4 === 0 && quoteCursor < quoteSample.length) {
+        feedItems.push({ kind: "quote", quote: quoteSample[quoteCursor++] });
+    }
+});
+while (quoteCursor < quoteSample.length) {
+    feedItems.push({ kind: "quote", quote: quoteSample[quoteCursor++] });
+}
+
+const seenAuthors = new Set<string>();
+const suggestedBlogs: (Article & { category: string })[] = [];
+for (const a of withImages) {
+    if (a.screen_name && a.profile_image_url_https && !seenAuthors.has(a.screen_name)) {
+        seenAuthors.add(a.screen_name);
+        suggestedBlogs.push(a);
+        if (suggestedBlogs.length >= 4) break;
+    }
+}
+
+const radar = articleFeed.find((a) => !suggestedBlogs.includes(a)) || articleFeed[0];
+
+const quickLinks = [
+    { label: "الكتّاب", href: "/authors/", icon: "👤" },
+    { label: "الوسوم", href: "/tags/", icon: "🏷️" },
+    { label: "المحفوظات", href: "/saved/", icon: "🔖" },
+    { label: "عن الموقع", href: "/about/", icon: "ℹ️" },
+];
+
+const navItems = [
+    { label: "الرئيسية", href: "/", icon: "🏠" },
+    { label: "الاقتباسات", href: "/quotes/", icon: "❝" },
+    { label: "الكتّاب", href: "/authors/", icon: "👤" },
+    { label: "الوسوم", href: "/tags/", icon: "🏷️" },
+    { label: "المحفوظات", href: "/saved/", icon: "🔖" },
+];
+---
+
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>الهلال — معاينة تصميم Tumblr (محلي فقط)</title>
+    <link rel="icon" type="image/svg+xml" href="/xarticles.svg" />
+</head>
+<body>
+    <div class="tumblr-shell">
+        <header class="topbar">
+            <div class="topbar-tabs">
+                <span class="tab active">لك</span>
+                <a class="tab" href="/">المقالات</a>
+                <a class="tab" href="/quotes/">الاقتباسات</a>
+            </div>
+            <div class="topbar-search">
+                <span class="search-icon">🔍</span>
+                <input type="text" placeholder="ابحث في الهلال" disabled />
+            </div>
+        </header>
+
+        <div class="tumblr-grid">
+            <nav class="sidebar-nav">
+                <a class="brand" href="/">الهلال</a>
+                <ul>
+                    {navItems.map((item) => (
+                        <li>
+                            <a href={item.href}>
+                                <span class="nav-icon" aria-hidden="true">{item.icon}</span>
+                                <span>{item.label}</span>
+                            </a>
+                        </li>
+                    ))}
+                </ul>
+            </nav>
+
+            <main class="feed">
+                <div class="quicklinks">
+                    {quickLinks.map((item) => (
+                        <a class="quicklink-item" href={item.href}>
+                            <span class="quicklink-icon" aria-hidden="true">{item.icon}</span>
+                            {item.label}
+                        </a>
+                    ))}
+                </div>
+
+                {feedItems.map((item) =>
+                    item.kind === "article" ? (
+                        <article class="post">
+                            <header class="post-header">
+                                <img
+                                    class="avatar"
+                                    src={cover(item.article.profile_image_url_https, 40, 40)}
+                                    alt=""
+                                    loading="lazy"
+                                />
+                                <a class="post-author" href={`/authors/${encodeURIComponent(item.article.screen_name)}/`}>
+                                    {item.article.screen_name}
+                                </a>
+                                <div class="post-header-actions">
+                                    <BookmarkButton
+                                        client:load
+                                        slug={item.article.slug || ""}
+                                        title={item.article.title}
+                                        variant="small"
+                                    />
+                                </div>
+                            </header>
+                            <a class="post-image-link" href={`/articles/${encodeURIComponent(item.article.slug || "")}/`}>
+                                <img
+                                    class="post-image"
+                                    src={cover(item.article.original_img_url, 960, 720)}
+                                    alt={item.article.title}
+                                    loading="lazy"
+                                />
+                            </a>
+                            <div class="post-body">
+                                <a class="post-title" href={`/articles/${encodeURIComponent(item.article.slug || "")}/`}>
+                                    {item.article.title}
+                                </a>
+                                <p class="post-preview">{item.article.preview_text}</p>
+                            </div>
+                        </article>
+                    ) : (
+                        <article class="post post-quote">
+                            <header class="post-header">
+                                {item.quote.authorImage ? (
+                                    <img class="avatar" src={item.quote.authorImage} alt="" loading="lazy" />
+                                ) : (
+                                    <span class="avatar avatar-fallback" aria-hidden="true">
+                                        {item.quote.author.trim().charAt(0)}
+                                    </span>
+                                )}
+                                <a class="post-author" href={`/quotes/${encodeURIComponent(item.quote.authorSlug)}/`}>
+                                    {item.quote.author}
+                                </a>
+                                <span class="post-type-pill">اقتباس</span>
+                            </header>
+                            <a
+                                class="post-quote-body"
+                                href={`/quotes/${encodeURIComponent(item.quote.authorSlug)}/${encodeURIComponent(item.quote.id)}/`}
+                            >
+                                <span class="post-quote-mark" aria-hidden="true">&rdquo;</span>
+                                <blockquote class={`post-quote-text post-quote-text-${quoteSizeTier(item.quote.text)}`}>
+                                    {item.quote.text}
+                                </blockquote>
+                                {item.quote.book && <span class="post-quote-book">من كتاب: {item.quote.book}</span>}
+                            </a>
+                        </article>
+                    )
+                )}
+            </main>
+
+            <aside class="sidebar-widgets">
+                <div class="widget ad-widget">
+                    <AdUnit slot="2951250905" />
+                </div>
+
+                <div class="widget">
+                    <h3>مدوّنات نرشحها لك</h3>
+                    <ul class="blog-suggestions">
+                        {suggestedBlogs.map((a) => (
+                            <li>
+                                <img class="avatar" src={cover(a.profile_image_url_https, 36, 36)} alt="" loading="lazy" />
+                                <a href={`/authors/${encodeURIComponent(a.screen_name)}/`}>{a.screen_name}</a>
+                                <a class="view-link" href={`/authors/${encodeURIComponent(a.screen_name)}/`}>عرض ←</a>
+                            </li>
+                        ))}
+                    </ul>
+                    <a class="explore-link" href="/authors/">استكشف كل الكتّاب</a>
+                </div>
+
+                {radar && (
+                    <div class="widget">
+                        <h3>الرادار</h3>
+                        <div class="radar-card">
+                            <header class="post-header">
+                                <img class="avatar" src={cover(radar.profile_image_url_https, 32, 32)} alt="" loading="lazy" />
+                                <a class="post-author" href={`/authors/${encodeURIComponent(radar.screen_name)}/`}>
+                                    {radar.screen_name}
+                                </a>
+                            </header>
+                            <a href={`/articles/${encodeURIComponent(radar.slug || "")}/`}>
+                                <img class="radar-image" src={cover(radar.original_img_url, 480, 480)} alt={radar.title} loading="lazy" />
+                            </a>
+                        </div>
+                    </div>
+                )}
+            </aside>
+        </div>
+    </div>
+
+    <style>
+        :root {
+            color-scheme: dark;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: #000000;
+            color: #ffffff;
+            font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+        }
+
+        .tumblr-shell {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 24px 0 16px;
+            gap: 24px;
+        }
+
+        .topbar-tabs {
+            display: flex;
+            gap: 24px;
+            font-weight: 600;
+            font-size: 18px;
+        }
+
+        .tab {
+            color: rgba(255, 255, 255, 0.5);
+            padding-bottom: 8px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .tab.active {
+            color: #ffffff;
+            border-bottom: 2px solid #4bc3f8;
+        }
+
+        .topbar-search {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #1b1b1b;
+            border-radius: 24px;
+            padding: 10px 16px;
+            min-width: 260px;
+        }
+
+        .topbar-search input {
+            background: transparent;
+            border: none;
+            color: #fff;
+            outline: none;
+            width: 100%;
+            font-size: 14px;
+        }
+
+        .tumblr-grid {
+            display: flex;
+            flex-direction: row-reverse;
+            align-items: flex-start;
+            gap: 32px;
+        }
+
+        .sidebar-nav {
+            flex: 0 0 220px;
+            position: sticky;
+            top: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .brand {
+            font-size: 22px;
+            font-weight: 800;
+            color: #fff;
+            text-decoration: none;
+        }
+
+        .sidebar-nav ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .sidebar-nav a {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            color: #eaeaea;
+            text-decoration: none;
+            font-size: 15px;
+        }
+
+        .sidebar-nav a:hover {
+            background: #1b1b1b;
+        }
+
+        .nav-icon {
+            font-size: 16px;
+            width: 20px;
+            text-align: center;
+        }
+
+        .feed {
+            flex: 1 1 auto;
+            min-width: 0;
+            max-width: 640px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .quicklinks {
+            display: flex;
+            justify-content: space-between;
+            background: #131313;
+            border: 1px solid #222;
+            border-radius: 12px;
+            padding: 14px 8px;
+        }
+
+        .quicklink-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #ddd;
+            text-decoration: none;
+            padding: 4px 8px;
+            border-radius: 8px;
+        }
+
+        .quicklink-item:hover {
+            background: #1b1b1b;
+            color: #fff;
+        }
+
+        .quicklink-icon {
+            font-size: 18px;
+        }
+
+        .post {
+            background: #0e0e0e;
+            border: 1px solid #1f1f1f;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .post-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 14px;
+        }
+
+        .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            object-fit: cover;
+            background: #333;
+            flex: 0 0 auto;
+        }
+
+        .avatar-fallback {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: #ccc;
+        }
+
+        .post-author {
+            font-weight: 700;
+            color: #fff;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .post-header-actions {
+            margin-inline-start: auto;
+        }
+
+        .post-type-pill {
+            margin-inline-start: auto;
+            font-size: 11px;
+            color: #9fd6ff;
+            background: #0b1b24;
+            border: 1px solid #133345;
+            padding: 3px 10px;
+            border-radius: 12px;
+        }
+
+        .post-image-link {
+            display: block;
+        }
+
+        .post-image {
+            width: 100%;
+            display: block;
+            object-fit: cover;
+            max-height: 640px;
+            background: #fff;
+        }
+
+        .post-body {
+            padding: 14px 16px 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .post-title {
+            color: #fff;
+            font-weight: 700;
+            font-size: 15px;
+            text-decoration: none;
+        }
+
+        .post-preview {
+            margin: 0;
+            color: #b7b7b7;
+            font-size: 14px;
+            line-height: 1.6;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .post-quote-body {
+            display: block;
+            text-decoration: none;
+            padding: 8px 24px 26px;
+            text-align: center;
+        }
+
+        .post-quote-mark {
+            display: block;
+            font-family: Georgia, "Times New Roman", serif;
+            font-size: 48px;
+            line-height: 1;
+            color: #4bc3f8;
+            margin-bottom: 4px;
+        }
+
+        .post-quote-text {
+            margin: 0;
+            font-family: Georgia, "Times New Roman", serif;
+            color: #fff;
+            line-height: 1.5;
+        }
+
+        .post-quote-text-xl {
+            font-size: 28px;
+        }
+
+        .post-quote-text-lg {
+            font-size: 22px;
+        }
+
+        .post-quote-text-md {
+            font-size: 18px;
+        }
+
+        .post-quote-text-sm {
+            font-size: 15px;
+        }
+
+        .post-quote-book {
+            display: block;
+            margin-top: 16px;
+            font-size: 13px;
+            color: #888;
+        }
+
+        .sidebar-widgets {
+            flex: 0 0 300px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            position: sticky;
+            top: 24px;
+        }
+
+        .widget {
+            background: #0e0e0e;
+            border: 1px solid #1f1f1f;
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .ad-widget {
+            padding: 12px;
+        }
+
+        .widget h3 {
+            margin: 0 0 12px;
+            font-size: 15px;
+        }
+
+        .blog-suggestions {
+            list-style: none;
+            margin: 0 0 12px;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .blog-suggestions li {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .blog-suggestions a {
+            color: #fff;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .view-link {
+            margin-inline-start: auto;
+            color: #4bc3f8 !important;
+            font-weight: 400 !important;
+            font-size: 12px !important;
+        }
+
+        .explore-link {
+            color: #4bc3f8;
+            font-size: 13px;
+            text-decoration: none;
+        }
+
+        .radar-card .post-header {
+            padding: 0 0 10px;
+        }
+
+        .radar-image {
+            width: 100%;
+            border-radius: 8px;
+            display: block;
+            object-fit: cover;
+            aspect-ratio: 1 / 1;
+        }
+
+        @media (max-width: 1100px) {
+            .sidebar-widgets {
+                display: none;
+            }
+        }
+
+        @media (max-width: 800px) {
+            .sidebar-nav {
+                display: none;
+            }
+            .feed {
+                max-width: none;
+            }
+        }
+    </style>
+</body>
+</html>
