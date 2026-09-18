@@ -36,7 +36,7 @@ const breadcrumbs = [
     <ul role="list" class="tag-cloud">
       {tags.map((tag) => (
         <li>
-          <a href={`/tags/${encodeURIComponent(tag.slug)}`} class="tag-pill">
+          <a href={`/tags/${encodeURIComponent(tag.slug)}/`} class="tag-pill">
             {tag.label}
             <span class="tag-pill-count">{tag.articles.length}</span>
           </a>

@@ -102,7 +102,7 @@ export default function Card({
                 <strong className="nu-c-helper-text nu-u-mt-1 nu-u-mb-1">{title}</strong>
             </a>
             {screen_name && (
-                <a href={authorHref || `/authors/${encodeURIComponent(screen_name)}`} className="card-author">
+                <a href={authorHref || `/authors/${encodeURIComponent(screen_name)}/`} className="card-author">
                     {authorLabel || `@${screen_name}`}
                 </a>
             )}

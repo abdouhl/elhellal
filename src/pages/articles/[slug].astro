@@ -104,12 +104,12 @@ const formatDate = (dateStr: string) => {
 const formattedDate = formatDate(tool.created_at);
 const canonicalUrl = `https://elhellal.com/articles/${encodeURIComponent(tool.slug)}/`;
 const faviconUrl = `/favicons/${slug}.png`;
-const fallbackPath = isPersonalPost ? `/authors/${person!.slug}` : (category === "all" ? "/" : `/${category}`);
+const fallbackPath = isPersonalPost ? `/authors/${person!.slug}/` : (category === "all" ? "/" : `/${category}/`);
 const tweetUrl = isPersonalPost ? undefined : `https://x.com/${tool.screen_name}/status/${tool.id_str}`;
 const readUrl = isPersonalPost ? undefined : (tool.url || tweetUrl);
 const sourceHost = !isPersonalPost && tool.url ? new URL(tool.url).hostname.replace(/^www\./, '') : null;
 const isSubstack = !!sourceHost && sourceHost.endsWith('substack.com');
-const authorHref = isPersonalPost ? `/authors/${person!.slug}` : `/authors/${tool.screen_name}`;
+const authorHref = isPersonalPost ? `/authors/${person!.slug}/` : `/authors/${tool.screen_name}/`;
 const authorDisplayName = isPersonalPost ? person!.nameAr : `@${tool.screen_name}`;
 const authorUrl = isPersonalPost
     ? authorHref
@@ -165,7 +165,7 @@ const relatedTools = isPersonalPost
 
 const categoryObj = isPersonalPost ? null : (articlesConfig as any).articles?.find((c: any) => c.category === categoryName);
 const categoryTitle = isPersonalPost ? person!.nameAr : (categoryObj?.title || (category.charAt(0).toUpperCase() + category.slice(1)));
-const categoryHref = isPersonalPost ? `/authors/${person!.slug}` : `/${category}`;
+const categoryHref = isPersonalPost ? `/authors/${person!.slug}/` : `/${category}/`;
 const breadcrumbs = [
   { name: "الرئيسية", url: "https://elhellal.com" },
   { name: categoryTitle, url: `https://elhellal.com${categoryHref}` },
@@ -283,7 +283,7 @@ const keywordsString = keywords?.join(', ');
               {keywords.map((kw: string) => {
                 const tagSlug = slugifyTag(kw);
                 return qualifyingTagSlugs.has(tagSlug) ? (
-                  <a href={`/tags/${encodeURIComponent(tagSlug)}`} class="keyword-tag">{kw}</a>
+                  <a href={`/tags/${encodeURIComponent(tagSlug)}/`} class="keyword-tag">{kw}</a>
                 ) : (
                   <span class="keyword-tag keyword-tag--static" title="لا توجد صفحة كافية من المقالات لهذا الوسم بعد">{kw}</span>
                 );

@@ -1,12 +1,11 @@
 ---
 import Layout from "../../../layouts/Layout.astro";
-import QuoteCard from "../../../components/QuoteCard";
+import { QuoteRow } from "../../../components/QuoteCard";
 import AdUnit from "../../../components/AdUnit.astro";
 import BreadcrumbSchema from "../../../components/schema/BreadcrumbSchema.astro";
 import QuoteSchema from "../../../components/schema/QuoteSchema.astro";
 import BookSchema from "../../../components/schema/BookSchema.astro";
 import { getQuoteBooks } from "../../../utils/quotes";
-import "../../../components/CardsContainer.css";
 
 export async function getStaticPaths() {
   return getQuoteBooks().map((entry) => ({
@@ -55,7 +54,7 @@ const breadcrumbs = [
     <nav class="breadcrumb" aria-label="مسار التنقل">
       <a href="/">الرئيسية</a>
       <span aria-hidden="true">›</span>
-      <a href="/quotes">الاقتباسات</a>
+      <a href="/quotes/">الاقتباسات</a>
       <span aria-hidden="true">›</span>
       <span>{book}</span>
     </nav>
@@ -81,9 +80,9 @@ const breadcrumbs = [
     <AdUnit slot="8525183818" format="fluid" layout="in-article" className="quote-page-ad" />
 
     <section aria-label={`اقتباسات من كتاب ${book}`}>
-      <ul role="list" class="link-card-grid">
+      <ul role="list" class="quote-row-list">
         {quotes.map((quote) => (
-          <QuoteCard client:visible quote={quote} />
+          <QuoteRow client:visible quote={quote} showAuthor={false} showBook={false} />
         ))}
       </ul>
     </section>
@@ -110,7 +109,7 @@ const breadcrumbs = [
     )}
 
     <div class="page-nav">
-      <a href="/quotes" class="back-link">كل الاقتباسات ←</a>
+      <a href="/quotes/" class="back-link">كل الاقتباسات ←</a>
     </div>
   </main>
 

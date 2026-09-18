@@ -176,6 +176,46 @@ function QuoteTags({ tags }: { tags?: string[] }) {
     );
 }
 
+interface QuoteRowProps {
+    quote: FlatQuote;
+    /** Hide the author byline when the page itself is already scoped to that author (e.g. an author's quote list). */
+    showAuthor?: boolean;
+    /** Hide the book byline when the page itself is already scoped to that book. */
+    showBook?: boolean;
+}
+
+/** quotes.net-style dense list row: quote text as a plain line + a byline, no card chrome. Used on the author/book/tag listing pages instead of the big illustrated QuoteCard. */
+export function QuoteRow({ quote, showAuthor = true, showBook = true }: QuoteRowProps) {
+    const url = quoteUrl(quote);
+    const authorUrl = `/quotes/${encodeURIComponent(quote.authorSlug)}/`;
+    const bookUrl = quote.bookSlug ? `/quotes/book/${encodeURIComponent(quote.bookSlug)}/` : undefined;
+
+    return (
+        <li className="quote-row">
+            <a href={url} className="quote-row-text-link">
+                <blockquote className="quote-row-text">{quote.text}</blockquote>
+            </a>
+            <div className="quote-row-footer">
+                <div className="quote-row-meta">
+                    {showAuthor && <a href={authorUrl} className="quote-row-author">{quote.author}</a>}
+                    {showAuthor && showBook && quote.book && <span className="quote-row-sep" aria-hidden="true">،</span>}
+                    {showBook && quote.book && (
+                        bookUrl ? <a href={bookUrl} className="quote-row-book">{quote.book}</a> : <span className="quote-row-book">{quote.book}</span>
+                    )}
+                    {quote.tags && quote.tags.length > 0 && (
+                        <span className="quote-row-tags">
+                            {quote.tags.slice(0, 3).map((tag) => (
+                                <span key={tag} className="quote-row-tag">#{tag}</span>
+                            ))}
+                        </span>
+                    )}
+                </div>
+                <QuoteActions quote={quote} />
+            </div>
+        </li>
+    );
+}
+
 function AuthorQuoteCard({ quote }: QuoteCardProps) {
     const url = quoteUrl(quote);
     const authorUrl = `/quotes/${encodeURIComponent(quote.authorSlug)}/`;

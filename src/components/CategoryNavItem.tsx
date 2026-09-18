@@ -20,7 +20,7 @@ export default function CategoryNavItem({
 
     const handleNavigation = (e: React.MouseEvent) => {
         e.preventDefault();
-        const path = category === 'all' ? '/' : `/${category}`;
+        const path = category === 'all' ? '/' : `/${category}/`;
         navigate(path, {
             history: 'push',
             state: { category },

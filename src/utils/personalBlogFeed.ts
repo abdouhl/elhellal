@@ -30,7 +30,7 @@ export async function getPersonalBlogFeedArticles(): Promise<ArticleWithCategory
                 created_at: post.data.pubDate.toISOString().slice(0, 10),
                 slug: post.slug,
                 authorName: person.nameAr,
-                authorHref: `/authors/${collection}`,
+                authorHref: `/authors/${collection}/`,
                 category: CATEGORY_BY_PERSON[collection],
             }));
         })

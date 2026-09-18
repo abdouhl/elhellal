@@ -312,3 +312,111 @@
 .quote-book-link:hover {
     color: rgba(255, 255, 255, 0.7);
 }
+
+/* ── Dense list rows (quotes.net-style) — used on author/book/tag listing
+   pages instead of the illustrated card grid: plain quote text + a byline,
+   grouped into one bordered box like the article page's core-sections. ── */
+.quote-row-list {
+    display: flex;
+    flex-direction: column;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    background: var(--background-secondary);
+    border: 0.5px solid var(--border-muted);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.quote-row {
+    padding: var(--spacing-05) var(--spacing-06);
+    border-bottom: 0.5px solid var(--border-muted);
+    transition: background 0.15s ease;
+}
+.quote-row:last-child {
+    border-bottom: none;
+}
+.quote-row:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.quote-row-text-link {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+}
+
+.quote-row-text {
+    margin: 0 0 var(--spacing-03);
+    padding-inline-start: 14px;
+    border-inline-start: 3px solid DarkOrange;
+    font-size: var(--desktop-body);
+    line-height: 1.8;
+    color: #f0ede8;
+    font-weight: 500;
+    transition: color 0.15s ease;
+}
+.quote-row:hover .quote-row-text {
+    color: #ffffff;
+}
+
+.quote-row-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-03);
+    flex-wrap: wrap;
+}
+
+.quote-row-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-family: var(--monospace);
+    font-size: var(--desktop-caption);
+    color: var(--content-secondary);
+}
+.quote-row-author {
+    color: DarkOrange;
+    font-weight: 700;
+    text-decoration: none;
+}
+.quote-row-author:hover {
+    color: #ff9d33;
+}
+.quote-row-sep {
+    opacity: 0.5;
+}
+.quote-row-book {
+    color: #2dd4bf;
+    text-decoration: none;
+}
+.quote-row-book:hover {
+    color: #5eead4;
+}
+.quote-row-tags {
+    display: flex;
+    gap: 8px;
+    margin-inline-start: 4px;
+}
+.quote-row-tag {
+    color: rgba(255, 255, 255, 0.35);
+}
+
+/* The shared QuoteActions bar floats over a card by default; inside a row it
+   sits inline in the footer instead. */
+.quote-row .quote-actions {
+    position: static;
+    opacity: 0.5;
+    transform: none;
+}
+.quote-row:is(:hover, :focus-within) .quote-actions {
+    opacity: 1;
+}
+
+@media (max-width: 640px) {
+    .quote-row .quote-actions {
+        opacity: 0.8;
+    }
+}

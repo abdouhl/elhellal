@@ -16,9 +16,9 @@ export default defineConfig({
     filter: (page) => !page.includes('/saved') && !page.includes('/404'),
   })],
   redirects: {
-    '/layla': '/authors/layla',
-    '/omar': '/authors/omar',
-    '/youssef': '/authors/youssef',
+    '/layla': '/authors/layla/',
+    '/omar': '/authors/omar/',
+    '/youssef': '/authors/youssef/',
     '/layla/[slug]': '/articles/[slug]',
     '/omar/[slug]': '/articles/[slug]',
     '/youssef/[slug]': '/articles/[slug]',
