@@ -40,6 +40,7 @@
     "import-quotes": "bun run scripts/import-goodreads-quotes.ts",
     "generate-pins": "bun run scripts/generate-pinterest-pin.ts",
     "tiktok-slides": "bun run scripts/generate-tiktok-slideshow.ts",
+    "book-tweet": "bun run scripts/generate-book-tweet.ts",
     "deploy:views": "wrangler deploy --config workers/views/wrangler.jsonc"
   },
   "dependencies": {

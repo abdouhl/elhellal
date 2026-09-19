@@ -46,3 +46,6 @@ public/pins/
 
 # generated TikTok slideshow images (manual-upload only, never served by the site)
 /tiktok-slides/
+
+# generated book tweets (manual-upload only, never served by the site)
+/x-posts/
