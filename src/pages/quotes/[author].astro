@@ -7,6 +7,7 @@ import QuoteSchema from "../../components/schema/QuoteSchema.astro";
 import PersonSchema from "../../components/schema/PersonSchema.astro";
 import { getQuoteAuthors, getQuoteBooks, getQuoteTags } from "../../utils/quotes";
 import { normalizeTag, slugifyTag } from "../../utils/tag-slug";
+import biographies from "../../data/biographies.json";
 
 export async function getStaticPaths() {
   return getQuoteAuthors().map((entry) => ({
@@ -39,6 +40,11 @@ const topTags = [...tagCounts.entries()]
 
 const bookQuoteCount = quotes.filter((q) => q.book).length;
 const directQuoteCount = quotes.length - bookQuoteCount;
+
+// Set only when this author has a biography on biographies.elhellal.com (see `bun run sync-biographies`).
+const biographyUrl = (biographies as string[]).includes(authorSlug)
+  ? `https://biographies.elhellal.com/${encodeURIComponent(authorSlug)}/`
+  : null;
 
 const canonicalUrl = `https://elhellal.com/quotes/${encodeURIComponent(authorSlug)}/`;
 const breadcrumbs = [
@@ -102,6 +108,9 @@ const pageDescription = authorBooks.length > 0
               </>
             )}
           </div>
+          {biographyUrl && (
+            <a href={biographyUrl} class="author-bio-btn">اقرأ السيرة <span aria-hidden="true">←</span></a>
+          )}
         </div>
       </div>
 
@@ -232,6 +241,20 @@ const pageDescription = authorBooks.length > 0
       flex-wrap: wrap;
     }
     .stat-dot { opacity: 0.5; }
+    .author-bio-btn {
+      display: inline-block;
+      margin-top: var(--spacing-03);
+      padding: 7px 16px;
+      background: rgba(255, 140, 0, 0.14);
+      border: 0.5px solid rgba(255, 140, 0, 0.5);
+      border-radius: 8px;
+      color: DarkOrange;
+      font-size: var(--desktop-body-sm);
+      font-weight: 700;
+      text-decoration: none;
+      transition: background 0.15s, color 0.15s;
+    }
+    .author-bio-btn:hover { background: DarkOrange; color: #111; }
 
     .author-categories {
       position: relative;

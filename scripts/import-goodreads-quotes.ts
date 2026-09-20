@@ -50,6 +50,8 @@ const QUOTES_PATH = path.join(__dirname, '../src/data/quotes.json');
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 const PAGE_DELAY_MS = 1800;   // between Goodreads page/cover fetches — be a well-behaved scraper
 const OLLAMA_DELAY_MS = 400;  // between translation calls
+const MAX_PAGES = 100;        // Goodreads' hard pagination cap for quotes
+const FETCH_TIMEOUT_MS = 30_000;
 
 // ─── Text cleanup ───────────────────────────────────────────────────────────────
 
@@ -146,7 +148,7 @@ function extractAuthorInfo(root: ReturnType<typeof parse>): AuthorInfo | null {
 
 async function fetchQuotesPage(authorSlug: string, page: number): Promise<ScrapedPage> {
     const url = `https://www.goodreads.com/author/quotes/${authorSlug}?page=${page}`;
-    const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+    const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT }, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
     if (!res.ok) return { quotes: [], authorInfo: null };
 
     const html = await res.text();
@@ -201,21 +203,29 @@ async function fetchQuotesPage(authorSlug: string, page: number): Promise<Scrape
     return { quotes, authorInfo };
 }
 
-/** Fetches every page for an author until a page comes back empty. */
+/**
+ * Fetches every page for an author until a page comes back empty or adds
+ * nothing new. Goodreads caps quote pagination at page 100 and, for prolific
+ * authors, keeps serving that same last page for every higher page number
+ * instead of an empty one — so "empty page" alone never terminates.
+ */
 async function fetchAllQuotesForAuthor(authorSlug: string): Promise<{ quotes: ScrapedQuote[]; authorInfo: AuthorInfo | null }> {
     const all: ScrapedQuote[] = [];
+    const seen = new Set<string>();
     let authorInfo: AuthorInfo | null = null;
-    let page = 1;
 
-    while (true) {
+    for (let page = 1; page <= MAX_PAGES; page++) {
         const result = await fetchQuotesPage(authorSlug, page);
-        if (result.quotes.length === 0) break;
-        all.push(...result.quotes);
+        const fresh = result.quotes.filter((q) => !seen.has(q.textRaw));
+        if (fresh.length === 0) break;
+        fresh.forEach((q) => seen.add(q.textRaw));
+        all.push(...fresh);
         authorInfo = authorInfo || result.authorInfo;
-        page++;
+        process.stdout.write(`   page ${page}: ${all.length} quote(s) so far\r`);
         await new Promise((r) => setTimeout(r, PAGE_DELAY_MS));
     }
 
+    process.stdout.write('\x1b[2K'); // clear the progress line
     return { quotes: all, authorInfo };
 }
 
@@ -223,7 +233,7 @@ async function fetchAllQuotesForAuthor(authorSlug: string): Promise<{ quotes: Sc
 async function fetchBookCover(bookHref: string): Promise<string | undefined> {
     try {
         const url = bookHref.startsWith('http') ? bookHref : `https://www.goodreads.com${bookHref}`;
-        const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+        const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT }, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
         if (!res.ok) return undefined;
         const html = await res.text();
         const root = parse(html);
