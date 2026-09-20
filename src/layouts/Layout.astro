@@ -95,7 +95,7 @@ const {
         </script>
 
         <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" type="image/svg+xml" href="/xarticles.svg" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
         <link rel="manifest" href="/manifest.json" />
@@ -668,17 +668,12 @@ const {
     }
 
     @media (max-width: 48rem) {
-        .favorites-text,
-        .submit-text {
+        .favorites-text {
             display: none;
         }
 
         .favorites-count {
             display: inline;
-        }
-
-        .submit-btn::after {
-            content: "Submit";
         }
     }
 
@@ -791,6 +786,16 @@ const {
         }
         .brand-name {
             font-size: 1.35rem;
+        }
+        /* Let the brand shrink and the tagline wrap so the header never
+           outgrows the viewport (which makes iOS Safari zoom the page out). */
+        .header-brand {
+            flex: 1 1 0;
+            min-width: 0;
+        }
+        .brand-tagline {
+            white-space: normal;
+            max-width: 100%;
         }
     }
 

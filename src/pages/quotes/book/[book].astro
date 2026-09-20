@@ -7,6 +7,7 @@ import QuoteSchema from "../../../components/schema/QuoteSchema.astro";
 import BookSchema from "../../../components/schema/BookSchema.astro";
 import { getQuoteBooks, getQuoteTags } from "../../../utils/quotes";
 import { slugifyTag } from "../../../utils/tag-slug";
+import bookSummaries from "../../../data/book-summaries.json";
 import { amazonSearchUrl, goodreadsSearchUrl, AMAZON_TAG } from "../../../config/affiliates";
 
 export async function getStaticPaths() {
@@ -54,6 +55,10 @@ const buyLinks = [
   { key: "amazon", label: "أمازون", href: amazonSearchUrl(searchQuery), sponsored: !!AMAZON_TAG },
   { key: "goodreads", label: "جودريدز", href: goodreadsSearchUrl(searchQuery), sponsored: false },
 ];
+
+// Set only when this book has a summary on books.elhellal.com (see `bun run sync-book-summaries`).
+const summarySlug = (bookSummaries as Record<string, string>)[bookSlug];
+const summaryUrl = summarySlug ? `https://books.elhellal.com/${encodeURIComponent(summarySlug)}/` : null;
 
 const breadcrumbs = [
   { name: "الرئيسية", url: "https://elhellal.com" },
@@ -113,6 +118,9 @@ const breadcrumbs = [
               <li>{t.href ? <a href={t.href}>{t.label}</a> : <span>{t.label}</span>}</li>
             ))}
           </ul>
+        )}
+        {summaryUrl && (
+          <a href={summaryUrl} class="book-summary-btn">اقرأ الملخص <span aria-hidden="true">←</span></a>
         )}
         <div class="book-buy">
           {buyLinks.map((l) => (
@@ -307,6 +315,20 @@ const breadcrumbs = [
       transition: background 0.15s, color 0.15s, border-color 0.15s;
     }
     .book-topics a:hover { background: rgba(255, 140, 0, 0.14); border-color: rgba(255, 140, 0, 0.4); color: DarkOrange; }
+    .book-summary-btn {
+      display: inline-block;
+      margin-bottom: var(--spacing-04);
+      padding: 9px 20px;
+      background: rgba(255, 140, 0, 0.14);
+      border: 0.5px solid rgba(255, 140, 0, 0.5);
+      border-radius: 8px;
+      color: DarkOrange;
+      font-size: var(--desktop-body-sm);
+      font-weight: 700;
+      text-decoration: none;
+      transition: background 0.15s, color 0.15s;
+    }
+    .book-summary-btn:hover { background: DarkOrange; color: #111; }
     .book-buy {
       display: flex;
       align-items: center;

@@ -403,7 +403,7 @@ async function main() {
     }
 
     const existingIds = collectExistingIds(quotesConfig);
-    const knownAuthorSlugs = new Set(quotesConfig.authors.map((a) => a.goodreadsSlug));
+    const knownAuthorSlugs = new Set(quotesConfig.authors.map((a) => a.goodreadsSlug).filter((s): s is string => !!s)); // tweet-only authors have no Goodreads slug
     const cliSlugs = process.argv.slice(2);
     const authorSlugs = [...new Set([...cliSlugs, ...knownAuthorSlugs])];
 

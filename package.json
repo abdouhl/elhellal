@@ -37,10 +37,14 @@
     "check-data": "bun run scripts/check-data.ts",
     "update-metadata": "bun run scripts/update-metadata.ts",
     "fetch-author-names": "bun run scripts/fetch-author-names.ts",
+    "sync-book-summaries": "bun run scripts/sync-book-summaries.ts",
     "import-quotes": "bun run scripts/import-goodreads-quotes.ts",
     "generate-pins": "bun run scripts/generate-pinterest-pin.ts",
     "tiktok-slides": "bun run scripts/generate-tiktok-slideshow.ts",
     "book-tweet": "bun run scripts/generate-book-tweet.ts",
+    "tiktok-quotes": "bun run scripts/generate-tiktok-quotes.ts",
+    "tweet-quote": "bun run scripts/generate-tweet-quote.ts",
+    "tiktok-books": "bun run scripts/generate-tiktok-book-summary.ts",
     "deploy:views": "wrangler deploy --config workers/views/wrangler.jsonc"
   },
   "dependencies": {
