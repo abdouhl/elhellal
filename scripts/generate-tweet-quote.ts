@@ -18,6 +18,7 @@
  *   bun run scripts/generate-tweet-quote.ts https://x.com/naval/status/1002103360646823936
  *   bun run scripts/generate-tweet-quote.ts 1002103360646823936 --no-save     # card only
  *   bun run scripts/generate-tweet-quote.ts <id> --dry-run                    # fetch + translate, print, write nothing
+ *   bun run scripts/generate-tweet-quote.ts <id> --no-copy                    # don't put the image on the clipboard
  *   bun run scripts/generate-tweet-quote.ts <id> --text "نص مخصص"              # skip translation, use this wording
  *   bun run scripts/generate-tweet-quote.ts <id> --font Katibeh [--font-weight 400]   # other quote font (any Google Arabic font)
  *
@@ -31,8 +32,9 @@
  *   alt.txt         — the quote as image alt text (accessibility)
  *   manifest.json   — what was fetched / translated / saved
  *
- * Nothing is posted — X's API needs paid credentials. Attach quote.png, paste
- * tweet.txt, post. The quote page only exists after quotes.json is deployed.
+ * Nothing is posted — X's API needs paid credentials. The card image is copied
+ * to the clipboard automatically (macOS; the last card if you pass several) —
+ * paste it into the composer, paste tweet.txt, post. The quote page only exists after quotes.json is deployed.
  *
  * Requires Ollama running locally with gemma4:e4b pulled (only if a tweet or
  * author name isn't already Arabic).
@@ -44,6 +46,7 @@ import path from 'path';
 import crypto from 'crypto';
 import https from 'https';
 import http from 'http';
+import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import type { QuotesConfig, QuoteAuthor, QuoteItem } from '../src/types/index.ts';
 import { slugifyTag } from '../src/utils/tag-slug.ts';
@@ -58,6 +61,7 @@ const VALUE_FLAGS = new Set(['--text', '--font', '--font-weight', '--out-dir', '
 const TWEET_INPUTS = args.filter((a, i) => !a.startsWith('--') && !VALUE_FLAGS.has(args[i - 1] ?? ''));
 const DRY_RUN = args.includes('--dry-run');
 const NO_SAVE = args.includes('--no-save');
+const NO_COPY = args.includes('--no-copy');
 const TEXT_OVERRIDE = getArg('--text');
 // Aref Ruqaa Bold is the calligraphic face of the reference card. A custom --font is loaded at
 // regular weight (many Arabic display fonts ship only that) unless --font-weight says otherwise.
@@ -326,6 +330,14 @@ function buildCardHtml(c: Card): string {
 </body></html>`;
 }
 
+// ─── Clipboard (macOS) ──────────────────────────────────────────────────────
+/** Puts the PNG itself (not the file path) on the clipboard, so it pastes straight into the X composer. */
+function copyImageToClipboard(file: string): boolean {
+  if (process.platform !== 'darwin') return false;
+  const script = `set the clipboard to (read (POSIX file "${file.replace(/["\\]/g, '\\$&')}") as «class PNGf»)`;
+  return spawnSync('osascript', ['-e', script], { stdio: 'ignore' }).status === 0;
+}
+
 // ─── Text outputs ───────────────────────────────────────────────────────────
 function buildTweetText(authorName: string, quoteUrl: string): string {
   return `${authorName}\n\n${quoteUrl}`;
@@ -401,6 +413,7 @@ async function main() {
   let page: Page | null = null;
   let madeCount = 0;
   let dirty = false;
+  let lastImage: string | null = null;
 
   for (const id of ids) {
     try {
@@ -463,6 +476,7 @@ async function main() {
       }, null, 2), 'utf-8');
 
       console.log(`   ✅  ${path.relative(process.cwd(), dir)}/  ${fit ? `(${fit.size}px)` : ''}${r.saved === 'new' ? '  + added to quotes.json' : ''}`);
+      lastImage = path.join(dir, 'quote.png');
       madeCount++;
     } catch (err: any) {
       console.error(`   ❌  ${err.message ?? err}`);
@@ -478,6 +492,13 @@ async function main() {
   console.log(`\n🎉  Done — ${madeCount} card(s) in ${path.relative(process.cwd(), path.join(OUT_ROOT, dateKey))}/`);
   if (dirty) console.log('📚  quotes.json updated — deploy before posting so the link in tweet.txt resolves.');
   console.log('📋  Per folder: attach quote.png, paste tweet.txt, add alt.txt as the image description, post.');
+  if (lastImage && !NO_COPY) {
+    if (copyImageToClipboard(lastImage)) {
+      console.log(`✂️   Image copied to clipboard${madeCount > 1 ? ' (the last card only)' : ''} — paste it straight into the post.`);
+    } else {
+      console.warn('⚠️  Could not copy the image to the clipboard (macOS only).');
+    }
+  }
 }
 
 main().catch((err) => {

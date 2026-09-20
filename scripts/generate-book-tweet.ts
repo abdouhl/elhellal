@@ -28,8 +28,11 @@
  *   reply.txt                  — optional self-reply linking to the book on elhellal.com
  *   manifest.json              — what was picked, for your own records
  *
- * Nothing is posted — this only generates the assets. Attach the two PNGs in
- * the X composer, paste tweet.txt, post.
+ * Nothing is posted — this only generates the assets. When it finishes (macOS)
+ * the tweet text is put on the clipboard; paste it into the X composer, press
+ * Enter in the terminal, and the two images are copied — paste them, post.
+ * (X takes one kind of content per paste, hence two steps.) The clipboard is
+ * for the last tweet if --count > 1. Pass --no-copy to skip it.
  */
 
 import puppeteer from 'puppeteer';
@@ -37,6 +40,8 @@ import fs from 'fs';
 import path from 'path';
 import https from 'https';
 import http from 'http';
+import readline from 'readline';
+import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import type { QuotesConfig } from '../src/types/index.ts';
 
@@ -51,6 +56,7 @@ const BOOK_OVERRIDE = getArg('--book');
 const DRY_RUN = args.includes('--dry-run');
 const RESET_HISTORY = args.includes('--reset-history');
 const FLIP = args.includes('--flip');
+const NO_COPY = args.includes('--no-copy');
 const DATE_OVERRIDE = getArg('--date'); // YYYY-MM-DD
 const QUOTES_FILE = getArg('--quotes-file') || path.join(__dirname, '../src/data/quotes.json');
 // Deliberately NOT under public/ — Astro copies everything in public/ into dist/, and these
@@ -282,6 +288,45 @@ function buildReplyText(c: Candidate): string {
   return `المزيد من اقتباسات «${c.bookTitle}» 👇\n${SITE}/quotes/book/${encodeURIComponent(c.bookSlug)}`;
 }
 
+// ─── Clipboard (macOS) ──────────────────────────────────────────────────────
+// A pasteboard can hold text or files, but X's composer only takes one kind per paste (files win
+// when both are present) — so it's two steps: text first, then both images as two file items.
+function copyTextToClipboard(text: string): boolean {
+  if (process.platform !== 'darwin') return false;
+  return spawnSync('pbcopy', { input: text, env: { ...process.env, LC_ALL: 'en_US.UTF-8' } }).status === 0;
+}
+
+function copyFilesToClipboard(files: string[]): boolean {
+  if (process.platform !== 'darwin') return false;
+  const script = `ObjC.import('AppKit');
+    const pb = $.NSPasteboard.generalPasteboard; pb.clearContents;
+    // One pasteboard item per file (like ⌘C on two files in Finder).
+    const urls = $(${JSON.stringify(files)}.map(f => $.NSURL.fileURLWithPath(f)));
+    if (!pb.writeObjects(urls)) throw new Error('writeObjects failed');
+    // The items are handed over lazily: if osascript exits right away only the first one survives.
+    $.NSThread.sleepForTimeInterval(1);`;
+  return spawnSync('osascript', ['-l', 'JavaScript', '-e', script], { stdio: 'ignore' }).status === 0;
+}
+
+/** Resolves on Enter — or immediately if stdin is closed/piped, so non-interactive runs never hang. */
+function waitForEnter(prompt: string): Promise<void> {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    rl.once('close', resolve);
+    rl.question(prompt, () => { rl.close(); });
+  });
+}
+
+async function copyTweetToClipboard(dir: string) {
+  const text = fs.readFileSync(path.join(dir, 'tweet.txt'), 'utf-8');
+  const images = ['1-book.png', '2-lesson.png'].map((f) => path.resolve(dir, f));
+  if (!copyTextToClipboard(text)) { console.warn('⚠️  Could not copy to the clipboard (macOS only).'); return; }
+  console.log('\n📋  Tweet text copied — paste it into the X composer (⌘V).');
+  await waitForEnter('    Then press Enter to copy the two images… ');
+  if (copyFilesToClipboard(images)) console.log('🖼️   Both images copied (book, then lesson) — paste them (⌘V).');
+  else console.warn('⚠️  Could not copy the images to the clipboard.');
+}
+
 // ─── Main ───────────────────────────────────────────────────────────────────
 async function main() {
   const now = DATE_OVERRIDE ? new Date(`${DATE_OVERRIDE}T12:00:00Z`) : new Date();
@@ -342,6 +387,7 @@ async function main() {
 
   const history = loadHistory();
   const made: Candidate[] = [];
+  let lastDir = '';
   const dayDir = path.join(OUT_ROOT, dateKey);
 
   // Walk the ranked pool until enough tweets are built — a book whose cover can't be fetched is skipped.
@@ -372,6 +418,7 @@ async function main() {
 
     console.log(`   ✅  ${path.relative(process.cwd(), dir)}/\n       «${c.lesson}»`);
     made.push(c);
+    lastDir = dir;
     if (!BOOK_OVERRIDE) history.add(c.bookSlug);
   }
 
@@ -388,6 +435,10 @@ async function main() {
 
   console.log(`\n🎉  Done — ${made.length} tweet(s) in ${path.relative(process.cwd(), dayDir)}/`);
   console.log('📋  Per folder: attach 1-book.png then 2-lesson.png, paste tweet.txt, post. reply.txt is an optional self-reply with the link.');
+  if (!NO_COPY) {
+    if (made.length > 1) console.log(`ℹ️   Clipboard is for the last tweet only (${made.length} were built).`);
+    await copyTweetToClipboard(lastDir);
+  }
 }
 
 main().catch((err) => {
