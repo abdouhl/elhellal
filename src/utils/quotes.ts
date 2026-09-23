@@ -195,7 +195,9 @@ export function buildQuoteTagIndex(): Map<string, QuoteTagEntry> {
     };
 
     getQuotes().forEach((quote) => {
-        (quote.tags || []).forEach((rawTag) => addTag(quote, rawTag));
+        // Guard against malformed source data (e.g. a tag stored as a nested
+        // array instead of a string) so one bad quote can't crash the whole index.
+        (quote.tags || []).filter((t): t is string => typeof t === 'string').forEach((rawTag) => addTag(quote, rawTag));
         extractAlTopicWords(quote.text).forEach((word) => addTag(quote, word));
     });
 

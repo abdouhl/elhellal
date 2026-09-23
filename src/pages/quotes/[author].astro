@@ -24,7 +24,9 @@ const authorBooks = getQuoteBooks().filter((b) => b.authorSlug === authorSlug);
 const qualifyingTagSlugs = new Set(getQuoteTags().map((t) => t.slug));
 const tagCounts = new Map<string, { label: string; count: number }>();
 quotes.forEach((q) => {
-  (q.tags || []).forEach((raw) => {
+  // Guard against malformed source data (e.g. a tag stored as a nested
+  // array instead of a string) so one bad quote can't crash the whole page.
+  (q.tags || []).filter((t): t is string => typeof t === "string").forEach((raw) => {
     const label = normalizeTag(raw);
     const slug = slugifyTag(raw);
     if (!label || !slug || !qualifyingTagSlugs.has(slug)) return;

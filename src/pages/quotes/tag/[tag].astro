@@ -6,12 +6,24 @@ import { QuoteRow } from "../../../components/QuoteCard";
 import AdUnit from "../../../components/AdUnit.astro";
 import BreadcrumbSchema from "../../../components/schema/BreadcrumbSchema.astro";
 import QuoteSchema from "../../../components/schema/QuoteSchema.astro";
-import { buildQuoteTagIndex, MIN_QUOTES_PER_TAG } from "../../../utils/quotes";
+import { shardOf } from "../../../utils/quote-shard";
+import type { FlatQuote } from "../../../types";
 
 const tagSlug = Astro.params.tag as string;
-const entry = buildQuoteTagIndex().get(tagSlug);
 
-if (!entry || entry.quotes.length < MIN_QUOTES_PER_TAG) {
+// Precomputed at build time by scripts/generate-quote-indices.ts (only tags
+// meeting MIN_QUOTES_PER_TAG are included) — one small dynamic import (one of
+// a fixed number of shards) instead of scanning + regex-extracting topics
+// from all ~15k quotes per request.
+let entry: { label: string; quotes: FlatQuote[] } | undefined;
+try {
+  const shard = await import(`../../../data/quote-by-tag/${shardOf(tagSlug)}.json`);
+  entry = shard.default[tagSlug];
+} catch {
+  entry = undefined;
+}
+
+if (!entry) {
   Astro.response.status = 404;
   return Astro.rewrite("/404");
 }

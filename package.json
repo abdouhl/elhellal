@@ -25,7 +25,7 @@
     "clean": "rm -rf dist .astro src/data/slug-map.json src/data/tool-metadata",
     "generate-llms": "bun run scripts/generate-llms.ts",
     "generate-client-data": "bun run scripts/generate-client-data.ts",
-    "prepare-data": "bun run add-slugs && bun run scripts/split-data.ts && bun run scripts/generate-slug-map.ts && bun run scripts/generate-article-metadata.ts && bun run generate-client-data && bun run generate-llms",
+    "prepare-data": "bun run add-slugs && bun run scripts/split-data.ts && bun run scripts/generate-slug-map.ts && bun run scripts/generate-article-metadata.ts && bun run scripts/generate-quote-indices.ts && bun run generate-client-data && bun run generate-llms",
     "prepublishOnly": "bun run prepare-data",
     "dev": "bun run prepare-data && astro dev",
     "start": "astro dev",

@@ -52,6 +52,7 @@ const PAGE_DELAY_MS = 1800;   // between Goodreads page/cover fetches — be a w
 const OLLAMA_DELAY_MS = 400;  // between translation calls
 const MAX_PAGES = 100;        // Goodreads' hard pagination cap for quotes
 const FETCH_TIMEOUT_MS = 30_000;
+const MAX_QUOTES_PER_AUTHOR = 500; // cap on total stored quotes (existing + new) per author
 
 // ─── Text cleanup ───────────────────────────────────────────────────────────────
 
@@ -204,17 +205,19 @@ async function fetchQuotesPage(authorSlug: string, page: number): Promise<Scrape
 }
 
 /**
- * Fetches every page for an author until a page comes back empty or adds
- * nothing new. Goodreads caps quote pagination at page 100 and, for prolific
- * authors, keeps serving that same last page for every higher page number
- * instead of an empty one — so "empty page" alone never terminates.
+ * Fetches pages for an author until a page comes back empty, adds nothing
+ * new, or `limit` scraped quotes have been collected. Goodreads caps quote
+ * pagination at page 100 and, for prolific authors, keeps serving that same
+ * last page for every higher page number instead of an empty one — so
+ * "empty page" alone never terminates. Goodreads serves quotes most-liked
+ * first, so capping at `limit` keeps the most popular ones.
  */
-async function fetchAllQuotesForAuthor(authorSlug: string): Promise<{ quotes: ScrapedQuote[]; authorInfo: AuthorInfo | null }> {
+async function fetchAllQuotesForAuthor(authorSlug: string, limit: number): Promise<{ quotes: ScrapedQuote[]; authorInfo: AuthorInfo | null }> {
     const all: ScrapedQuote[] = [];
     const seen = new Set<string>();
     let authorInfo: AuthorInfo | null = null;
 
-    for (let page = 1; page <= MAX_PAGES; page++) {
+    for (let page = 1; page <= MAX_PAGES && all.length < limit; page++) {
         const result = await fetchQuotesPage(authorSlug, page);
         const fresh = result.quotes.filter((q) => !seen.has(q.textRaw));
         if (fresh.length === 0) break;
@@ -226,7 +229,7 @@ async function fetchAllQuotesForAuthor(authorSlug: string): Promise<{ quotes: Sc
     }
 
     process.stdout.write('\x1b[2K'); // clear the progress line
-    return { quotes: all, authorInfo };
+    return { quotes: all.slice(0, limit), authorInfo };
 }
 
 /** Fetches a book's own Goodreads quotes page to grab its cover thumbnail. */
@@ -431,10 +434,21 @@ async function main() {
 
     for (const authorSlug of authorSlugs) {
         process.stdout.write(`🔎 ${authorSlug}\n`);
+
+        const existingAuthor = quotesConfig.authors.find((a) => a.goodreadsSlug === authorSlug);
+        const existingCount = existingAuthor
+            ? existingAuthor.quotes.length + existingAuthor.books.reduce((n, b) => n + b.quotes.length, 0)
+            : 0;
+        let authorTotalCount = existingCount;
+        if (existingCount >= MAX_QUOTES_PER_AUTHOR) {
+            console.log(`   ⏭️  already has ${existingCount} quotes (cap ${MAX_QUOTES_PER_AUTHOR}) — skipping\n`);
+            continue;
+        }
+
         let scraped: ScrapedQuote[];
         let authorInfo: AuthorInfo | null;
         try {
-            const result = await fetchAllQuotesForAuthor(authorSlug);
+            const result = await fetchAllQuotesForAuthor(authorSlug, MAX_QUOTES_PER_AUTHOR - existingCount);
             scraped = result.quotes;
             authorInfo = result.authorInfo;
         } catch (e: any) {
@@ -465,6 +479,11 @@ async function main() {
         const bookCoverCache = new Map<string, string | undefined>();
 
         for (const q of scraped) {
+            if (authorTotalCount >= MAX_QUOTES_PER_AUTHOR) {
+                console.log(`   ⏭️  reached cap of ${MAX_QUOTES_PER_AUTHOR} quotes for ${authorName} — stopping`);
+                break;
+            }
+
             const id = makeId(authorSlug, q.textRaw);
             if (existingIds.has(id)) {
                 skipped++;
@@ -509,6 +528,7 @@ async function main() {
                 (bookEntry ? bookEntry.quotes : authorEntry.quotes).push(quoteItem);
                 existingIds.add(id);
                 added++;
+                authorTotalCount++;
                 process.stdout.write('   ✅ ' + text.slice(0, 60) + '…\n');
 
                 if (added % SAVE_EVERY === 0) {

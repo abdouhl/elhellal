@@ -6,11 +6,23 @@ import AdUnit from "../../../components/AdUnit.astro";
 import BreadcrumbSchema from "../../../components/schema/BreadcrumbSchema.astro";
 import QuoteSchema from "../../../components/schema/QuoteSchema.astro";
 import PersonSchema from "../../../components/schema/PersonSchema.astro";
-import { getQuotes, getQuoteById } from "../../../utils/quotes";
 import { slugifyTag } from "../../../utils/tag-slug";
+import { shardOf } from "../../../utils/quote-shard";
+import type { FlatQuote } from "../../../types";
 
 const { author: authorParam, id } = Astro.params;
-const quote = getQuoteById(id as string);
+
+// Precomputed at build time by scripts/generate-quote-indices.ts — this is a
+// single small dynamic import (one of a fixed number of shards, not one file
+// per quote) instead of loading all ~15k quotes and scanning for a match on
+// every request, which was blowing the Workers CPU budget.
+let quote: (FlatQuote & { authorQuoteCount: number; otherQuotes: FlatQuote[] }) | undefined;
+try {
+  const shard = await import(`../../../data/quote-by-id/${shardOf(id as string)}.json`);
+  quote = shard.default[id as string];
+} catch {
+  quote = undefined;
+}
 
 if (!quote) {
   Astro.response.status = 404;
@@ -33,8 +45,7 @@ Astro.response.headers.set("Cache-Control", "public, max-age=2592000, s-maxage=2
 const authorUrl = `https://elhellal.com/quotes/${encodeURIComponent(quote.authorSlug)}/`;
 const canonicalUrl = `${authorUrl}${encodeURIComponent(quote.id)}/`;
 
-const authorQuotes = getQuotes().filter((q) => q.authorSlug === quote.authorSlug);
-const otherQuotes = authorQuotes.filter((q) => q.id !== quote.id).slice(0, 6);
+const otherQuotes = quote.otherQuotes;
 
 const shareText = quote.book
   ? `"${quote.text}" — ${quote.author}، ${quote.book}`
@@ -95,7 +106,7 @@ const pageDescription = quote.book
 
           {quote.tags && quote.tags.length > 0 && (
             <div class="single-quote-tags">
-              {quote.tags.map((tag) => (
+              {quote.tags.filter((tag): tag is string => typeof tag === "string").map((tag) => (
                 <a href={`/quotes/tag/${encodeURIComponent(slugifyTag(tag))}/`} class="keyword-tag">#{tag}</a>
               ))}
             </div>
@@ -145,7 +156,7 @@ const pageDescription = quote.book
             )}
             <div class="author-text">
               <a href={`/quotes/${encodeURIComponent(quote.authorSlug)}/`} class="author-handle">{quote.author}</a>
-              <span class="author-sub">{authorQuotes.length} اقتباس</span>
+              <span class="author-sub">{quote.authorQuoteCount} اقتباس</span>
             </div>
           </div>
           <a href={`/quotes/${encodeURIComponent(quote.authorSlug)}/`} class="sidebar-link">كل اقتباسات {quote.author} ←</a>

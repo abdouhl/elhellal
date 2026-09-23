@@ -36,6 +36,8 @@ src/data/articles/
 src/data/article-metadata/
 src/data/slug-map.json
 src/data/articles.client.json
+src/data/quote-by-id/
+src/data/quote-by-tag/
 
 # private import scripts
 scripts/import-substack.ts
