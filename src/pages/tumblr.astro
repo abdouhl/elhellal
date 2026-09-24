@@ -8,7 +8,7 @@ import BookmarkButton from "../components/BookmarkButton";
 import AdUnit from "../components/AdUnit.astro";
 import type { Category, Article } from "../types";
 
-export const prerender = false;
+export const prerender = true;
 
 if (!import.meta.env.DEV) {
     return Astro.redirect("/", 302);

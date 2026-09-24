@@ -245,6 +245,14 @@ const {
                     </div>
                 </div>
 
+                <nav class="sister-sites" aria-label="مواقع الهلال">
+                    <a href="/" class="sister-site is-current">المقالات</a>
+                    <a href="https://quotes.elhellal.com/" class="sister-site">الاقتباسات</a>
+                    <a href="https://books.elhellal.com/" class="sister-site">ملخصات الكتب</a>
+                    <a href="https://biographies.elhellal.com/" class="sister-site">السير الذاتية</a>
+                    <a href="https://quiz.elhellal.com/" class="sister-site">اختبر معلوماتك</a>
+                </nav>
+
                 {showSearch && (
                     <div class="header-search-row">
                         <SearchInput client:load placeholder={searchPlaceholder} />
@@ -268,6 +276,10 @@ const {
                 <a href="https://quotes.elhellal.com/" class="nu-u-link--subtle">الاقتباسات</a>
                 <span class="footer-separator" aria-hidden="true">·</span>
                 <a href="https://books.elhellal.com/" class="nu-u-link--subtle">ملخصات الكتب</a>
+                <span class="footer-separator" aria-hidden="true">·</span>
+                <a href="https://biographies.elhellal.com/" class="nu-u-link--subtle">السير الذاتية</a>
+                <span class="footer-separator" aria-hidden="true">·</span>
+                <a href="https://quiz.elhellal.com/" class="nu-u-link--subtle">اختبر معلوماتك</a>
                 <span class="footer-separator" aria-hidden="true">·</span>
                 <a href="/privacy/" class="nu-u-link--subtle">الخصوصية</a>
                 <span class="footer-separator" aria-hidden="true">·</span>
@@ -524,6 +536,48 @@ const {
     .social-link:focus {
         outline: 1px solid var(--button-primary);
         outline-offset: 2px;
+    }
+
+    .sister-sites {
+        display: flex;
+        justify-content: center;
+        gap: var(--spacing-02);
+        padding: var(--spacing-03) 0;
+        border-top: 0.5px solid var(--border-muted);
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .sister-sites::-webkit-scrollbar {
+        display: none;
+    }
+
+    .sister-site {
+        flex: 0 0 auto;
+        padding: var(--spacing-01) var(--spacing-04);
+        border-radius: 999px;
+        font-size: var(--desktop-caption);
+        line-height: var(--lh-desktop-caption);
+        color: var(--content-secondary);
+        text-decoration: none;
+        white-space: nowrap;
+        transition: color 0.15s, background-color 0.15s;
+    }
+
+    .sister-site:hover {
+        color: var(--content-primary);
+        background-color: var(--border-muted);
+    }
+
+    .sister-site.is-current {
+        color: var(--content-primary);
+        font-family: "ROM-Bold", var(--system-ui);
+    }
+
+    @media (max-width: 48rem) {
+        .sister-sites {
+            justify-content: flex-start;
+        }
     }
 
     .header-search-row {

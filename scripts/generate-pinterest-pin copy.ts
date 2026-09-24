@@ -593,7 +593,7 @@ async function main() {
       kind: 'tag', key: tagSlug, folder: 'tags', title: label, badge: 'وسم',
       count: entries.length, color: entries[0].color,
       previewArticles: pickPreviewArticles(entries, MIN_TAG_ARTICLES),
-      targetUrl: `https://elhellal.com/tags/${tagSlug}`,
+      targetUrl: `https://elhellal.com/tags/${tagSlug}/`,
     });
   }
 
@@ -603,7 +603,7 @@ async function main() {
       kind: 'category', key: cat.category, folder: 'categories', title: cat.title, badge: 'تصنيف',
       count: cat.content.length, color: accentColor(cat.category),
       previewArticles: pickPreviewArticles(cat.content.map((article: Article) => ({ article })), MIN_CATEGORY_ARTICLES),
-      targetUrl: `https://elhellal.com/${cat.category}`,
+      targetUrl: `https://elhellal.com/${cat.category}/`,
     });
   }
 
@@ -613,7 +613,7 @@ async function main() {
       kind: 'author', key: screen_name, folder: 'authors', title: `@${screen_name}`, badge: 'كاتب',
       count: entries.length, color: entries[0].color,
       previewArticles: pickPreviewArticles(entries, MIN_AUTHOR_ARTICLES),
-      targetUrl: `https://elhellal.com/authors/${screen_name}`,
+      targetUrl: `https://elhellal.com/authors/${screen_name}/`,
     });
   }
 

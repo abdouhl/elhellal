@@ -1,0 +1,3 @@
+# Quotes moved to their own site (repo elhellal-quotes). Handled at the edge, no Worker CPU.
+/quotes              https://quotes.elhellal.com/          301
+/quotes/*            https://quotes.elhellal.com/:splat    301

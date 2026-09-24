@@ -1,22 +1,15 @@
 {
-	"main": "dist/_worker.js/index.js",
+	// Fully static site: every page is prerendered, so no Worker script runs.
+	// Requests are served straight from assets (no Worker CPU = no CPU-limit errors).
+	// Redirects live in public/_redirects (+ the ones Astro generates); unknown
+	// paths get dist/404.html with a real 404 status.
 	"name": "elhellal",
 	"compatibility_date": "2026-02-21",
-	"compatibility_flags": [
-		"nodejs_compat",
-		"global_fetch_strictly_public"
-	],
 	"assets": {
-		"binding": "ASSETS",
-		"directory": "./dist"
+		"directory": "./dist",
+		"not_found_handling": "404-page"
 	},
 	"observability": {
 		"enabled": true
-	},
-	"kv_namespaces": [
-		{
-			"binding": "ARTICLE_VIEWS",
-			"id": "251870004a90439ead04e09a9ac9412a"
-		}
-	]
+	}
 }
