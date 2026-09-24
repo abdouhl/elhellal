@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import type { ArticlesConfig, Category, Article, QuotesConfig, QuoteItem } from '../src/types/index.ts';
+import type { ArticlesConfig, Category, Article } from '../src/types/index.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -29,21 +29,6 @@ let totalSplitTools = 0;
 
 const toolsPath = path.join(__dirname, '../src/data/articles.json');
 const splitDataDir = path.join(__dirname, '../src/data/articles');
-const quotesPath = path.join(__dirname, '../src/data/quotes.json');
-
-interface QuoteIssues {
-    missing_fields: string[];
-    duplicate_ids: string[];
-    bad_length: string[];
-}
-
-const quoteIssues: QuoteIssues = {
-    missing_fields: [],
-    duplicate_ids: [],
-    bad_length: [],
-};
-
-let totalQuotes = 0;
 
 function validateTool(tool: Article, source: string) {
     const identifier = `${tool.title} (${source})`;
@@ -115,41 +100,10 @@ try {
         });
     }
 
-    // 3. Check quotes.json (nested author > book > quote)
-    if (fs.existsSync(quotesPath)) {
-        console.log("Checking quotes.json...");
-        const quotesData: QuotesConfig = JSON.parse(fs.readFileSync(quotesPath, 'utf-8'));
-        const seenIds = new Set<string>();
-
-        const checkQuote = (quote: QuoteItem, authorSlug: string, authorName: string) => {
-            totalQuotes++;
-            const identifier = `"${quote.text?.slice(0, 40)}" (${authorName || 'unknown author'})`;
-
-            if (!quote.text || !authorName || !authorSlug) {
-                quoteIssues.missing_fields.push(identifier);
-            }
-
-            if (quote.text && (quote.text.length < 4 || quote.text.length > 500)) {
-                quoteIssues.bad_length.push(identifier);
-            }
-
-            if (seenIds.has(quote.id)) {
-                quoteIssues.duplicate_ids.push(identifier);
-            }
-            seenIds.add(quote.id);
-        };
-
-        quotesData.authors.forEach((author) => {
-            author.quotes.forEach((q) => checkQuote(q, author.slug, author.name));
-            author.books.forEach((book) => book.quotes.forEach((q) => checkQuote(q, author.slug, author.name)));
-        });
-    }
-
     // --- Reporting ---
     console.log(`\nReport Summary:`);
     console.log(`Total tools processed: ${totalTools} (+ ${totalSplitTools} split)`);
-    console.log(`Total quotes processed: ${totalQuotes}`);
-    console.log(`Issues found: ${Object.values(issues).flat().length + Object.values(quoteIssues).flat().length}`);
+    console.log(`Issues found: ${Object.values(issues).flat().length}`);
 
     if (issues.missing_url.length > 0) {
         console.log("\n❌ Missing URLs:");
@@ -181,22 +135,8 @@ try {
         issues.invalid_structure.forEach(i => console.log(`   - ${i}`));
     }
 
-    if (quoteIssues.missing_fields.length > 0) {
-        console.log("\n❌ Quotes Missing Required Fields (text/author name/authorSlug):");
-        quoteIssues.missing_fields.forEach(i => console.log(`   - ${i}`));
-    }
 
-    if (quoteIssues.bad_length.length > 0) {
-        console.log("\n❌ Quotes with Suspicious Length (text < 4 or > 500 chars):");
-        quoteIssues.bad_length.forEach(i => console.log(`   - ${i}`));
-    }
-
-    if (quoteIssues.duplicate_ids.length > 0) {
-        console.log("\n❌ Duplicate Quote IDs:");
-        quoteIssues.duplicate_ids.forEach(i => console.log(`   - ${i}`));
-    }
-
-    const issueCount = Object.values(issues).flat().length + Object.values(quoteIssues).flat().length;
+    const issueCount = Object.values(issues).flat().length;
     if (issueCount === 0) {
         console.log("\n✅ Data check passed! No issues found.");
     } else {

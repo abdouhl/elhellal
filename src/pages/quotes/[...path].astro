@@ -1,0 +1,11 @@
+---
+// Quotes moved to their own site (quotes.elhellal.com, repo elhellal-quotes).
+// Permanently redirect every old /quotes/* URL to the same path there so
+// existing links and search rankings carry over.
+export const prerender = false;
+
+const path = Astro.params.path ?? "";
+const target = new URL(`/${path}${path && !path.endsWith("/") ? "/" : ""}`, "https://quotes.elhellal.com");
+target.search = Astro.url.search;
+return Astro.redirect(target.toString(), 301);
+---

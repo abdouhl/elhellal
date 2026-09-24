@@ -4,10 +4,9 @@
 // navigation). No "Follow"/social affordances — this site has no accounts.
 // Never built/served in production.
 import data from "../data/articles.json";
-import { getQuotes } from "../utils/quotes";
 import BookmarkButton from "../components/BookmarkButton";
 import AdUnit from "../components/AdUnit.astro";
-import type { Category, Article, FlatQuote } from "../types";
+import type { Category, Article } from "../types";
 
 export const prerender = false;
 
@@ -31,14 +30,6 @@ function cover(src: string | undefined, w: number, h: number): string {
     return src.startsWith(CF_R2_BASE) ? cfImage(src, { width: w, height: h, fit: "cover", format: "auto", quality: 80 }) : src;
 }
 
-function quoteSizeTier(text: string): "xl" | "lg" | "md" | "sm" {
-    const len = text.length;
-    if (len <= 50) return "xl";
-    if (len <= 100) return "lg";
-    if (len <= 170) return "md";
-    return "sm";
-}
-
 const allArticles: (Article & { category: string })[] = (data.articles as Category[]).flatMap((cat) =>
     cat.content.map((a) => ({ ...a, category: cat.category }))
 );
@@ -47,26 +38,6 @@ const withImages = allArticles.filter((a) => a.original_img_url);
 const articleFeed = [...withImages]
     .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""))
     .slice(0, 16);
-
-const allQuotes = getQuotes();
-const quoteStep = Math.max(1, Math.floor(allQuotes.length / 6));
-const quoteSample: FlatQuote[] = [];
-for (let i = 0; i < allQuotes.length && quoteSample.length < 6; i += quoteStep) {
-    quoteSample.push(allQuotes[i]);
-}
-
-type FeedItem = { kind: "article"; article: Article & { category: string } } | { kind: "quote"; quote: FlatQuote };
-const feedItems: FeedItem[] = [];
-let quoteCursor = 0;
-articleFeed.forEach((article, idx) => {
-    feedItems.push({ kind: "article", article });
-    if ((idx + 1) % 4 === 0 && quoteCursor < quoteSample.length) {
-        feedItems.push({ kind: "quote", quote: quoteSample[quoteCursor++] });
-    }
-});
-while (quoteCursor < quoteSample.length) {
-    feedItems.push({ kind: "quote", quote: quoteSample[quoteCursor++] });
-}
 
 const seenAuthors = new Set<string>();
 const suggestedBlogs: (Article & { category: string })[] = [];
@@ -89,7 +60,7 @@ const quickLinks = [
 
 const navItems = [
     { label: "الرئيسية", href: "/", icon: "🏠" },
-    { label: "الاقتباسات", href: "/quotes/", icon: "❝" },
+    { label: "الاقتباسات", href: "https://quotes.elhellal.com/", icon: "❝" },
     { label: "الكتّاب", href: "/authors/", icon: "👤" },
     { label: "الوسوم", href: "/tags/", icon: "🏷️" },
     { label: "المحفوظات", href: "/saved/", icon: "🔖" },
@@ -111,7 +82,7 @@ const navItems = [
             <div class="topbar-tabs">
                 <span class="tab active">لك</span>
                 <a class="tab" href="/">المقالات</a>
-                <a class="tab" href="/quotes/">الاقتباسات</a>
+                <a class="tab" href="https://quotes.elhellal.com/">الاقتباسات</a>
             </div>
             <div class="topbar-search">
                 <span class="search-icon">🔍</span>
@@ -144,71 +115,43 @@ const navItems = [
                     ))}
                 </div>
 
-                {feedItems.map((item) =>
-                    item.kind === "article" ? (
+                {articleFeed.map((article) => (
                         <article class="post">
                             <header class="post-header">
                                 <img
                                     class="avatar"
-                                    src={cover(item.article.profile_image_url_https, 40, 40)}
+                                    src={cover(article.profile_image_url_https, 40, 40)}
                                     alt=""
                                     loading="lazy"
                                 />
-                                <a class="post-author" href={`/authors/${encodeURIComponent(item.article.screen_name)}/`}>
-                                    {item.article.screen_name}
+                                <a class="post-author" href={`/authors/${encodeURIComponent(article.screen_name)}/`}>
+                                    {article.screen_name}
                                 </a>
                                 <div class="post-header-actions">
                                     <BookmarkButton
                                         client:load
-                                        slug={item.article.slug || ""}
-                                        title={item.article.title}
+                                        slug={article.slug || ""}
+                                        title={article.title}
                                         variant="small"
                                     />
                                 </div>
                             </header>
-                            <a class="post-image-link" href={`/articles/${encodeURIComponent(item.article.slug || "")}/`}>
+                            <a class="post-image-link" href={`/articles/${encodeURIComponent(article.slug || "")}/`}>
                                 <img
                                     class="post-image"
-                                    src={cover(item.article.original_img_url, 960, 720)}
-                                    alt={item.article.title}
+                                    src={cover(article.original_img_url, 960, 720)}
+                                    alt={article.title}
                                     loading="lazy"
                                 />
                             </a>
                             <div class="post-body">
-                                <a class="post-title" href={`/articles/${encodeURIComponent(item.article.slug || "")}/`}>
-                                    {item.article.title}
+                                <a class="post-title" href={`/articles/${encodeURIComponent(article.slug || "")}/`}>
+                                    {article.title}
                                 </a>
-                                <p class="post-preview">{item.article.preview_text}</p>
+                                <p class="post-preview">{article.preview_text}</p>
                             </div>
                         </article>
-                    ) : (
-                        <article class="post post-quote">
-                            <header class="post-header">
-                                {item.quote.authorImage ? (
-                                    <img class="avatar" src={item.quote.authorImage} alt="" loading="lazy" />
-                                ) : (
-                                    <span class="avatar avatar-fallback" aria-hidden="true">
-                                        {item.quote.author.trim().charAt(0)}
-                                    </span>
-                                )}
-                                <a class="post-author" href={`/quotes/${encodeURIComponent(item.quote.authorSlug)}/`}>
-                                    {item.quote.author}
-                                </a>
-                                <span class="post-type-pill">اقتباس</span>
-                            </header>
-                            <a
-                                class="post-quote-body"
-                                href={`/quotes/${encodeURIComponent(item.quote.authorSlug)}/${encodeURIComponent(item.quote.id)}/`}
-                            >
-                                <span class="post-quote-mark" aria-hidden="true">&rdquo;</span>
-                                <blockquote class={`post-quote-text post-quote-text-${quoteSizeTier(item.quote.text)}`}>
-                                    {item.quote.text}
-                                </blockquote>
-                                {item.quote.book && <span class="post-quote-book">من كتاب: {item.quote.book}</span>}
-                            </a>
-                        </article>
-                    )
-                )}
+                ))}
             </main>
 
             <aside class="sidebar-widgets">
