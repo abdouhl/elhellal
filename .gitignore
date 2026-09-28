@@ -49,3 +49,6 @@ public/pins/
 
 # generated book tweets (manual-upload only, never served by the site)
 /x-posts/
+
+# X scheduler output (snippet + posted state)
+.x-schedule/

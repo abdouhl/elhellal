@@ -35,6 +35,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "check-data": "bun run scripts/check-data.ts",
+    "x-schedule": "bun run scripts/x-schedule.ts",
     "update-metadata": "bun run scripts/update-metadata.ts",
     "fetch-author-names": "bun run scripts/fetch-author-names.ts",
     "generate-pins": "bun run scripts/generate-pinterest-pin.ts",
