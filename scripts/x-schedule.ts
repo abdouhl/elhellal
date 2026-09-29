@@ -10,6 +10,9 @@
  *   bun run x-schedule --day      4 posts on one day (today if all slots are
  *                                 still ahead, otherwise tomorrow)
  *   bun run x-schedule --month    4 posts a day for the next 30 days (120)
+ *   bun run x-schedule --month 10 2026
+ *                                 4 posts a day for every day of that calendar
+ *                                 month (days already past are skipped)
  *
  * Then open https://x.com/home in Chrome, open DevTools console
  * (Cmd+Opt+J) and paste — the snippet is copied to your clipboard and also
@@ -52,14 +55,27 @@ const opt = (name: string) => {
 
 const mode = flag("month") ? "month" : flag("day") ? "day" : undefined;
 if (!mode) {
-    console.error("Usage: bun run x-schedule --day | --month [--times 09:00,13:00,18:00,21:00] [--date YYYY-MM-DD] [--days 30] [--category slug] [--random] [--dry-run]");
+    console.error("Usage: bun run x-schedule --day | --month [M YYYY] [--times 09:00,13:00,18:00,21:00] [--date YYYY-MM-DD] [--days 30] [--category slug] [--random] [--dry-run]");
     process.exit(1);
 }
 const times = (opt("times") ?? "09:00,13:00,18:00,21:00").split(",").map((t) => t.trim());
 for (const t of times) {
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(t)) throw new Error(`Bad time "${t}", use HH:MM (24h)`);
 }
-const days = mode === "month" ? Number(opt("days") ?? 30) : 1;
+// `--month 10 2026` → that calendar month; plain `--month` → next --days days.
+const monthArgs = (() => {
+    const i = argv.indexOf("--month");
+    const m = Number(argv[i + 1]);
+    const y = Number(argv[i + 2]);
+    if (i < 0 || !/^\d{1,2}$/.test(argv[i + 1] ?? "")) return undefined;
+    if (m < 1 || m > 12 || !/^\d{4}$/.test(argv[i + 2] ?? "")) {
+        throw new Error("Use --month <1-12> <YYYY>, e.g. --month 10 2026");
+    }
+    return { m, y };
+})();
+const days = monthArgs
+    ? new Date(monthArgs.y, monthArgs.m, 0).getDate()
+    : mode === "month" ? Number(opt("days") ?? 30) : 1;
 const dryRun = flag("dry-run");
 
 // ── dates ──────────────────────────────────────────────────────────────
@@ -71,6 +87,7 @@ const at = (day: string, time: string) => new Date(`${day}T${time}:00`);
 const earliest = Date.now() + 15 * 60_000;
 
 function firstDay(): string {
+    if (monthArgs) return `${monthArgs.y}-${pad(monthArgs.m)}-01`;
     const given = opt("date");
     if (given) return given;
     const today = ymd(new Date());
@@ -91,7 +108,7 @@ const slots: string[] = [];
         d.setDate(d.getDate() + 1);
     }
 }
-if (!slots.length) throw new Error("No future slots — pick a later --date or --times");
+if (!slots.length) throw new Error(monthArgs ? "That month is already over — pick a future one" : "No future slots — pick a later --date or --times");
 
 // ── tweet text ─────────────────────────────────────────────────────────
 function charWeight(cp: number): number {
@@ -129,13 +146,23 @@ const posted: Record<string, string> = existsSync(STATE_FILE) ? JSON.parse(readF
 
 const category = opt("category");
 const since = opt("since") ?? "2026-09-15";
-let pool = data.articles
+// The same post is sometimes imported twice under different ids/urls, so
+// "already used" is judged by author + text, not just by id.
+const contentKey = (a: Article) => `${a.screen_name}|${(a.preview_text || a.tldr || a.title).replace(/\s+/g, " ").trim().slice(0, 120)}`;
+const all = data.articles.flatMap((c) => c.content);
+const usedKeys = new Set(all.filter((a) => posted[a.id_str]).map(contentKey));
+
+const seen = new Set<string>();
+const pool = data.articles
     .filter((c) => !category || c.category === category)
     .flatMap((c) => c.content)
-    .filter((a) => a.tldr?.trim() && a.slug && a.created_at >= since && !posted[a.id_str]);
-
-// Same article can appear in several categories.
-pool = [...new Map(pool.map((a) => [a.id_str, a])).values()];
+    .filter((a) => {
+        if (!a.tldr?.trim() || !a.slug || a.created_at < since || posted[a.id_str]) return false;
+        const key = contentKey(a);
+        if (usedKeys.has(key) || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
 
 if (flag("random")) {
     for (let i = pool.length - 1; i > 0; i--) {
