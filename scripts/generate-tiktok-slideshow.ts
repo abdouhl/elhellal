@@ -15,6 +15,15 @@
  *   bun run scripts/generate-tiktok-slideshow.ts --date 2026-09-18
  *   bun run scripts/generate-tiktok-slideshow.ts --dry-run
  *   bun run scripts/generate-tiktok-slideshow.ts --reset-history
+ *   bun run tiktok-slides --month 10 2026            one slideshow per day of
+ *                                                    that month (past days skipped)
+ *   bun run tiktok-slides --month 10 2026 --time 19:00   time shown in the checklist
+ *
+ * --month renders tiktok-slides/<date>/ for every remaining day of that month,
+ * then prints a checklist (date, post time, folder) to work through by hand in
+ * TikTok Studio: Upload > Photos, add the PNGs in order, paste caption.txt,
+ * Schedule. Days whose folder already has a manifest.json are reused, not
+ * re-rendered (--force to rebuild them).
  *
  * Selection: the --count newest articles (across all categories) that
  * haven't appeared in a previous run are picked, so a "daily series" run
@@ -43,6 +52,8 @@ import path from 'path';
 import https from 'https';
 import http from 'http';
 import { fileURLToPath } from 'url';
+import readline from 'readline';
+import { spawnSync } from 'child_process';
 import type { Article, ArticlesConfig, Category } from '../src/types/index.ts';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -55,6 +66,20 @@ const COUNT = parseInt(getArg('--count') || '5', 10);
 const DRY_RUN = args.includes('--dry-run');
 const RESET_HISTORY = args.includes('--reset-history');
 const DATE_OVERRIDE = getArg('--date'); // YYYY-MM-DD
+const FORCE = args.includes('--force');
+const POST_TIME = getArg('--time') || '19:00'; // planned local post time for --month
+// `--month 10 2026` → every day of that calendar month.
+const MONTH = (() => {
+  const i = args.indexOf('--month');
+  if (i < 0) return null;
+  const m = Number(args[i + 1]);
+  const y = Number(args[i + 2]);
+  if (!/^\d{1,2}$/.test(args[i + 1] ?? '') || m < 1 || m > 12 || !/^\d{4}$/.test(args[i + 2] ?? '')) {
+    console.error('❌  Use --month <1-12> <YYYY>, e.g. --month 10 2026');
+    process.exit(1);
+  }
+  return { m, y };
+})();
 const ARTICLES_FILE = getArg('--articles-file') || path.join(__dirname, '../src/data/articles.json');
 // Deliberately NOT under public/ — Astro copies everything in public/ verbatim into dist/,
 // so slideshow PNGs living there would ship to production and eat back into the Cloudflare
@@ -65,6 +90,10 @@ const HISTORY_FILE = path.join(OUT_ROOT, 'history.json');
 
 if (!Number.isFinite(COUNT) || COUNT < 1 || COUNT > 12) {
   console.error('❌  --count must be a number between 1 and 12.');
+  process.exit(1);
+}
+if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(POST_TIME)) {
+  console.error('❌  --time must be HH:MM (24h), e.g. 19:00');
   process.exit(1);
 }
 
@@ -145,7 +174,14 @@ function loadCandidateArticles(): FeaturedArticle[] {
     });
   });
   all.sort((a, b) => new Date(b.article.created_at).getTime() - new Date(a.article.created_at).getTime());
-  return all;
+  // The same post is sometimes imported twice under different id_str/slug — keep only the first copy.
+  const seen = new Set<string>();
+  return all.filter(({ article }) => {
+    const key = `${article.screen_name}|${(article.preview_text || article.title).slice(0, 120)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function loadHistory(): Set<string> {
@@ -373,31 +409,21 @@ function buildCaption(items: FeaturedArticle[], date: Date): string {
 }
 
 // ─── Main ───────────────────────────────────────────────────────────────────
-async function main() {
-  const now = DATE_OVERRIDE ? new Date(`${DATE_OVERRIDE}T12:00:00Z`) : new Date();
-  const dateKey = DATE_OVERRIDE || isoDate(now);
+const pad2 = (n: number) => String(n).padStart(2, '0');
+const localYmd = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 
-  const all = loadCandidateArticles();
-  const history = loadHistory();
-  const featured = pickFeatured(all, history, COUNT);
+interface DayResult {
+  date: string;
+  dir: string;
+  slides: string[]; // absolute paths, upload order
+  caption: string;
+  articles: { slug: string | undefined; title: string; category: string }[];
+}
 
-  if (featured.length === 0) {
-    console.error('❌  No articles available to feature.');
-    process.exit(1);
-  }
-  if (featured.length < COUNT) {
-    console.warn(`⚠️  Only ${featured.length} articles available (asked for ${COUNT}).`);
-  }
+type Browser = Awaited<ReturnType<typeof puppeteer.launch>>;
 
-  console.log(`\n🎬  Building TikTok slideshow for ${dateKey} — ${featured.length} articles:\n`);
-  featured.forEach(({ article }, i) => console.log(`   ${i + 1}. ${article.title}`));
-  console.log('');
-
-  if (DRY_RUN) {
-    console.log('🧪  --dry-run: no files written, history not updated.');
-    return;
-  }
-
+/** Renders one day's slideshow into tiktok-slides/<dateKey>/ and returns what was written. */
+async function renderDay(browser: Browser, featured: FeaturedArticle[], now: Date, dateKey: string): Promise<DayResult> {
   const outDir = path.join(OUT_ROOT, dateKey);
   fs.mkdirSync(outDir, { recursive: true });
 
@@ -410,7 +436,6 @@ async function main() {
   }));
   console.log(`${images.size}/${featured.length} fetched\n`);
 
-  const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security', '--disable-dev-shm-usage'] });
   const page = await browser.newPage();
   await page.setViewport({ width: W, height: H, deviceScaleFactor: 1 });
 
@@ -444,24 +469,183 @@ async function main() {
   await renderSlide(buildOutroSlide(featured, images), outroFile);
   slideFiles.push(outroFile);
 
-  await browser.close();
+  await page.close();
 
   const caption = buildCaption(featured, now);
   fs.writeFileSync(path.join(outDir, 'caption.txt'), caption, 'utf-8');
 
+  const articles = featured.map(({ article, categoryTitle }) => ({ slug: article.slug, title: article.title, category: categoryTitle }));
   const manifest = {
     date: dateKey,
     generatedAt: new Date().toISOString(),
     slides: slideFiles,
-    articles: featured.map(({ article, categoryTitle }) => ({ slug: article.slug, title: article.title, category: categoryTitle })),
+    articles,
   };
   fs.writeFileSync(path.join(outDir, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf-8');
+
+  console.log(`\n✅  ${dateKey} — ${slideFiles.length} slides in ${path.relative(process.cwd(), outDir)}/`);
+  return { date: dateKey, dir: outDir, slides: slideFiles.map((f) => path.join(outDir, f)), caption, articles };
+}
+
+/** Reads back a day that was already rendered on a previous run. */
+function loadExistingDay(dateKey: string): DayResult | null {
+  const dir = path.join(OUT_ROOT, dateKey);
+  try {
+    const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf-8'));
+    const caption = fs.readFileSync(path.join(dir, 'caption.txt'), 'utf-8');
+    const slides: string[] = manifest.slides.map((f: string) => path.join(dir, f));
+    if (!slides.every((f) => fs.existsSync(f))) return null;
+    return { date: dateKey, dir, slides, caption, articles: manifest.articles };
+  } catch {
+    return null;
+  }
+}
+
+// ─── Clipboard walk (macOS) ─────────────────────────────────────────────────
+function copyTextToClipboard(text: string): boolean {
+  if (process.platform !== 'darwin') return false;
+  return spawnSync('pbcopy', { input: text, env: { ...process.env, LC_ALL: 'en_US.UTF-8' } }).status === 0;
+}
+
+/** Resolves on Enter — or immediately if stdin is closed/piped, so non-interactive runs never hang. */
+function waitForEnter(prompt: string): Promise<string> {
+  return new Promise((resolve) => {
+    let answer = '';
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    rl.once('close', () => resolve(answer));
+    rl.question(prompt, (a) => { answer = a.trim(); rl.close(); });
+  });
+}
+
+/** Splits a caption into TikTok's title (first line) and description (the rest, minus hashtag lines). */
+function splitCaption(caption: string): { title: string; description: string } {
+  const [title, ...rest] = caption.split('\n').filter((l) => !l.trim().startsWith('#'));
+  return { title: title.trim(), description: rest.join('\n').trim() };
+}
+
+async function walkCaptions(results: DayResult[]) {
+  console.log('ℹ️   Copying each day in date order: title, Enter, description, Enter, next day… (q + Enter stops).');
+  for (let i = 0; i < results.length; i++) {
+    const r = results[i];
+    const { title, description } = splitCaption(r.caption);
+    const steps: [string, string][] = [['title', title], ['description', description]];
+    for (let j = 0; j < steps.length; j++) {
+      const [label, text] = steps[j];
+      if (!copyTextToClipboard(text)) {
+        console.warn('⚠️  Could not copy to the clipboard (macOS only).');
+        return;
+      }
+      console.log(`\n📋  ${r.date} ${label} copied (${i + 1}/${results.length}) — paste it into TikTok (⌘V).`);
+      const last = i === results.length - 1 && j === steps.length - 1;
+      const next = j === 0 ? 'description' : 'next day\'s title';
+      if (!last && (await waitForEnter(`    Press Enter to copy the ${next}… `)).toLowerCase() === 'q') return;
+    }
+  }
+}
+
+async function runSingleDay() {
+  const now = DATE_OVERRIDE ? new Date(`${DATE_OVERRIDE}T12:00:00Z`) : new Date();
+  const dateKey = DATE_OVERRIDE || isoDate(now);
+
+  const all = loadCandidateArticles();
+  const history = loadHistory();
+  const featured = pickFeatured(all, history, COUNT);
+
+  if (featured.length === 0) {
+    console.error('❌  No articles available to feature.');
+    process.exit(1);
+  }
+  if (featured.length < COUNT) {
+    console.warn(`⚠️  Only ${featured.length} articles available (asked for ${COUNT}).`);
+  }
+
+  console.log(`\n🎬  Building TikTok slideshow for ${dateKey} — ${featured.length} articles:\n`);
+  featured.forEach(({ article }, i) => console.log(`   ${i + 1}. ${article.title}`));
+  console.log('');
+
+  if (DRY_RUN) {
+    console.log('🧪  --dry-run: no files written, history not updated.');
+    return;
+  }
+
+  const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security', '--disable-dev-shm-usage'] });
+  await renderDay(browser, featured, now, dateKey);
+  await browser.close();
 
   featured.forEach(({ article }) => history.add(article.slug!));
   fs.writeFileSync(HISTORY_FILE, JSON.stringify([...history], null, 2), 'utf-8');
 
-  console.log(`\n✅  Done — ${slideFiles.length} slides in ${path.relative(process.cwd(), outDir)}/`);
   console.log('📋  Caption saved to caption.txt — upload the PNGs in numeric order via the TikTok app (Post > Photo).');
+}
+
+async function runMonth({ m, y }: { m: number; y: number }) {
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const today = localYmd(new Date());
+  const dates: string[] = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    const key = `${y}-${pad2(m)}-${pad2(d)}`;
+    if (key >= today) dates.push(key);
+  }
+  if (dates.length === 0) {
+    console.error(`❌  ${y}-${pad2(m)} is already over.`);
+    process.exit(1);
+  }
+
+  const all = loadCandidateArticles();
+  const history = loadHistory();
+
+  console.log(`\n🗓  TikTok slideshows for ${y}-${pad2(m)} — ${dates.length} day(s), ${COUNT} articles each\n`);
+
+  let browser: Browser | null = null;
+  const results: DayResult[] = [];
+  for (const dateKey of dates) {
+    const existing = FORCE ? null : loadExistingDay(dateKey);
+    if (existing) {
+      // Keep its articles out of later days' picks even after a --reset-history.
+      existing.articles.forEach((a) => a.slug && history.add(a.slug));
+      console.log(`⏭  ${dateKey} already generated — reusing (pass --force to rebuild)`);
+      results.push(existing);
+      continue;
+    }
+
+    const featured = pickFeatured(all, history, COUNT);
+    if (featured.length === 0) {
+      console.error(`❌  No articles left for ${dateKey}.`);
+      break;
+    }
+    // Picks are claimed immediately so the next day in this run never repeats them.
+    featured.forEach(({ article }) => history.add(article.slug!));
+
+    if (DRY_RUN) {
+      console.log(`📅  ${dateKey}`);
+      featured.forEach(({ article }, i) => console.log(`     ${i + 1}. ${article.title}`));
+      continue;
+    }
+
+    console.log(`\n🎬  ${dateKey}`);
+    browser ??= await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security', '--disable-dev-shm-usage'] });
+    results.push(await renderDay(browser, featured, new Date(`${dateKey}T12:00:00Z`), dateKey));
+    // Persist after every day so an interrupted run never re-features what it already rendered.
+    fs.writeFileSync(HISTORY_FILE, JSON.stringify([...history], null, 2), 'utf-8');
+  }
+  await browser?.close();
+
+  if (DRY_RUN) {
+    console.log('\n🧪  --dry-run: no files written, history not updated.');
+    return;
+  }
+
+  console.log(`\n✅  ${results.length} slideshow(s) ready — post each one in TikTok Studio (Upload > Photos):\n`);
+  for (const r of results) {
+    console.log(`   ☐  ${r.date} ${POST_TIME}   ${path.relative(process.cwd(), r.dir)}/   (${r.slides.length} slides + caption.txt)`);
+  }
+  console.log('');
+  await walkCaptions(results);
+}
+
+async function main() {
+  if (MONTH) return runMonth(MONTH);
+  return runSingleDay();
 }
 
 main().catch((err) => {
