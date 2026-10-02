@@ -1,0 +1,220 @@
+/* Imgur-style feed — reuses .link-card colors, only the layout is new. */
+
+.masonry-feed {
+  padding-top: var(--spacing-05);
+}
+
+/* Sort tabs */
+.feed-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: var(--spacing-05);
+  border-bottom: 1px solid var(--border-muted);
+}
+
+.feed-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  padding: 10px 14px;
+  font-family: var(--body-copy);
+  font-size: var(--desktop-body-sm);
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.45);
+  cursor: var(--c-pointer);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.feed-tab:hover {
+  color: #f0f0f0;
+}
+
+.feed-tab.is-active {
+  color: #f0f0f0;
+  border-bottom-color: DarkOrange;
+}
+
+.feed-count {
+  margin-inline-start: auto;
+  font-family: var(--monospace);
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+/* Masonry: one flex row of columns; RTL puts the first column on the right. */
+.masonry {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-05);
+}
+
+.masonry-col {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-05);
+  margin: 0;
+  padding: 0;
+}
+
+/* Below 640px (and before hydration picks a column count) collapse to a single
+   list; each card's inline `order` keeps the feed in reading order. */
+@media (max-width: 639px) {
+  .masonry {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .masonry-col {
+    display: contents;
+  }
+}
+
+/* One-item list wrapping each Card (see MasonryFeed.tsx) */
+.masonry-cell {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* content-visibility: auto lets the browser guess card sizes, which jitters
+   columns — layout-only override, the card's look is unchanged. */
+.masonry .link-card {
+  content-visibility: visible;
+}
+
+/* Tag explorer (TagTiles.astro): one row of tiles collapsed, full grid expanded */
+.tag-explorer {
+  padding-top: var(--spacing-05);
+  scroll-margin-top: 80px;
+}
+
+.tag-explorer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-04);
+}
+
+.tag-tiles-heading {
+  margin: 0;
+  font-size: var(--desktop-body-sm);
+  font-weight: 700;
+  color: #f0f0f0;
+}
+
+.tag-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 4px 0;
+  font-family: var(--monospace);
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.55);
+  cursor: var(--c-pointer);
+  transition: color 0.15s ease;
+}
+
+.tag-toggle:hover {
+  color: DarkOrange;
+}
+
+.tag-toggle-icon {
+  font-size: 16px;
+  line-height: 1;
+  color: DarkOrange;
+}
+
+.tag-toggle-less,
+.tag-explorer[data-expanded="true"] .tag-toggle-more {
+  display: none;
+}
+
+.tag-explorer[data-expanded="true"] .tag-toggle-less {
+  display: inline;
+}
+
+.tag-explorer[data-expanded="true"] .tag-toggle-icon {
+  transform: rotate(45deg);
+}
+
+.tag-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 4px 0 0; /* room for the tile's -2px hover lift */
+  list-style: none;
+  /* Collapsed: exactly one row of tiles (4px + 92px tile) */
+  max-height: 96px;
+  overflow: hidden;
+}
+
+.tag-explorer[data-expanded="true"] .tag-tiles {
+  max-height: none;
+}
+
+.tag-tile {
+  min-width: 0;
+}
+
+.tag-tile a {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  height: 92px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  overflow: hidden;
+  text-decoration: none;
+  background-color: #111111;
+  box-shadow: 0px 0px 0px 0.5px rgba(255, 255, 255, 0.08);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.tag-tile a:is(:hover, :focus-visible) {
+  transform: translateY(-2px);
+  box-shadow: 0px 0px 0px 1px DarkOrange;
+}
+
+.tag-tile img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.7;
+}
+
+.tag-tile a::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 10%, rgba(0, 0, 0, 0.15));
+}
+
+.tag-tile-label,
+.tag-tile-count {
+  position: relative;
+  z-index: 1;
+}
+
+.tag-tile-label {
+  font-weight: 700;
+  font-size: 14px;
+  color: #f0f0f0;
+  line-height: 1.3;
+}
+
+.tag-tile-count {
+  font-family: var(--monospace);
+  font-size: 11px;
+  color: DarkOrange;
+}
+

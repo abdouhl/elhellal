@@ -1,12 +1,16 @@
 ---
 import Layout from "../../layouts/Layout.astro";
-import Card from "../../components/Card";
+import MasonryFeed from "../../components/MasonryFeed";
+import ExploreTiles from "../../components/ExploreTiles.astro";
+import FeedChrome from "../../components/FeedChrome.astro";
+import "../../components/MasonryFeed.css";
 import BreadcrumbSchema from "../../components/schema/BreadcrumbSchema.astro";
 import ItemListSchema from "../../components/schema/ItemListSchema.astro";
 import PersonSchema from "../../components/schema/PersonSchema.astro";
 import { getAuthors, type AuthorArticle } from "../../utils/authors";
 import data from "../../data/articles.json";
-import "../../components/CardsContainer.css";
+import { categoryTiles } from "../../utils/exploreTiles";
+import type { ArticleWithCategory } from "../../types";
 
 export async function getStaticPaths() {
   return (await getAuthors()).map((author) => ({
@@ -41,6 +45,22 @@ const categoryTitleMap: Record<string, string> = {};
 const sorted = [...articles].sort(
   (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
 );
+
+// Only what a card needs — the full entries carry tldr/keywords/etc.
+const feedArticles: ArticleWithCategory[] = sorted.map((a) => ({
+  id_str: a.id_str,
+  title: a.title,
+  preview_text: a.preview_text,
+  original_img_url: a.original_img_url,
+  screen_name: a.screen_name,
+  created_at: a.created_at,
+  slug: a.slug,
+  url: a.url,
+  internalHref: a.internalHref,
+  authorHref: a.authorHref,
+  authorName: a.authorName,
+  category: a.category,
+}));
 
 const authorLabel = displayName || `@${screen_name}`;
 const canonicalUrl = `https://elhellal.com/authors/${encodeURIComponent(screen_name)}/`;
@@ -101,6 +121,7 @@ const latestDate = sorted[0]
   <BreadcrumbSchema items={breadcrumbs} />
 
   <main id="main-content" class="author-page">
+    <FeedChrome />
     <nav class="breadcrumb" aria-label="مسار التنقل">
       <a href="/">الرئيسية</a>
       <span aria-hidden="true">›</span>
@@ -158,22 +179,13 @@ const latestDate = sorted[0]
       )}
     </header>
 
-    <ul role="list" class="link-card-grid">
-      {sorted.map((tool) => (
-        <Card
-          client:visible
-          href={tool.url || `https://x.com/${tool.screen_name}/status/${tool.id_str}`}
-          title={tool.title}
-          body={tool.preview_text}
-          screen_name={tool.screen_name}
-          dateAdded={tool.created_at}
-          slug={tool.slug}
-          category={categoryTitleMap[tool.category] || tool.category}
-          image={tool.original_img_url}
-          internalHref={tool.internalHref}
-        />
-      ))}
-    </ul>
+    <ExploreTiles
+      tiles={categoryTiles(articles)}
+      heading="يكتب في"
+      moreLabel="كل التصنيفات"
+      lessLabel="أقل"
+    />
+    <MasonryFeed client:load articles={feedArticles} />
 
     <div class="page-nav">
       <a href="/authors/" class="back-link">كل الكتّاب →</a>
@@ -182,9 +194,11 @@ const latestDate = sorted[0]
 
   <style>
     .author-page {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: var(--spacing-06) var(--spacing-05) var(--spacing-10);
+      padding-bottom: var(--spacing-10);
+    }
+
+    .author-page .breadcrumb {
+      margin-top: var(--spacing-06);
     }
 
     .breadcrumb {

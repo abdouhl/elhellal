@@ -1,11 +1,13 @@
 ---
 import Layout from "../../layouts/Layout.astro";
-import Card from "../../components/Card";
+import MasonryFeed from "../../components/MasonryFeed";
+import ExploreTiles from "../../components/ExploreTiles.astro";
+import FeedChrome from "../../components/FeedChrome.astro";
+import "../../components/MasonryFeed.css";
 import BreadcrumbSchema from "../../components/schema/BreadcrumbSchema.astro";
 import ItemListSchema from "../../components/schema/ItemListSchema.astro";
 import { getQualifyingTags, type TaggedArticle } from "../../utils/tags";
-import data from "../../data/articles.json";
-import "../../components/CardsContainer.css";
+import { tagTiles } from "../../utils/exploreTiles";
 
 export async function getStaticPaths() {
   return getQualifyingTags().map((tag) => ({
@@ -16,12 +18,13 @@ export async function getStaticPaths() {
 
 const { label, articles } = Astro.props as { label: string; articles: TaggedArticle[] };
 
-const categoryTitleMap: Record<string, string> = {};
-(data.articles as any[]).forEach((c) => { categoryTitleMap[c.category] = c.title; });
-
 const sorted = [...articles].sort(
   (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
 );
+
+const slugs = articles.map((a) => a.slug).filter((s): s is string => !!s);
+// Tags that show up alongside this one
+const related = tagTiles(articles, [Astro.params.tag]);
 
 const canonicalUrl = `https://elhellal.com/tags/${encodeURIComponent(Astro.params.tag)}/`;
 const breadcrumbs = [
@@ -47,6 +50,7 @@ const breadcrumbs = [
   <BreadcrumbSchema items={breadcrumbs} />
 
   <main id="main-content" class="tag-page">
+    <FeedChrome />
     <nav class="breadcrumb" aria-label="مسار التنقل">
       <a href="/">الرئيسية</a>
       <span aria-hidden="true">›</span>
@@ -60,21 +64,8 @@ const breadcrumbs = [
       <p class="tag-count">{sorted.length} مقالة</p>
     </header>
 
-    <ul role="list" class="link-card-grid">
-      {sorted.map((tool) => (
-        <Card
-          client:visible
-          href={tool.url || `https://x.com/${tool.screen_name}/status/${tool.id_str}`}
-          title={tool.title}
-          body={tool.preview_text}
-          screen_name={tool.screen_name}
-          dateAdded={tool.created_at}
-          slug={tool.slug}
-          category={categoryTitleMap[tool.category] || tool.category}
-          image={tool.original_img_url}
-        />
-      ))}
-    </ul>
+    <ExploreTiles tiles={related} heading="وسوم ذات صلة" />
+    <MasonryFeed client:load slugs={slugs} />
 
     <div class="page-nav">
       <a href="/tags/" class="back-link">كل الوسوم →</a>
@@ -83,9 +74,11 @@ const breadcrumbs = [
 
   <style>
     .tag-page {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: var(--spacing-06) var(--spacing-05) var(--spacing-10);
+      padding-bottom: var(--spacing-10);
+    }
+
+    .tag-page .breadcrumb {
+      margin-top: var(--spacing-06);
     }
 
     .breadcrumb {

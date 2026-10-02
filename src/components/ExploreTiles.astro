@@ -1,0 +1,65 @@
+---
+// Imgur-style "explore" block for listing pages: one row of tiles, with a
+// "more / fewer" toggle that expands the full grid. Tiles come from
+// src/utils/exploreTiles.ts (categories or tags, depending on the page).
+import type { ExploreTile } from "../utils/exploreTiles";
+
+interface Props {
+  tiles: ExploreTile[];
+  heading?: string;
+  /** Toggle labels, e.g. "المزيد من الوسوم" / "وسوم أقل" */
+  moreLabel?: string;
+  lessLabel?: string;
+}
+
+const {
+  tiles,
+  heading = "استكشف الوسوم",
+  moreLabel = "المزيد من الوسوم",
+  lessLabel = "وسوم أقل",
+} = Astro.props;
+---
+
+{tiles.length > 0 && (
+  <section class="tag-explorer" data-expanded="false">
+    <div class="tag-explorer-head">
+      <h2 class="tag-tiles-heading">{heading}</h2>
+      {tiles.length > 2 && (
+        <button type="button" class="tag-toggle" aria-expanded="false" aria-controls="tag-tiles-grid">
+          <span class="tag-toggle-more">{moreLabel}</span>
+          <span class="tag-toggle-less">{lessLabel}</span>
+          <span class="tag-toggle-icon" aria-hidden="true">+</span>
+        </button>
+      )}
+    </div>
+    <ul role="list" class="tag-tiles" id="tag-tiles-grid">
+      {tiles.map((tile) => (
+        <li class="tag-tile">
+          <a href={tile.href}>
+            {tile.image && <img src={tile.image} alt="" loading="lazy" decoding="async" />}
+            <span class="tag-tile-label">{tile.label}</span>
+            <span class="tag-tile-count">{tile.count} مقالة</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  </section>
+)}
+
+<script>
+  const initTagToggle = () => {
+    document.querySelectorAll<HTMLElement>(".tag-explorer").forEach((section) => {
+      const button = section.querySelector<HTMLButtonElement>(".tag-toggle");
+      if (!button || button.dataset.bound) return;
+      button.dataset.bound = "1";
+      button.addEventListener("click", () => {
+        const expanded = section.dataset.expanded !== "true";
+        section.dataset.expanded = String(expanded);
+        button.setAttribute("aria-expanded", String(expanded));
+        if (!expanded) section.scrollIntoView({ block: "start", behavior: "smooth" });
+      });
+    });
+  };
+  initTagToggle();
+  document.addEventListener("astro:page-load", initTagToggle);
+</script>

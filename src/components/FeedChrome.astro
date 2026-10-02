@@ -1,0 +1,282 @@
+---
+// Imgur-style page chrome for listing pages:
+//  - a top banner ad whose close button unlocks after 5 seconds
+//  - a floating "back to top" pill that appears once you scroll
+//  - a fixed footer bar that shows on load and slides away when you scroll
+import AdUnit from "./AdUnit.astro";
+
+interface Props {
+  /** Render the top banner ad (the default slot is the site's display unit). */
+  adSlot?: string;
+}
+
+const { adSlot = "2951250905" } = Astro.props;
+---
+
+<div class="top-ad" data-closable="false">
+  <button type="button" class="top-ad-close" aria-label="إغلاق الإعلان" disabled>
+    <span class="top-ad-countdown">5</span>
+    <span class="top-ad-x" aria-hidden="true">×</span>
+  </button>
+  <AdUnit slot={adSlot} minHeight={90} />
+</div>
+
+<button type="button" class="to-top" aria-label="العودة إلى الأعلى">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+  </svg>
+  <span>للأعلى</span>
+</button>
+
+<footer class="feed-footer" aria-label="روابط الموقع">
+  <nav class="feed-footer-nav">
+    <a href="/about/">حول الموقع</a>
+    <a href="/tags/">الوسوم</a>
+    <a href="/authors/">الكتّاب</a>
+    <a href="https://quotes.elhellal.com/">الاقتباسات</a>
+    <a href="https://books.elhellal.com/">ملخصات الكتب</a>
+    <a href="https://quiz.elhellal.com/">اختبر معلوماتك</a>
+    <a href="/privacy/">الخصوصية</a>
+    <a href="/terms/">الشروط</a>
+    <a href="/rss.xml">RSS</a>
+  </nav>
+  <span class="feed-footer-copy">الهلال © 2026</span>
+</footer>
+
+<script>
+  const AD_CLOSE_DELAY = 5;
+  const SHOW_TO_TOP_AFTER = 600; // px scrolled
+  const HIDE_FOOTER_AFTER = 40;
+
+  const initTopAd = () => {
+    const ad = document.querySelector<HTMLElement>(".top-ad");
+    const button = ad?.querySelector<HTMLButtonElement>(".top-ad-close");
+    const counter = ad?.querySelector<HTMLElement>(".top-ad-countdown");
+    if (!ad || !button || !counter || ad.dataset.bound) return;
+    ad.dataset.bound = "1";
+
+    let remaining = AD_CLOSE_DELAY;
+    const timer = window.setInterval(() => {
+      remaining -= 1;
+      counter.textContent = String(remaining);
+      if (remaining > 0) return;
+      window.clearInterval(timer);
+      ad.dataset.closable = "true";
+      button.disabled = false;
+    }, 1000);
+
+    button.addEventListener("click", () => {
+      ad.classList.add("is-closing");
+      // Remove after the collapse animation (0.3s); a timer is more reliable
+      // than transitionend, which may not fire if nothing actually animates.
+      window.setTimeout(() => ad.remove(), 350);
+    });
+  };
+
+  const onScroll = () => {
+    const y = window.scrollY;
+    document.querySelector(".to-top")?.classList.toggle("is-visible", y > SHOW_TO_TOP_AFTER);
+    document.querySelector(".feed-footer")?.classList.toggle("is-hidden", y > HIDE_FOOTER_AFTER);
+  };
+
+  let ticking = false;
+  window.addEventListener(
+    "scroll",
+    () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        onScroll();
+        ticking = false;
+      });
+    },
+    { passive: true },
+  );
+
+  document.addEventListener("click", (e) => {
+    if ((e.target as Element).closest?.(".to-top")) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  });
+
+  // Both are idempotent: run now (astro:page-load may already have fired by the
+  // time this module executes) and again after each view-transition navigation.
+  const init = () => {
+    initTopAd();
+    onScroll();
+  };
+  init();
+  document.addEventListener("astro:page-load", init);
+</script>
+
+<style>
+  /* Top banner ad */
+  .top-ad {
+    position: relative;
+    margin-top: var(--spacing-05);
+    padding: 10px 12px;
+    border-radius: 12px;
+    background-color: #111111;
+    box-shadow: 0px 0px 0px 0.5px rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+    max-height: 400px;
+    transition: opacity 0.25s ease, max-height 0.3s ease, margin 0.3s ease, padding 0.3s ease;
+  }
+
+  .top-ad.is-closing {
+    opacity: 0;
+    max-height: 0;
+    margin-top: 0;
+    padding-block: 0;
+  }
+
+  .top-ad:has(ins.adsbygoogle[data-ad-status="unfilled"]) {
+    display: none;
+  }
+
+  .top-ad-close {
+    position: absolute;
+    top: 8px;
+    left: 8px; /* RTL: opposite the "إعلان" label */
+    z-index: 2;
+    width: 26px;
+    height: 26px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    border: 0.5px solid rgba(255, 255, 255, 0.15);
+    background: rgba(0, 0, 0, 0.62);
+    color: rgba(255, 255, 255, 0.45);
+    font-family: var(--monospace);
+    font-size: 12px;
+    cursor: default;
+  }
+
+  .top-ad-x {
+    display: none;
+    font-size: 18px;
+    line-height: 1;
+  }
+
+  .top-ad[data-closable="true"] .top-ad-countdown {
+    display: none;
+  }
+
+  .top-ad[data-closable="true"] .top-ad-x {
+    display: block;
+  }
+
+  .top-ad[data-closable="true"] .top-ad-close {
+    color: #f0f0f0;
+    cursor: var(--c-pointer);
+  }
+
+  .top-ad[data-closable="true"] .top-ad-close:hover {
+    border-color: DarkOrange;
+    color: DarkOrange;
+  }
+
+  /* Back to top pill */
+  .to-top {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    z-index: 1000;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 16px;
+    border-radius: 999px;
+    border: 0.5px solid rgba(255, 255, 255, 0.12);
+    background-color: #111111;
+    color: #f0f0f0;
+    font-family: var(--body-copy);
+    font-size: 13px;
+    font-weight: 700;
+    box-shadow: 0px 4px 16px rgba(0, 0, 0, 0.5);
+    cursor: var(--c-pointer);
+    opacity: 0;
+    transform: translateY(12px);
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease, border-color 0.15s ease;
+  }
+
+  .to-top svg {
+    color: DarkOrange;
+  }
+
+  .to-top.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  .to-top:hover {
+    border-color: DarkOrange;
+  }
+
+  /* Fixed footer bar — visible at the top of the page, slides away on scroll */
+  .feed-footer {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-05);
+    padding: 12px 24px;
+    background-color: var(--background-high-contrast);
+    -webkit-backdrop-filter: blur(0.5rem);
+    backdrop-filter: blur(0.5rem);
+    border-top: 1px solid var(--border-muted);
+    transition: transform 0.3s ease;
+  }
+
+  .feed-footer.is-hidden {
+    transform: translateY(100%);
+  }
+
+  .feed-footer-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+  }
+
+  .feed-footer a {
+    font-family: var(--monospace);
+    font-size: 12px;
+    color: var(--content-secondary);
+    text-decoration: none;
+    transition: color 0.15s ease;
+  }
+
+  .feed-footer a:hover {
+    color: DarkOrange;
+  }
+
+  .feed-footer-copy {
+    margin-inline-start: auto;
+    font-family: var(--monospace);
+    font-size: 12px;
+    color: var(--content-secondary);
+    white-space: nowrap;
+  }
+
+  @media (max-width: 639px) {
+    .feed-footer {
+      padding: 10px 16px;
+    }
+    .feed-footer-nav {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .feed-footer-copy {
+      display: none;
+    }
+    .to-top {
+      right: 16px;
+      bottom: 16px;
+    }
+  }
+</style>

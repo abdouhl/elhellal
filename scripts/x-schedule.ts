@@ -27,8 +27,10 @@
  * Rerunning the same snippet skips posts it already scheduled.
  *
  * Options:
- *   --times 09:00,13:00,18:00,21:00   daily article slots (local time, 24h; "--no-articles" to skip)
- *   --quiz-times 11:00,16:00           daily quiz slots ("--no-quiz" to skip)
+ *   --articles 6                       articles per day, spread 08:00–22:00 (default 4)
+ *   --quizzes 3                        Arabic quiz questions per day, spread 09:00–21:00 (default 2)
+ *   --times 09:00,13:00,18:00,21:00   exact daily article slots (local time, 24h; "--no-articles" to skip)
+ *   --quiz-times 11:00,16:00           exact daily quiz slots ("--no-quiz" to skip)
  *   --book-times 20:00                 daily book/lesson slots ("--no-book" to skip)
  *   --date YYYY-MM-DD                  day to use (--day) / first day (--month)
  *   --days 30                          number of days for --month
@@ -68,20 +70,37 @@ const opt = (name: string) => {
 
 const mode = flag("month") ? "month" : flag("day") ? "day" : undefined;
 if (!mode) {
-    console.error("Usage: bun run x-schedule --day | --month [M YYYY] [--times 09:00,13:00,18:00,21:00] [--quiz-times 11:00,16:00] [--book-times 20:00] [--no-articles|--no-quiz|--no-book] [--date YYYY-MM-DD] [--days 30] [--category slug] [--random] [--dry-run]");
+    console.error("Usage: bun run x-schedule --day | --month [M YYYY] [--articles N] [--quizzes N] [--times 09:00,13:00,18:00,21:00] [--quiz-times 11:00,16:00] [--book-times 20:00] [--no-articles|--no-quiz|--no-book] [--date YYYY-MM-DD] [--days 30] [--category slug] [--random] [--dry-run]");
     process.exit(1);
 }
-function timeList(name: string, fallback: string, off: string): string[] {
+// `n` posts a day spread evenly over [from, to] hours, nudged off times another kind already uses.
+function spread(n: number, taken: string[], from: number, to: number): string {
+    const hm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+    const out: string[] = [];
+    for (let i = 0; i < n; i++) {
+        let m = n === 1 ? 13 * 60 : from * 60 + Math.round(((to - from) * 60 * i) / (n - 1) / 5) * 5;
+        while (taken.includes(hm(m)) || out.includes(hm(m))) m += 10;
+        out.push(hm(m));
+    }
+    return out.join(",");
+}
+function timeList(name: string, fallback: string, off: string, countName?: string, taken: string[] = [], window = [8, 22]): string[] {
     if (flag(off)) return [];
+    const n = countName ? opt(countName) : undefined;
+    if (n !== undefined && !opt(name)) {
+        if (!/^\d+$/.test(n) || Number(n) > 24) throw new Error(`--${countName} takes a number of posts per day (0-24)`);
+        if (Number(n) === 0) return [];
+        fallback = spread(Number(n), taken, window[0]!, window[1]!);
+    }
     const list = (opt(name) ?? fallback).split(",").map((t) => t.trim());
     for (const t of list) {
         if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(t)) throw new Error(`Bad time "${t}" in --${name}, use HH:MM (24h)`);
     }
     return list;
 }
-const times = timeList("times", "09:00,13:00,18:00,21:00", "no-articles");
-const quizTimes = timeList("quiz-times", "11:00,16:00", "no-quiz");
 const bookTimes = timeList("book-times", "20:00", "no-book");
+const times = timeList("times", "09:00,13:00,18:00,21:00", "no-articles", "articles", bookTimes);
+const quizTimes = timeList("quiz-times", "11:00,16:00", "no-quiz", "quizzes", [...bookTimes, ...times], [9, 21]);
 const allTimes = [...times, ...quizTimes, ...bookTimes];
 // `--month 10 2026` → that calendar month; plain `--month` → next --days days.
 const monthArgs = (() => {
@@ -212,7 +231,8 @@ const queue: Item[] = pool.slice(0, slots.length).map((a, i) => ({
 // ── quiz questions ─────────────────────────────────────────────────────
 if (quizSlots.length) {
     if (!existsSync(QUIZ_REPO)) throw new Error(`Quiz repo not found at ${QUIZ_REPO} (or pass --no-quiz)`);
-    const engine = await import(join(QUIZ_REPO, "src/game/engine.ts"));
+    // Arabic questions only — the quiz repo also has an English set under /en/.
+    const { engine } = await import(join(QUIZ_REPO, "src/game/ar.ts"));
     const seo = await import(join(QUIZ_REPO, "src/game/seo.ts"));
     const ids = (engine.allQuestionIds() as [string, string][]).map(([id]) => id).filter((id) => !posted[`quiz:${id}`]);
     for (let i = ids.length - 1; i > 0; i--) {
@@ -222,9 +242,9 @@ if (quizSlots.length) {
     if (ids.length < quizSlots.length) console.warn(`Only ${ids.length} unused quiz questions — scheduling ${ids.length} of ${quizSlots.length} quiz slots.`);
     quizSlots.slice(0, ids.length).forEach((at, i) => {
         const id = ids[i]!;
-        const url = `${QUIZ_SITE}${seo.qPath(id)}`;
+        const url = `${QUIZ_SITE}${seo.qPath("ar", id)}`;
         const sep = "\n\n";
-        const body = fit(`🧠 ${seo.seoTitle(engine.questionById(id))}`, MAX_WEIGHT - URL_WEIGHT - weight(sep));
+        const body = fit(`🧠 ${seo.seoTitle("ar", engine.questionById(id))}`, MAX_WEIGHT - URL_WEIGHT - weight(sep));
         queue.push({ id: `quiz:${id}`, at, kind: "quiz", text: `${body}${sep}${url}` });
     });
 }

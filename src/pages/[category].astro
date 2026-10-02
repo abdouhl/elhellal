@@ -1,10 +1,14 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import Dashboard from "../components/Dashboard";
+import MasonryFeed from "../components/MasonryFeed";
+import ExploreTiles from "../components/ExploreTiles.astro";
+import FeedChrome from "../components/FeedChrome.astro";
+import "../components/MasonryFeed.css";
 import ItemListSchema from "../components/schema/ItemListSchema.astro";
 import BreadcrumbSchema from "../components/schema/BreadcrumbSchema.astro";
 import data from "../data/articles.json";
 import { getPersonalBlogFeedArticles } from "../utils/personalBlogFeed";
+import { categoryArticles, categoryTiles, tagTiles } from "../utils/exploreTiles";
 
 export function getStaticPaths() {
   // Derive paths from data instead of hardcoding
@@ -22,6 +26,14 @@ const categoryTitle = categoryData?.title || category;
 const personalBlogArticles = (await getPersonalBlogFeedArticles()).filter(
   (article) => article.category === category
 );
+
+// Tags narrow the category down; small categories with too few tags fall back
+// to the other categories so the block never disappears.
+const tags = tagTiles(categoryArticles(category));
+const useTags = tags.length >= 4;
+const tiles = useTags
+  ? tags
+  : categoryTiles().filter((tile) => tile.href !== `/${category}/`);
 
 // Breadcrumb data
 const breadcrumbs = [
@@ -42,6 +54,17 @@ const breadcrumbs = [
   <ItemListSchema items={categoryTools} listName={`${categoryTitle} Articles`} />
   <BreadcrumbSchema items={breadcrumbs} />
   <main id="main-content">
-    <Dashboard client:load category={category} extraArticles={personalBlogArticles} transition:persist />
+    <FeedChrome />
+    {useTags ? (
+      <ExploreTiles tiles={tiles} />
+    ) : (
+      <ExploreTiles
+        tiles={tiles}
+        heading="استكشف التصنيفات"
+        moreLabel="المزيد من التصنيفات"
+        lessLabel="تصنيفات أقل"
+      />
+    )}
+    <MasonryFeed client:load filter={category} extraArticles={personalBlogArticles} />
   </main>
 </Layout>
