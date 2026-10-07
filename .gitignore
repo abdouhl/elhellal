@@ -53,3 +53,6 @@ public/pins/
 # X scheduler output (snippet + posted state)
 .x-schedule/
 .linkedin-schedule/
+
+# substack discovery output
+.substack-discovery/
