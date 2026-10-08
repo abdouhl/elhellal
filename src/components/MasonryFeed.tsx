@@ -1,33 +1,47 @@
-import { useMemo, useState, useEffect, useRef } from 'react';
-import Fuse from 'fuse.js';
+import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import Card from './Card';
 import AdCard from './AdCard';
 import EmptyState, { SearchIcon } from './EmptyState';
 import './CardsContainer.css';
 import './MasonryFeed.css';
-import data from '../data/articles.client.json';
-import type { Category, ArticleWithCategory } from '../types';
-import { toolComparators, seededShuffle } from '../utils/sorting';
+import { seededShuffle } from '../utils/sorting';
 import { isRecentlyAdded } from '../utils/dates';
+import {
+    compareAlpha,
+    feedPageCount,
+    feedPageUrl,
+    matchesQuery,
+    queryTokens,
+    type FeedCard,
+} from '../lib/feed';
 
 // Imgur-style article feed: sort tabs + a masonry feed whose
 // columns are filled in JS (shortest column first) so reading order stays
 // right-to-left across rows instead of top-to-bottom per column.
+//
+// Data comes in one of two ways:
+//  - `cards`: the whole (small) list inline — tag and author pages.
+//  - `scope` + `total`: a big feed ("all" or a category) that lives in static
+//    JSON pages (src/pages/feed/…); only `initialCards` ship with the page
+//    and the rest is fetched as the reader scrolls or searches.
 const ITEMS_PER_PAGE = 100;
 const AD_INTERVAL = 12;
+const NEW_DAYS = 3;
+/** Feed files fetched at once while scanning for search matches. */
+const SCAN_CONCURRENCY = 4;
 
 // Same breakpoints as .link-card-grid.
 const BREAKPOINTS: Array<[number, number]> = [[1400, 4], [1024, 3], [640, 2]];
 
-type FeedSort = 'dateNewest' | 'random' | 'nameAsc';
-const SORT_TABS: Array<{ key: FeedSort; label: string }> = [
+type FeedSortTab = 'dateNewest' | 'random' | 'nameAsc';
+const SORT_TABS: Array<{ key: FeedSortTab; label: string }> = [
     { key: 'dateNewest', label: 'الأحدث' },
     { key: 'random', label: 'اكتشف' },
     { key: 'nameAsc', label: 'أبجدياً' },
 ];
 
 type FeedItem =
-    | { type: 'card'; key: string; order: number; card: ArticleWithCategory }
+    | { type: 'card'; key: string; order: number; card: FeedCard }
     | { type: 'ad'; key: string; order: number };
 
 // Rough card height in px, only used to pick the shortest column. Mirrors
@@ -52,25 +66,38 @@ function useColumnCount(): number {
     return count;
 }
 
-interface MasonryFeedProps {
-    /** Category to show, or 'all' */
-    filter?: string;
-    extraArticles?: ArticleWithCategory[];
-    /** Restrict the feed to these article slugs (tag pages) */
-    slugs?: string[];
-    /** Use exactly these articles instead of the site-wide data (author pages) */
-    articles?: ArticleWithCategory[];
+/** A run = one combination of sort/search/filter, filled page by page. */
+interface Run {
+    key: string;
+    items: FeedCard[];
+    /** Next feed page to read */
+    nextPage: number;
+    done: boolean;
+    loading: boolean;
 }
 
-export default function MasonryFeed({ filter = 'all', extraArticles = [], slugs, articles }: MasonryFeedProps) {
-    const [sort, setSort] = useState<FeedSort>('dateNewest');
+interface MasonryFeedProps {
+    /** Big feeds: which static feed to page through ("all" or a category) */
+    scope?: string;
+    /** Big feeds: number of articles in the scope */
+    total?: number;
+    /** Big feeds: the first newest-first cards, rendered on the server */
+    initialCards?: FeedCard[];
+    /** Small feeds: every card, already newest-first */
+    cards?: FeedCard[];
+    /** category key → display title */
+    categoryTitles: Record<string, string>;
+}
+
+export default function MasonryFeed({ scope, total = 0, initialCards = [], cards, categoryTitles }: MasonryFeedProps) {
+    const [sort, setSort] = useState<FeedSortTab>('dateNewest');
     const [seed, setSeed] = useState(42);
     const [searchQuery, setSearchQuery] = useState('');
     const [filterNew, setFilterNew] = useState(false);
     const [displayedCount, setDisplayedCount] = useState(ITEMS_PER_PAGE);
-    const [isLoading, setIsLoading] = useState(false);
     const loaderRef = useRef<HTMLDivElement>(null);
     const columnCount = useColumnCount();
+    const pageCache = useRef(new Map<string, Promise<FeedCard[]>>());
 
     useEffect(() => {
         const handleSearch = (e: Event) => {
@@ -90,63 +117,127 @@ export default function MasonryFeed({ filter = 'all', extraArticles = [], slugs,
         };
     }, []);
 
-    const categoryTitleMap = useMemo(() => {
-        const map: Record<string, string> = {};
-        (data.articles as Category[]).forEach(c => { map[c.category] = c.title; });
-        return map;
-    }, []);
+    const inline = cards !== undefined;
+    const pageCount = inline ? 1 : feedPageCount(total);
+    const tokens = useMemo(() => (searchQuery.length >= 2 ? queryTokens(searchQuery) : []), [searchQuery]);
+    const searching = tokens.length > 0;
 
-    const allFlatTools = useMemo((): ArticleWithCategory[] => {
-        if (articles) return articles;
-        const base = (data.articles as Category[]).flatMap((item) =>
-            item.content.map((tool) => ({ ...tool, category: item.category }))
-        );
-        const all = [...base, ...extraArticles];
-        if (!slugs) return all;
-        const allowed = new Set(slugs);
-        return all.filter((a) => a.slug && allowed.has(a.slug));
-    }, [extraArticles, slugs, articles]);
+    // Recently-added filtering reads newest-first so it can stop at the first
+    // old card; other sorts are then applied to that (small) set.
+    const order = filterNew || sort === 'dateNewest' || sort === 'random' ? 'newest' : 'alpha';
+    // "اكتشف" reads newest pages in a seeded random order, each page shuffled.
+    const pageOrder = useMemo(
+        () => (sort === 'random' && !filterNew ? seededShuffle([...Array(pageCount).keys()], seed) : [...Array(pageCount).keys()]),
+        [sort, filterNew, pageCount, seed]
+    );
 
-    const fuse = useMemo(() => new Fuse(allFlatTools, {
-        keys: ['title', 'preview_text'],
-        threshold: 0.3,
-        minMatchCharLength: 2,
-        ignoreLocation: true,
-    }), [allFlatTools]);
+    const loadPage = useCallback(
+        (index: number): Promise<FeedCard[]> => {
+            const url = feedPageUrl(scope || 'all', order, index);
+            let page = pageCache.current.get(url);
+            if (!page) {
+                page = fetch(url).then((res) => (res.ok ? (res.json() as Promise<FeedCard[]>) : Promise.reject(res.status)));
+                page.catch(() => pageCache.current.delete(url));
+                pageCache.current.set(url, page);
+            }
+            return page;
+        },
+        [order, scope]
+    );
 
-    const filteredCards = useMemo((): ArticleWithCategory[] => {
-        const base = searchQuery.length >= 2
-            ? fuse.search(searchQuery).map(r => r.item)
-            : allFlatTools;
-        let inCategory = base.filter(t => filter === 'all' || t.category === filter);
-        if (filterNew) inCategory = inCategory.filter(t => isRecentlyAdded(t.created_at, 3));
-        if (sort === 'random') return seededShuffle(inCategory, seed);
-        return [...inCategory].sort(toolComparators[sort]);
-    }, [filter, sort, seed, searchQuery, filterNew, fuse, allFlatTools]);
+    const runKey = `${order}|${pageOrder.join(',')}|${tokens.join(' ')}|${filterNew}`;
+    // The server-rendered first cards are page 0 of the default run, so it
+    // starts pre-filled and only fetches when the reader scrolls past them.
+    const initialRun = (): Run => {
+        const isDefault = order === 'newest' && pageOrder[0] === 0 && !searching && !filterNew;
+        if (inline) return { key: runKey, items: [], nextPage: 0, done: false, loading: false };
+        return isDefault && initialCards.length > 0
+            ? { key: runKey, items: initialCards, nextPage: 0, done: pageCount === 0, loading: false }
+            : { key: runKey, items: [], nextPage: 0, done: false, loading: false };
+    };
+    const [run, setRun] = useState<Run>(initialRun);
+    const current = run.key === runKey ? run : initialRun();
 
     useEffect(() => {
         setDisplayedCount(ITEMS_PER_PAGE);
-    }, [filter, searchQuery, filterNew, sort, seed]);
+    }, [runKey, seed, sort]);
+
+    // Inline feeds are filled synchronously so the server render isn't empty.
+    const inlineItems = useMemo(() => {
+        if (!inline) return null;
+        const base = order === 'alpha' ? [...cards].sort(compareAlpha) : cards;
+        let list = base.filter((c) => matchesQuery(c, tokens));
+        if (filterNew) list = list.filter((c) => isRecentlyAdded(c.date, NEW_DAYS));
+        return list;
+    }, [inline, cards, order, tokens, filterNew]);
+
+    // Paged feeds: read more feed files until there are enough matches to show.
+    useEffect(() => {
+        if (inline || current.done || current.loading) return;
+        if (current.items.length >= displayedCount) return;
+
+        const key = current.key;
+        const batch = pageOrder.slice(current.nextPage, current.nextPage + (searching ? SCAN_CONCURRENCY : 1));
+        if (batch.length === 0) {
+            setRun({ ...current, done: true });
+            return;
+        }
+        setRun({ ...current, loading: true });
+
+        Promise.all(batch.map(loadPage))
+            .then((pages) => {
+                setRun((prev) => {
+                    if (prev.key !== key) return prev;
+                    let items = prev.items;
+                    let done = false;
+                    pages.forEach((page, i) => {
+                        let rows = page;
+                        // Page 0 of the default run starts with the initial cards already shown.
+                        if (prev.nextPage + i === 0 && prev.items.length > 0) rows = rows.slice(prev.items.length);
+                        if (sort === 'random' && !filterNew) rows = seededShuffle(rows, seed + batch[i]!);
+                        if (filterNew) {
+                            const fresh = rows.filter((c) => isRecentlyAdded(c.date, NEW_DAYS));
+                            // Newest-first: once a page has an old card, later pages are older still.
+                            if (fresh.length < rows.length) done = true;
+                            rows = fresh;
+                        }
+                        items = items.concat(rows.filter((c) => matchesQuery(c, tokens)));
+                    });
+                    const nextPage = prev.nextPage + batch.length;
+                    return { key, items, nextPage, done: done || nextPage >= pageOrder.length, loading: false };
+                });
+            })
+            .catch(() => {
+                setRun((prev) => (prev.key === key ? { ...prev, done: true, loading: false } : prev));
+            });
+    }, [inline, current, displayedCount, pageOrder, searching, loadPage, sort, filterNew, seed, tokens]);
+
+    const filteredCards = useMemo((): FeedCard[] => {
+        const list = inlineItems ?? current.items;
+        // A filtered set is small enough to sort here; plain sorts arrive in order.
+        if (filterNew && sort === 'nameAsc') return [...list].sort(compareAlpha);
+        if (sort === 'random' && (inline || filterNew)) return seededShuffle(list, seed);
+        return list;
+    }, [inlineItems, current.items, filterNew, sort, inline, seed]);
+
+    const complete = inline || current.done;
+    const hasMore = displayedCount < filteredCards.length || !complete;
 
     useEffect(() => {
         const observer = new IntersectionObserver((entries) => {
-            if (entries[0]?.isIntersecting && !isLoading && displayedCount < filteredCards.length) {
-                setIsLoading(true);
-                setTimeout(() => {
-                    setDisplayedCount(prev => Math.min(prev + ITEMS_PER_PAGE, filteredCards.length));
-                    setIsLoading(false);
-                }, 300);
+            if (entries[0]?.isIntersecting && hasMore && !current.loading) {
+                setDisplayedCount((prev) => prev + ITEMS_PER_PAGE);
             }
         }, { threshold: 0.1 });
         if (loaderRef.current) observer.observe(loaderRef.current);
         return () => observer.disconnect();
-    }, [displayedCount, isLoading, filteredCards.length]);
+    }, [hasMore, current.loading, filteredCards.length]);
 
     const feedItems = useMemo(() => {
         const items: FeedItem[] = [];
         const displayed = filteredCards.slice(0, displayedCount);
         displayed.forEach((card, i) => {
-            items.push({ type: 'card', key: `${card.title}-${i}`, order: items.length, card });
+            items.push({ type: 'card', key: `${card.slug || card.title}-${i}`, order: items.length, card });
             if ((i + 1) % AD_INTERVAL === 0 && i !== displayed.length - 1) {
                 items.push({ type: 'ad', key: `ad-${i}`, order: items.length });
             }
@@ -165,11 +256,17 @@ export default function MasonryFeed({ filter = 'all', extraArticles = [], slugs,
         return cols;
     }, [feedItems, columnCount]);
 
-    const onTabClick = (key: FeedSort) => {
+    const onTabClick = (key: FeedSortTab) => {
         // Clicking "اكتشف" again reshuffles, like Imgur's random feed.
         if (key === 'random' && sort === 'random') setSeed(s => s + 1);
         setSort(key);
     };
+
+    // Unfiltered big feeds know their size up front; filtered ones count what's found so far.
+    const countLabel = !inline && !searching && !filterNew
+        ? total
+        : `${filteredCards.length}${complete ? '' : '+'}`;
+    const stillLooking = !complete && filteredCards.length === 0;
 
     return (
         <section className="masonry-feed">
@@ -186,10 +283,10 @@ export default function MasonryFeed({ filter = 'all', extraArticles = [], slugs,
                         {tab.label}
                     </button>
                 ))}
-                <span className="feed-count">{filteredCards.length} مقالة</span>
+                <span className="feed-count">{countLabel} مقالة</span>
             </div>
 
-            {filteredCards.length === 0 ? (
+            {filteredCards.length === 0 && !stillLooking ? (
                 <EmptyState
                     icon={<SearchIcon />}
                     message={`لا توجد نتائج لـ "${searchQuery}" في هذا التصنيف.`}
@@ -208,15 +305,15 @@ export default function MasonryFeed({ filter = 'all', extraArticles = [], slugs,
                                         <AdCard />
                                     ) : (
                                         <Card
-                                            href={item.card.url || `https://x.com/${item.card.screen_name}/status/${item.card.id_str}`}
+                                            href={item.card.url || ''}
                                             title={item.card.title}
-                                            body={item.card.preview_text}
-                                            screen_name={item.card.screen_name}
-                                            dateAdded={item.card.created_at}
+                                            body=""
+                                            screen_name={item.card.author}
+                                            dateAdded={item.card.date}
                                             slug={item.card.slug}
                                             internalHref={item.card.internalHref}
-                                            category={categoryTitleMap[item.card.category] || item.card.category}
-                                            image={item.card.original_img_url}
+                                            category={categoryTitles[item.card.category] || item.card.category}
+                                            image={item.card.img}
                                             authorHref={item.card.authorHref}
                                             authorLabel={item.card.authorName}
                                             priority={item.order < 4}
@@ -229,11 +326,12 @@ export default function MasonryFeed({ filter = 'all', extraArticles = [], slugs,
                 </div>
             )}
 
-            {displayedCount < filteredCards.length && (
+            {hasMore && (
                 <div ref={loaderRef} className="infinite-scroll-loader">
-                    {isLoading && <p className="loading-text">جارٍ تحميل المزيد...</p>}
+                    {current.loading && <p className="loading-text">جارٍ تحميل المزيد...</p>}
                 </div>
             )}
         </section>
     );
 }
+

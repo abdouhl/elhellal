@@ -1,11 +1,12 @@
 import rss from '@astrojs/rss';
 import type { APIContext } from 'astro';
-import data from '../data/articles.json';
+import { loadArticles } from '../lib/articles-data';
 import { getPersonalBlogFeedArticles } from '../utils/personalBlogFeed';
 
 const MAX_ITEMS = 60;
 
 export async function GET(context: APIContext) {
+  const data = loadArticles();
   const categoryArticles = (data.articles as any[]).flatMap((category) =>
     category.content.map((article: any) => ({
       title: article.title,

@@ -1,8 +1,10 @@
-import data from '../data/articles.json';
+import { loadArticles } from '../lib/articles-data';
 import type { Article, Category } from '../types';
 
-export { normalizeTag, slugifyTag } from './tag-slug';
-import { normalizeTag, slugifyTag } from './tag-slug';
+export { normalizeTag, slugifyTag, MIN_TAG_ARTICLES } from './tag-slug';
+import { normalizeTag, slugifyTag, MIN_TAG_ARTICLES } from './tag-slug';
+
+const data = loadArticles();
 
 export interface TaggedArticle extends Article {
     category: string;
@@ -13,9 +15,6 @@ export interface TagEntry {
     label: string;
     articles: TaggedArticle[];
 }
-
-/** Below this many articles, a tag page would be thinner than the article itself — skip it. */
-export const MIN_TAG_ARTICLES = 3;
 
 let cachedIndex: Map<string, TagEntry> | null = null;
 

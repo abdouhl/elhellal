@@ -8,13 +8,17 @@ import FeedChrome from "../components/FeedChrome.astro";
 import "../components/MasonryFeed.css";
 import OrganizationSchema from "../components/schema/OrganizationSchema.astro";
 import ItemListSchema from "../components/schema/ItemListSchema.astro";
-import data from "../data/articles.json";
-import { getPersonalBlogFeedArticles } from "../utils/personalBlogFeed";
+import { loadArticles } from "../lib/articles-data";
+import { getFeeds, getCategoryTitles } from "../lib/feed-data";
+import { FEED_INITIAL } from "../lib/feed";
 import { categoryTiles } from "../utils/exploreTiles";
+
+const data = loadArticles();
 
 // Flatten all tools for the homepage ItemList
 const allTools = data.articles.flatMap((category: any) => category.content);
-const personalBlogArticles = await getPersonalBlogFeedArticles();
+const feed = (await getFeeds()).get("all")!;
+const categoryTitles = getCategoryTitles();
 ---
 
 <Layout
@@ -46,7 +50,13 @@ const personalBlogArticles = await getPersonalBlogFeedArticles();
       moreLabel="المزيد من التصنيفات"
       lessLabel="تصنيفات أقل"
     />
-    <MostRead client:load />
-    <MasonryFeed client:load filter="all" extraArticles={personalBlogArticles} />
+    <MostRead client:load categoryTitles={categoryTitles} />
+    <MasonryFeed
+      client:load
+      scope="all"
+      total={feed.newest.length}
+      initialCards={feed.newest.slice(0, FEED_INITIAL)}
+      categoryTitles={categoryTitles}
+    />
   </main>
 </Layout>

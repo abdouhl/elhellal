@@ -1,6 +1,8 @@
-import data from '../data/articles.json';
+import { loadArticles } from '../lib/articles-data';
 import type { Category } from '../types';
 import { buildTagIndex, MIN_TAG_ARTICLES, normalizeTag, slugifyTag, type TaggedArticle } from './tags';
+
+const data = loadArticles();
 
 // Tiles for the Imgur-style "explore" block on listing pages.
 export interface ExploreTile {

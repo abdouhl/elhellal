@@ -1,7 +1,9 @@
 ---
-import data from "../data/articles.client.json";
+import { loadArticles } from "../lib/articles-data";
 import { isRecentlyAdded } from "../utils/dates";
 import type { Category } from "../types";
+
+const data = loadArticles();
 
 const RECENT_DAYS = 3;
 const MAX_ITEMS = 15;

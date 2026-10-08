@@ -1,43 +1,53 @@
 import { useState, useEffect } from 'react';
-import { getBookmarkedArticles, type BookmarkedArticle } from '../utils/bookmarks';
-import { toolComparators, type SortKey } from '../utils/sorting';
+import { getBookmarks, type BookmarkedArticle } from '../utils/bookmarks';
 import Card from './Card';
 import EmptyState, { BookmarkIcon } from './EmptyState';
 import './CardsContainer.css';
-import data from '../data/articles.client.json';
-import type { Category } from '../types';
+import { lookupCards } from '../lib/article-lookup';
+import { compareAlpha, compareNewest, toFeedCard, type FeedCard } from '../lib/feed';
 
-type FavoritesSortKey = Exclude<SortKey, 'random'>;
+type FavoritesSortKey = 'nameAsc' | 'nameDesc' | 'dateNewest' | 'dateOldest';
+
+const comparators: Record<FavoritesSortKey, (a: FeedCard, b: FeedCard) => number> = {
+    nameAsc: compareAlpha,
+    nameDesc: (a, b) => compareAlpha(b, a),
+    dateNewest: compareNewest,
+    dateOldest: (a, b) => compareNewest(b, a),
+};
 
 interface FavoritesViewProps {
     extraArticles?: BookmarkedArticle[];
 }
 
 export default function FavoritesView({ extraArticles = [] }: FavoritesViewProps) {
-    const [bookmarkedArticles, setBookmarkedArticles] = useState<BookmarkedArticle[]>([]);
+    const [bookmarkedArticles, setBookmarkedArticles] = useState<FeedCard[] | null>(null);
     const [sortBy, setSortBy] = useState<FavoritesSortKey>('nameAsc');
 
-    const loadBookmarks = () => {
-        const tools = getBookmarkedArticles(data.articles as Category[], extraArticles);
-        setBookmarkedArticles(tools);
-    };
-
     useEffect(() => {
+        let latest = 0;
+        const loadBookmarks = async () => {
+            const call = ++latest;
+            const slugs = getBookmarks();
+            // Personal-blog posts aren't in the article shards; they come in as props.
+            const extra = extraArticles.filter((a) => a.slug && slugs.includes(a.slug));
+            const extraSlugs = new Set(extra.map((a) => a.slug));
+            const found = await lookupCards(slugs.filter((s) => !extraSlugs.has(s)));
+            if (call !== latest) return;
+            setBookmarkedArticles([
+                ...slugs.map((s) => found.get(s)).filter((c): c is FeedCard => Boolean(c)),
+                ...extra.map((a) => toFeedCard(a, a.category)),
+            ]);
+        };
+
         loadBookmarks();
+        window.addEventListener('bookmarks:changed', loadBookmarks);
+        return () => {
+            window.removeEventListener('bookmarks:changed', loadBookmarks);
+        };
     }, [extraArticles]);
 
-    useEffect(() => {
-        const handleBookmarkChange = () => {
-            loadBookmarks();
-        };
-
-        window.addEventListener('bookmarks:changed', handleBookmarkChange);
-        return () => {
-            window.removeEventListener('bookmarks:changed', handleBookmarkChange);
-        };
-    }, []);
-
-    const sortedTools = [...bookmarkedArticles].sort(toolComparators[sortBy]);
+    // Still reading the shards — render nothing rather than flash the empty state.
+    if (bookmarkedArticles === null) return null;
 
     if (bookmarkedArticles.length === 0) {
         return (
@@ -52,6 +62,8 @@ export default function FavoritesView({ extraArticles = [] }: FavoritesViewProps
         );
     }
 
+    const sortedTools = [...bookmarkedArticles].sort(comparators[sortBy]);
+
     return (
         <section>
             <div className="favorites-header">
@@ -60,7 +72,6 @@ export default function FavoritesView({ extraArticles = [] }: FavoritesViewProps
                         {bookmarkedArticles.length} {bookmarkedArticles.length === 1 ? 'مقالة محفوظة' : 'مقالات محفوظة'}
                     </p>
                 </div>
-
                 <div className="favorites-controls">
                     <select
                         value={sortBy}
@@ -76,20 +87,20 @@ export default function FavoritesView({ extraArticles = [] }: FavoritesViewProps
             </div>
 
             <ul role="list" className="link-card-grid">
-                {sortedTools.map(({ id_str, title, preview_text, screen_name, created_at, slug, category, original_img_url, internalHref, authorHref, authorName }, i) => (
+                {sortedTools.map((card, i) => (
                     <Card
-                        key={`${slug}-${i}`}
-                        href={internalHref || `https://x.com/${screen_name}/status/${id_str}`}
-                        title={title}
-                        body={preview_text}
-                        screen_name={screen_name}
-                        dateAdded={created_at}
-                        slug={slug}
-                        internalHref={internalHref}
-                        category={category}
-                        image={original_img_url}
-                        authorHref={authorHref}
-                        authorLabel={authorName}
+                        key={`${card.slug}-${i}`}
+                        href={card.internalHref || card.url || ''}
+                        title={card.title}
+                        body=""
+                        screen_name={card.author}
+                        dateAdded={card.date}
+                        slug={card.slug}
+                        internalHref={card.internalHref}
+                        category={card.category}
+                        image={card.img}
+                        authorHref={card.authorHref}
+                        authorLabel={card.authorName}
                     />
                 ))}
             </ul>

@@ -13,7 +13,9 @@ export default defineConfig({
       },
     }
   ), sitemap({
-    filter: (page) => !page.includes('/saved') && !page.includes('/404'),
+    // /articles/__shell__/ is the Worker's template, not a page; real article
+    // URLs go in sitemap-articles-*.xml (scripts/build-worker-data.ts).
+    filter: (page) => !page.includes('/saved') && !page.includes('/404') && !page.includes('/__shell__'),
   })],
   redirects: {
     '/layla': '/authors/layla/',
@@ -22,6 +24,11 @@ export default defineConfig({
     '/layla/[slug]': '/articles/[slug]',
     '/omar/[slug]': '/articles/[slug]',
     '/youssef/[slug]': '/articles/[slug]',
+  },
+  vite: {
+    // Emit JSON imports as JSON.parse("…") instead of JS object literals — the
+    // 40MB+ data files otherwise blow past Node's default heap when bundling.
+    json: { stringify: true },
   },
   //output: "server",
   adapter: cloudflare()

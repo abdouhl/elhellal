@@ -3,10 +3,12 @@
 // wired to real elhellal content and real site features (bookmarks, ads,
 // navigation). No "Follow"/social affordances — this site has no accounts.
 // Never built/served in production.
-import data from "../data/articles.json";
+import { loadArticles } from "../lib/articles-data";
 import BookmarkButton from "../components/BookmarkButton";
 import AdUnit from "../components/AdUnit.astro";
 import type { Category, Article } from "../types";
+
+const data = loadArticles();
 
 export const prerender = true;
 

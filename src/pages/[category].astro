@@ -6,13 +6,16 @@ import FeedChrome from "../components/FeedChrome.astro";
 import "../components/MasonryFeed.css";
 import ItemListSchema from "../components/schema/ItemListSchema.astro";
 import BreadcrumbSchema from "../components/schema/BreadcrumbSchema.astro";
-import data from "../data/articles.json";
-import { getPersonalBlogFeedArticles } from "../utils/personalBlogFeed";
+import { loadArticles } from "../lib/articles-data";
+import { getFeeds, getCategoryTitles } from "../lib/feed-data";
+import { FEED_INITIAL } from "../lib/feed";
 import { categoryArticles, categoryTiles, tagTiles } from "../utils/exploreTiles";
+
+const data = loadArticles();
 
 export function getStaticPaths() {
   // Derive paths from data instead of hardcoding
-  return data.articles.map((cat: any) => ({
+  return loadArticles().articles.map((cat: any) => ({
     params: { category: cat.category }
   }));
 }
@@ -23,9 +26,8 @@ const { category } = Astro.params;
 const categoryData = data.articles.find((cat: any) => cat.category === category);
 const categoryTools = categoryData?.content || [];
 const categoryTitle = categoryData?.title || category;
-const personalBlogArticles = (await getPersonalBlogFeedArticles()).filter(
-  (article) => article.category === category
-);
+const feed = (await getFeeds()).get(category!)!;
+const categoryTitles = getCategoryTitles();
 
 // Tags narrow the category down; small categories with too few tags fall back
 // to the other categories so the block never disappears.
@@ -65,6 +67,12 @@ const breadcrumbs = [
         lessLabel="تصنيفات أقل"
       />
     )}
-    <MasonryFeed client:load filter={category} extraArticles={personalBlogArticles} />
+    <MasonryFeed
+      client:load
+      scope={category}
+      total={feed.newest.length}
+      initialCards={feed.newest.slice(0, FEED_INITIAL)}
+      categoryTitles={categoryTitles}
+    />
   </main>
 </Layout>

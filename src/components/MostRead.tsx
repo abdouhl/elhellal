@@ -1,64 +1,40 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Card from './Card';
 import './MostRead.css';
-import data from '../data/articles.client.json';
-import type { Article, Category } from '../types';
 import { VIEWS_API_BASE } from '../config/views';
+import { lookupCards } from '../lib/article-lookup';
+import type { FeedCard } from '../lib/feed';
 
 interface LeaderboardEntry {
     slug: string;
     count: number;
 }
 
-interface ArticleWithCategory extends Article {
-    category: string;
+interface MostReadProps {
+    /** category key → display title */
+    categoryTitles: Record<string, string>;
 }
 
-export default function MostRead() {
-    // null = still loading, [] = no data (API down / leaderboard empty) — both render nothing
-    const [items, setItems] = useState<LeaderboardEntry[] | null>(null);
+export default function MostRead({ categoryTitles }: MostReadProps) {
+    // Empty while loading and when there's no data (API down / leaderboard empty) — both render nothing
+    const [resolved, setResolved] = useState<FeedCard[]>([]);
 
     useEffect(() => {
         let cancelled = false;
-
         fetch(`${VIEWS_API_BASE}/most-read?limit=8`)
             .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
-            .then((json) => {
-                if (!cancelled) setItems(Array.isArray(json?.items) ? json.items : []);
+            .then(async (json) => {
+                const items: LeaderboardEntry[] = Array.isArray(json?.items) ? json.items : [];
+                const cards = await lookupCards(items.map((entry) => entry.slug));
+                if (!cancelled) {
+                    setResolved(items.map((entry) => cards.get(entry.slug)).filter((c): c is FeedCard => Boolean(c)));
+                }
             })
-            .catch(() => {
-                if (!cancelled) setItems([]);
-            });
-
+            .catch(() => {});
         return () => {
             cancelled = true;
         };
     }, []);
-
-    const categoryTitleMap = useMemo(() => {
-        const map: Record<string, string> = {};
-        (data.articles as Category[]).forEach((c) => {
-            map[c.category] = c.title;
-        });
-        return map;
-    }, []);
-
-    const articlesBySlug = useMemo(() => {
-        const map = new Map<string, ArticleWithCategory>();
-        (data.articles as Category[]).forEach((cat) => {
-            cat.content.forEach((article) => {
-                if (article.slug) map.set(article.slug, { ...article, category: cat.category });
-            });
-        });
-        return map;
-    }, []);
-
-    const resolved = useMemo(() => {
-        if (!items) return [];
-        return items
-            .map((entry) => articlesBySlug.get(entry.slug))
-            .filter((article): article is ArticleWithCategory => Boolean(article));
-    }, [items, articlesBySlug]);
 
     if (resolved.length === 0) return null;
 
@@ -69,18 +45,18 @@ export default function MostRead() {
                 الأكثر قراءة
             </h2>
             <ul role="list" className="link-card-grid most-read-grid">
-                {resolved.map(({ id_str, title, preview_text, screen_name, created_at, slug, category, original_img_url, url }, i) => (
+                {resolved.map((card, i) => (
                     <Card
-                        key={slug}
+                        key={card.slug}
                         rank={i + 1}
-                        href={url || `https://x.com/${screen_name}/status/${id_str}`}
-                        title={title}
-                        body={preview_text}
-                        screen_name={screen_name}
-                        dateAdded={created_at}
-                        slug={slug}
-                        category={categoryTitleMap[category] || category}
-                        image={original_img_url}
+                        href={card.url || ''}
+                        title={card.title}
+                        body=""
+                        screen_name={card.author}
+                        dateAdded={card.date}
+                        slug={card.slug}
+                        category={categoryTitles[card.category] || card.category}
+                        image={card.img}
                     />
                 ))}
             </ul>

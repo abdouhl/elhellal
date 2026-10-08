@@ -1,14 +1,25 @@
 {
-	// Fully static site: every page is prerendered, so no Worker script runs.
-	// Requests are served straight from assets (no Worker CPU = no CPU-limit errors).
+	// Static-first site. Every file in dist/ is served straight from the asset
+	// layer (free, no request quota, no Worker CPU). The Worker below only runs
+	// for paths with NO matching file — in practice /articles/<slug>/ pages,
+	// which it renders from dist/_data/ shards (see workers/site/src/index.ts).
 	// Redirects live in public/_redirects (+ the ones Astro generates); unknown
 	// paths get dist/404.html with a real 404 status.
 	"name": "elhellal",
+	"main": "workers/site/src/index.ts",
 	"compatibility_date": "2026-02-21",
 	"assets": {
 		"directory": "./dist",
-		"not_found_handling": "404-page"
+		"binding": "ASSETS",
+		"not_found_handling": "404-page",
+		// Browser navigations to a path with no file get the 404 page straight
+		// from the asset layer, without ever reaching the Worker — so article
+		// URLs must go to the Worker first. It hands the few static article
+		// pages (personal-blog posts) back to the asset layer.
+		"run_worker_first": ["/articles/*"]
 	},
+	// The article shell is bundled into the Worker as a string.
+	"rules": [{ "type": "Text", "globs": ["**/*.html"], "fallthrough": true }],
 	"observability": {
 		"enabled": true
 	}

@@ -16,3 +16,6 @@ export function slugifyTag(raw: string): string {
         .replace(/\s+/g, '-')                // spaces -> hyphen
         .replace(/[^\p{L}\p{N}-]/gu, '');     // strip anything else unsafe; \p{L}/\p{N} keep Arabic + other unicode letters/numbers
 }
+
+/** Below this many articles, a tag page would be thinner than the article itself — skip it. */
+export const MIN_TAG_ARTICLES = 3;

@@ -1,24 +1,25 @@
 ---
 import Layout from "../../layouts/Layout.astro";
-import slugMap from "../../data/slug-map.json";
 import ArticleSchema from "../../components/schema/ArticleSchema.astro";
 import BreadcrumbSchema from "../../components/schema/BreadcrumbSchema.astro";
 import BookmarkButton from "../../components/BookmarkButton";
 import AdUnit from "../../components/AdUnit.astro";
-import articlesConfig from "../../data/articles.json";
-import { getQualifyingTagSlugSet, slugifyTag } from "../../utils/tags";
 import { getCollection } from "astro:content";
 import { personalBlogs, PERSONAL_COLLECTIONS, type PersonalBlogPerson } from "../../data/personal-blogs";
 import { getPlaceholderImage } from "../../utils/placeholderImage";
+import { ARTICLE_SHELL_SLUG } from "../../lib/article-page";
+import { shellMarkers } from "../../lib/shell-template";
 
-const qualifyingTagSlugs = getQualifyingTagSlugSet();
-
+// This page renders in two modes:
+// - Personal-blog posts (src/content/*) prerender as ordinary static pages.
+// - slug === ARTICLE_SHELL_SLUG renders the article *shell*: the same markup
+//   with {{tokens}} where the data goes. scripts/build-worker-data.ts moves it
+//   out of dist/ and the site Worker (workers/site/) fills it per request for
+//   every articles.json article, from static JSON shards. Prerendering those
+//   (100k+) would blow past Cloudflare's file-count and build limits.
+//   Their data derivations live in articleTemplateData()
+//   (src/lib/article-page.ts) — keep it in sync with the markup below.
 export async function getStaticPaths() {
-  const slugMapData = await import("../../data/slug-map.json");
-  const jsonPaths = Object.keys(slugMapData.default).map((slug) => ({
-    params: { slug },
-  }));
-
   const personalPostLists = await Promise.all(
     PERSONAL_COLLECTIONS.map((c) => getCollection(c))
   );
@@ -26,190 +27,214 @@ export async function getStaticPaths() {
     params: { slug: post.slug },
   }));
 
-  return [...jsonPaths, ...personalPaths];
+  return [{ params: { slug: ARTICLE_SHELL_SLUG } }, ...personalPaths];
 }
 
 export const prerender = true;
 
 const { slug } = Astro.params;
+const isShell = slug === ARTICLE_SHELL_SLUG;
+const { open, close, eachOpen, eachClose } = shellMarkers(isShell);
+const T = (name: string) => `{{${name}}}`;
 
-const categoryList = (slugMap as Record<string, string[]>)[slug as string];
-const categoryName = categoryList?.[0];
+interface RelatedCard { href: string; image: string; title: string; author: string }
+
+interface ArticleView {
+  seoTitle: string;
+  seoDescription: string;
+  canonicalUrl: string;
+  ogImage?: string | undefined;
+  twitterCreator?: string | undefined;
+  keywordsString?: string | undefined;
+  slug: string;
+  title: string;
+  preview_text: string;
+  original_img_url?: string | undefined;
+  screen_name?: string | undefined;
+  created_at: string;
+  dateAr: string;
+  categoryHref: string;
+  categoryTitle: string;
+  fallbackPath: string;
+  authorHref: string;
+  authorDisplayName: string;
+  authorUrl: string;
+  authorSubLabel: string;
+  avatar?: string | undefined;
+  readUrl?: string | undefined;
+  isSubstack: boolean;
+  tag?: string | undefined;
+  tldr?: string | undefined;
+  whyThisMatters?: string | undefined;
+  whoItems: Array<{ text: string }>;
+  hasCore: boolean;
+  keywords: Array<{ label: string; href: string }>;
+  xShareUrl: string;
+  linkedinShareUrl: string;
+  redditShareUrl: string;
+  related: RelatedCard[];
+  relatedHeading: string;
+}
 
 let isPersonalPost = false;
 let person: PersonalBlogPerson | undefined;
 let PersonContent: any;
-let personOtherPosts: any[] = [];
-let tool: any;
-let category = "";
-let categoryTools: { default: any[] } = { default: [] };
+let v: ArticleView;
 
-if (categoryName) {
-  categoryTools = await import(`../../data/articles/${categoryName}.json`);
-  const found = categoryTools.default.find((x: any) => x.slug === slug) || null;
-
-  if (!found) {
-    throw new Error(`Article not found: ${slug}`);
-  }
-
-  tool = found;
-  category = categoryName;
+if (isShell) {
+  // Every value is a token; the Worker substitutes per article.
+  v = {
+    seoTitle: T("seoTitle"),
+    seoDescription: T("seoDescription"),
+    canonicalUrl: T("canonicalUrl"),
+    ogImage: T("ogImage"),
+    twitterCreator: T("twitterCreator"),
+    keywordsString: T("keywordsString"),
+    slug: T("slug"),
+    title: T("title"),
+    preview_text: T("preview_text"),
+    original_img_url: T("original_img_url"),
+    screen_name: T("screen_name"),
+    created_at: T("created_at"),
+    dateAr: T("dateAr"),
+    categoryHref: T("categoryHref"),
+    categoryTitle: T("categoryTitle"),
+    fallbackPath: T("fallbackPath"),
+    authorHref: T("authorHref"),
+    authorDisplayName: T("authorDisplayName"),
+    authorUrl: T("authorUrl"),
+    authorSubLabel: T("authorSubLabel"),
+    avatar: T("avatar"),
+    readUrl: T("readUrl"),
+    isSubstack: true,
+    tag: T("tag"),
+    tldr: T("tldr"),
+    whyThisMatters: T("whyThisMatters"),
+    whoItems: [{ text: T(".text") }],
+    hasCore: true,
+    keywords: [{ label: T(".label"), href: T(".href") }],
+    xShareUrl: T("xShareUrl"),
+    linkedinShareUrl: T("linkedinShareUrl"),
+    redditShareUrl: T("redditShareUrl"),
+    related: [{ href: T(".href"), image: T(".image"), title: T(".title"), author: T(".author") }],
+    relatedHeading: `المزيد في ${T("categoryTitle")}`,
+  };
 } else {
+  let found: any;
   for (const key of PERSONAL_COLLECTIONS) {
     const posts = await getCollection(key);
-    const found = posts.find((p) => p.slug === slug);
+    found = posts.find((p) => p.slug === slug);
     if (found) {
       isPersonalPost = true;
-      person = personalBlogs[key];
-      const rendered = await found.render();
-      PersonContent = rendered.Content;
-      personOtherPosts = posts
+      person = personalBlogs[key]!;
+      PersonContent = (await found.render()).Content;
+      const otherPosts = posts
         .filter((p) => p.slug !== slug)
         .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf())
         .slice(0, 3);
-      tool = {
-        title: found.data.title,
-        preview_text: found.data.description,
-        created_at: found.data.pubDate.toISOString().slice(0, 10),
-        screen_name: person.slug,
+      const canonicalUrl = `https://elhellal.com/articles/${encodeURIComponent(found.slug)}/`;
+      const authorHref = `/authors/${person.slug}/`;
+      const encodedShareText = encodeURIComponent(
+        `اكتشف "${found.data.title}" — مقالة رائعة وجدتها على الهلال! ${canonicalUrl}`
+      );
+      const encodedCanonicalUrl = encodeURIComponent(canonicalUrl);
+      v = {
+        seoTitle: found.data.title,
+        seoDescription: found.data.description,
+        canonicalUrl,
         // No placeholder fallback here on purpose: the article page shows no
         // cover image at all when there's no real thumb (see .article-cover
-        // below). Card-style listings (relatedTools, Card.tsx) still fall
-        // back to a placeholder — that distinction is the point.
-        original_img_url: found.data.large || found.data.thumb,
+        // below). Related cards still fall back to a placeholder.
+        ogImage: found.data.large || found.data.thumb,
         slug: found.slug,
+        title: found.data.title,
+        preview_text: found.data.description,
+        original_img_url: found.data.large || found.data.thumb,
+        screen_name: person.slug,
+        created_at: found.data.pubDate.toISOString().slice(0, 10),
+        dateAr: found.data.pubDate.toLocaleDateString("ar", { year: "numeric", month: "long", day: "numeric" }),
+        categoryHref: authorHref,
+        categoryTitle: person.nameAr,
+        fallbackPath: authorHref,
+        authorHref,
+        authorDisplayName: person.nameAr,
+        authorUrl: authorHref,
+        authorSubLabel: person.tagline,
+        isSubstack: false,
+        whoItems: [],
+        hasCore: false,
+        keywords: [],
+        xShareUrl: `https://x.com/intent/post?text=${encodedShareText}&url=${encodedCanonicalUrl}`,
+        linkedinShareUrl: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedCanonicalUrl}`,
+        redditShareUrl: `https://www.reddit.com/submit?url=${encodedCanonicalUrl}&title=${encodedShareText}`,
+        related: otherPosts.map((p) => ({
+          href: `/articles/${encodeURIComponent(p.slug)}/`,
+          image: p.data.large || p.data.thumb || getPlaceholderImage(),
+          title: p.data.title,
+          author: person!.nameAr,
+        })),
+        relatedHeading: `مقالات أخرى لـ ${person.nameAr}`,
       };
-      category = person.slug;
       break;
     }
   }
-
-  if (!isPersonalPost) {
+  if (!found) {
     throw new Error(`Article not found: ${slug}`);
   }
 }
 
-const formatDate = (dateStr: string) => {
-  try {
-    return new Date(dateStr).toLocaleDateString("ar", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  } catch {
-    return dateStr;
-  }
-};
-
-const formattedDate = formatDate(tool.created_at);
-const canonicalUrl = `https://elhellal.com/articles/${encodeURIComponent(tool.slug)}/`;
-const faviconUrl = `/favicons/${slug}.png`;
-const fallbackPath = isPersonalPost ? `/authors/${person!.slug}/` : (category === "all" ? "/" : `/${category}/`);
-const tweetUrl = isPersonalPost ? undefined : `https://x.com/${tool.screen_name}/status/${tool.id_str}`;
-const readUrl = isPersonalPost ? undefined : (tool.url || tweetUrl);
-const sourceHost = !isPersonalPost && tool.url ? new URL(tool.url).hostname.replace(/^www\./, '') : null;
-const isSubstack = !!sourceHost && sourceHost.endsWith('substack.com');
-const authorHref = isPersonalPost ? `/authors/${person!.slug}/` : `/authors/${tool.screen_name}/`;
-const authorDisplayName = isPersonalPost ? person!.nameAr : `@${tool.screen_name}`;
-const authorUrl = isPersonalPost
-    ? authorHref
-    : isSubstack
-      ? `https://${tool.screen_name}.substack.com`
-      : tool.url
-        ? new URL(tool.url).origin
-        : `https://x.com/${tool.screen_name}`;
-const authorSubLabel = isPersonalPost ? person!.tagline : (isSubstack ? 'Substack' : (sourceHost ?? 'عرض على X'));
-
-let meta: any = {};
-if (!isPersonalPost) {
-  try {
-    const toolMetadata = await import(`../../data/article-metadata/${slug}.json`);
-    meta = toolMetadata.default;
-  } catch (e) {}
-}
-
-const seoTitle = meta.title || tool.title;
-const seoDescription = meta.description || tool.metaDescription || tool.preview_text;
-const seoOgImage = tool.original_img_url;
-const seoOgType = "article";
-const seoOgSiteName = "الهلال";
-
-const encodedShareText = encodeURIComponent(
-  `اكتشف "${tool.title}" — مقالة رائعة وجدتها على الهلال! ${canonicalUrl}`
-);
-const encodedCanonicalUrl = encodeURIComponent(canonicalUrl);
-const xShareUrl = isPersonalPost
-  ? `https://x.com/intent/post?text=${encodedShareText}&url=${encodedCanonicalUrl}`
-  : `https://x.com/intent/post?text=${encodedShareText}&url=${encodedCanonicalUrl}&via=${tool.screen_name}`;
-const linkedinShareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodedCanonicalUrl}`;
-const redditShareUrl = `https://www.reddit.com/submit?url=${encodedCanonicalUrl}&title=${encodedShareText}`;
-
-const allCategoryTools = categoryTools.default || [];
-const otherTools = isPersonalPost ? [] : allCategoryTools.filter((t: any) => t.slug !== slug);
-const relatedTools = isPersonalPost
-  ? personOtherPosts.map((p) => ({
-      slug: p.slug,
-      title: p.data.title,
-      original_img_url: p.data.large || p.data.thumb || getPlaceholderImage(),
-      authorLabel: person!.nameAr,
-    }))
-  : otherTools
-      .sort(() => Math.random() - 0.5)
-      .slice(0, 3)
-      .map((t: any) => ({
-        slug: t.slug,
-        title: t.title,
-        original_img_url: t.original_img_url,
-        authorLabel: t.screen_name ? `@${t.screen_name}` : undefined,
-      }));
-
-const categoryObj = isPersonalPost ? null : (articlesConfig as any).articles?.find((c: any) => c.category === categoryName);
-const categoryTitle = isPersonalPost ? person!.nameAr : (categoryObj?.title || (category.charAt(0).toUpperCase() + category.slice(1)));
-const categoryHref = isPersonalPost ? `/authors/${person!.slug}/` : `/${category}/`;
 const breadcrumbs = [
   { name: "الرئيسية", url: "https://elhellal.com" },
-  { name: categoryTitle, url: `https://elhellal.com${categoryHref}` },
-  { name: tool.title },
+  { name: v!.categoryTitle, url: `https://elhellal.com${v!.categoryHref}` },
+  { name: v!.title },
 ];
-
-const tldr: string | undefined = isPersonalPost ? undefined : tool.tldr;
-const whyThisMatters: string | undefined = isPersonalPost ? undefined : tool.whyThisMatters;
-const whoShouldRead: string | undefined = isPersonalPost ? undefined : tool.whoShouldRead;
-const keywords: string[] | undefined = isPersonalPost ? undefined : tool.keywords;
-const keywordsString = keywords?.join(', ');
 ---
 
 <Layout
   site="الهلال"
-  title={seoTitle}
+  title={v.seoTitle}
   tagline="دليل منتقى لأفضل المقالات العربية على الإنترنت"
-  pageTitle={seoTitle}
-  pageDescription={seoDescription}
-  canonicalUrl={canonicalUrl}
-  ogTitle={seoTitle}
-  ogDescription={seoDescription}
-  ogUrl={canonicalUrl}
-  ogImage={seoOgImage}
-  ogType={seoOgType}
-  ogSiteName={seoOgSiteName}
+  pageTitle={v.seoTitle}
+  pageDescription={v.seoDescription}
+  canonicalUrl={v.canonicalUrl}
+  ogTitle={v.seoTitle}
+  ogDescription={v.seoDescription}
+  ogUrl={v.canonicalUrl}
+  ogImage={v.ogImage}
+  ogType="article"
+  ogSiteName="الهلال"
   twitterCard="summary_large_image"
-  twitterTitle={seoTitle}
-  twitterDescription={seoDescription}
-  twitterImage={seoOgImage}
-  twitterCreator={!isPersonalPost && tool.screen_name ? `@${tool.screen_name}` : undefined}
-  pageFavicon={faviconUrl}
-  keywords={keywordsString}
+  twitterTitle={v.seoTitle}
+  twitterDescription={v.seoDescription}
+  twitterImage={v.ogImage}
+  twitterCreator={v.twitterCreator}
+  keywords={v.keywordsString}
 >
-  <ArticleSchema
-    headline={tool.title}
-    description={tool.preview_text}
-    url={canonicalUrl}
-    image={tool.original_img_url}
-    datePublished={tool.created_at}
-    authorName={isPersonalPost ? person!.nameAr : authorDisplayName}
-    authorUrl={isPersonalPost ? `https://elhellal.com/authors/${person!.slug}/` : authorUrl}
-  />
-  <BreadcrumbSchema items={breadcrumbs} />
+  {isShell && (
+    <Fragment
+      slot="head"
+      set:html={`${open("defaultOgImage")}<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">${close("defaultOgImage")}`}
+    />
+  )}
+  {isShell ? (
+    <Fragment>
+      <script type="application/ld+json" set:html="{{{articleLd}}}" />
+      <script type="application/ld+json" set:html="{{{breadcrumbLd}}}" />
+    </Fragment>
+  ) : (
+    <Fragment>
+      <ArticleSchema
+        headline={v.title}
+        description={v.preview_text}
+        url={v.canonicalUrl}
+        image={v.original_img_url}
+        datePublished={v.created_at}
+        authorName={v.authorDisplayName}
+        authorUrl={`https://elhellal.com${v.authorHref}`}
+      />
+      <BreadcrumbSchema items={breadcrumbs} />
+    </Fragment>
+  )}
 
   <main id="main-content" class="article-page">
 
@@ -217,9 +242,9 @@ const keywordsString = keywords?.join(', ');
     <nav class="breadcrumb" aria-label="مسار التنقل">
       <a href="/">الرئيسية</a>
       <span aria-hidden="true">›</span>
-      <a href={categoryHref}>{categoryTitle}</a>
+      <a href={v.categoryHref}>{v.categoryTitle}</a>
       <span aria-hidden="true">›</span>
-      <span>{tool.title}</span>
+      <span>{v.title}</span>
     </nav>
 
     <div class="article-layout">
@@ -228,76 +253,111 @@ const keywordsString = keywords?.join(', ');
       <article class="article-card" itemscope itemtype="https://schema.org/Article">
 
         <!-- Cover image (omitted entirely when the article has no thumb — no placeholder here) -->
-        {tool.original_img_url && (
-          <div class="article-cover">
-            <img
-              src={tool.original_img_url}
-              alt={tool.title}
-              class="article-cover-img"
-              itemprop="image"
-              loading="eager"
-              onerror="this.closest('.article-cover').style.display='none'"
-            />
-            <div class="article-cover-tags">
-              <a href={categoryHref} class="cover-tag">{categoryTitle}</a>
-              {!isPersonalPost && tool.screen_name && (
-                <span class="cover-tag">{authorDisplayName}</span>
-              )}
+        {(isShell || v.original_img_url) && (
+          <Fragment>
+            <Fragment set:html={open("original_img_url")} />
+            <div class="article-cover">
+              <img
+                src={v.original_img_url}
+                alt={v.title}
+                class="article-cover-img"
+                itemprop="image"
+                loading="eager"
+                onerror="this.closest('.article-cover').style.display='none'"
+              />
+              <div class="article-cover-tags">
+                <a href={v.categoryHref} class="cover-tag">{v.categoryTitle}</a>
+                {!isPersonalPost && v.screen_name && (
+                  <Fragment>
+                    <Fragment set:html={open("screen_name")} />
+                    <span class="cover-tag">{v.authorDisplayName}</span>
+                    <Fragment set:html={close("screen_name")} />
+                  </Fragment>
+                )}
+              </div>
             </div>
-          </div>
+            <Fragment set:html={close("original_img_url")} />
+          </Fragment>
         )}
 
         <!-- Article body -->
         <div class="article-body">
 
           <header class="article-header">
-            {!tool.original_img_url && (
-              <div class="article-tags-standalone">
-                <a href={categoryHref} class="cover-tag cover-tag-standalone">{categoryTitle}</a>
-                {!isPersonalPost && tool.screen_name && (
-                  <span class="cover-tag cover-tag-standalone">{authorDisplayName}</span>
-                )}
-              </div>
+            {(isShell || !v.original_img_url) && (
+              <Fragment>
+                <Fragment set:html={open("!original_img_url")} />
+                <div class="article-tags-standalone">
+                  <a href={v.categoryHref} class="cover-tag cover-tag-standalone">{v.categoryTitle}</a>
+                  {!isPersonalPost && v.screen_name && (
+                    <Fragment>
+                      <Fragment set:html={open("screen_name")} />
+                      <span class="cover-tag cover-tag-standalone">{v.authorDisplayName}</span>
+                      <Fragment set:html={close("screen_name")} />
+                    </Fragment>
+                  )}
+                </div>
+                <Fragment set:html={close("!original_img_url")} />
+              </Fragment>
             )}
-            <h1 class="article-title" itemprop="headline">{tool.title}</h1>
+            <h1 class="article-title" itemprop="headline">{v.title}</h1>
             <div class="article-meta">
-              <time datetime={tool.created_at} itemprop="datePublished">{formattedDate}</time>
-              {tool.screen_name && (
-                <>
+              <time datetime={v.created_at} itemprop="datePublished">{v.dateAr}</time>
+              {v.screen_name && (
+                <Fragment>
+                  <Fragment set:html={open("screen_name")} />
                   <span class="meta-dot">·</span>
                   <a
-                    href={authorHref}
+                    href={v.authorHref}
                     class="meta-author"
                     itemprop="author"
                   >
-                    {authorDisplayName}
+                    {v.authorDisplayName}
                   </a>
-                </>
+                  <Fragment set:html={close("screen_name")} />
+                </Fragment>
               )}
             </div>
           </header>
 
           <!-- Keywords -->
-          {keywords && keywords.length > 0 && (
-            <div class="article-keywords" aria-label="الكلمات المفتاحية">
-              {keywords.map((kw: string) => {
-                const tagSlug = slugifyTag(kw);
-                return qualifyingTagSlugs.has(tagSlug) ? (
-                  <a href={`/tags/${encodeURIComponent(tagSlug)}/`} class="keyword-tag">{kw}</a>
-                ) : (
-                  <span class="keyword-tag keyword-tag--static" title="لا توجد صفحة كافية من المقالات لهذا الوسم بعد">{kw}</span>
-                );
-              })}
-            </div>
+          {v.keywords.length > 0 && (
+            <Fragment>
+              <Fragment set:html={open("keywords")} />
+              <div class="article-keywords" aria-label="الكلمات المفتاحية">
+                <Fragment set:html={eachOpen("keywords")} />
+                {v.keywords.map((kw) => (
+                  <Fragment>
+                    {(isShell || kw.href) && (
+                      <Fragment>
+                        <Fragment set:html={open(".href")} />
+                        <a href={kw.href} class="keyword-tag">{kw.label}</a>
+                        <Fragment set:html={close(".href")} />
+                      </Fragment>
+                    )}
+                    {(isShell || !kw.href) && (
+                      <Fragment>
+                        <Fragment set:html={open("!.href")} />
+                        <span class="keyword-tag keyword-tag--static" title="لا توجد صفحة كافية من المقالات لهذا الوسم بعد">{kw.label}</span>
+                        <Fragment set:html={close("!.href")} />
+                      </Fragment>
+                    )}
+                  </Fragment>
+                ))}
+                <Fragment set:html={eachClose("keywords")} />
+              </div>
+              <Fragment set:html={close("keywords")} />
+            </Fragment>
           )}
 
           <!-- About section -->
           <section class="article-about" aria-label="About this article">
-            {tool.preview_text && (
-              <p class="article-summary" itemprop="description">{tool.preview_text}</p>
-            )}
-            {meta.description && meta.description !== tool.preview_text && (
-              <p class="article-description">{meta.description}</p>
+            {(isShell || v.preview_text) && (
+              <Fragment>
+                <Fragment set:html={open("preview_text")} />
+                <p class="article-summary" itemprop="description">{v.preview_text}</p>
+                <Fragment set:html={close("preview_text")} />
+              </Fragment>
             )}
           </section>
 
@@ -309,45 +369,47 @@ const keywordsString = keywords?.join(', ');
           )}
 
           <!-- Core Structure — renders only when fields are present -->
-          {(tldr || whyThisMatters || whoShouldRead) && (
-            <div class="core-sections">
+          {v.hasCore && (
+            <Fragment>
+              <Fragment set:html={open("hasCore")} />
+              <div class="core-sections">
 
-              {tldr && (
+                <Fragment set:html={open("tldr")} />
                 <div class="core-section">
                   <p class="core-label">
                     <span class="core-emoji">⚡</span> ملخص
                   </p>
-                  <p class="core-body">{tldr}</p>
+                  <p class="core-body">{v.tldr}</p>
                 </div>
-              )}
+                <Fragment set:html={close("tldr")} />
 
-              {whyThisMatters && (
+                <Fragment set:html={open("whyThisMatters")} />
                 <div class="core-section">
                   <p class="core-label">
                     <span class="core-emoji">🎯</span> لماذا يهمك هذا
                   </p>
-                  <p class="core-body">{whyThisMatters}</p>
+                  <p class="core-body">{v.whyThisMatters}</p>
                 </div>
-              )}
+                <Fragment set:html={close("whyThisMatters")} />
 
-              {whoShouldRead && (
+                <Fragment set:html={open("whoItems")} />
                 <div class="core-section">
                   <p class="core-label">
                     <span class="core-emoji">👥</span> من يجب أن يقرأ هذا
                   </p>
                   <ul class="core-list">
-                    {whoShouldRead
-                      .split("\n")
-                      .map((line: string) => line.replace(/^-\s*/, "").trim())
-                      .filter((line: string) => line.length > 0)
-                      .map((item: string) => (
-                        <li>{item}</li>
-                      ))}
+                    <Fragment set:html={eachOpen("whoItems")} />
+                    {v.whoItems.map((item) => (
+                      <li>{item.text}</li>
+                    ))}
+                    <Fragment set:html={eachClose("whoItems")} />
                   </ul>
                 </div>
-              )}
+                <Fragment set:html={close("whoItems")} />
 
-            </div>
+              </div>
+              <Fragment set:html={close("hasCore")} />
+            </Fragment>
           )}
 
           <!-- In-article ad — sits at a natural reading break, after the summary/before the CTA -->
@@ -356,47 +418,51 @@ const keywordsString = keywords?.join(', ');
           <!-- CTA -->
           <div class="article-cta">
             {!isPersonalPost && (
-              readUrl ? (
+              <Fragment>
+                <Fragment set:html={open("readUrl")} />
                 <a
-                  href={readUrl}
+                  href={v.readUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   class="btn-read"
                   itemprop="url"
                 >
-                  {isSubstack ? (
-                    <Fragment>
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256">
-                        <path d="M224,104a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,104Zm8,56a8,8,0,0,1-8,8H32a8,8,0,0,1,0-16H224A8,8,0,0,1,232,160ZM40,72H216a8,8,0,0,0,0-16H40a8,8,0,0,0,0,16Z"/>
-                      </svg>
-                      اقرأ المقال
-                    </Fragment>
-                  ) : (
-                    'اقرأ المقال'
-                  )}
+                  <Fragment set:html={open("isSubstack")} />
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256">
+                    <path d="M224,104a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,104Zm8,56a8,8,0,0,1-8,8H32a8,8,0,0,1,0-16H224A8,8,0,0,1,232,160ZM40,72H216a8,8,0,0,0,0-16H40a8,8,0,0,0,0,16Z"/>
+                  </svg>
+                  <Fragment set:html={close("isSubstack")} />
+                  اقرأ المقال
                 </a>
-              ) : (
+                <Fragment set:html={close("readUrl")} />
+                <Fragment set:html={open("!readUrl")} />
                 <span class="btn-read btn-disabled">لا يوجد رابط</span>
-              )
+                <Fragment set:html={close("!readUrl")} />
+              </Fragment>
             )}
-            <BookmarkButton client:load slug={slug} title={tool.title} variant="default" />
+            <BookmarkButton
+              client:load
+              slug={isShell ? "{{jt:slug}}" : v.slug}
+              title={isShell ? "{{jt:title}}" : v.title}
+              variant="default"
+            />
           </div>
 
           <!-- Share -->
           <div class="article-share">
             <span class="share-label">مشاركة</span>
             <div class="share-buttons">
-              <a href={xShareUrl} target="_blank" rel="noopener noreferrer" class="share-btn" title="Share on X" aria-label="Share on X">
+              <a href={v.xShareUrl} target="_blank" rel="noopener noreferrer" class="share-btn" title="Share on X" aria-label="Share on X">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 256 256">
                   <path d="M214.75,211.71l-62.6-98.38,61.77-67.95a8,8,0,0,0-11.84-10.76L143.24,99.34,102.75,35.71A8,8,0,0,0,96,32H48a8,8,0,0,0-6.75,12.3l62.6,98.37-61.77,68a8,8,0,1,0,11.84,10.76l58.84-64.72,40.49,63.63A8,8,0,0,0,160,224h48a8,8,0,0,0,6.75-12.29ZM164.39,208,62.57,48h29L193.43,208Z"/>
                 </svg>
               </a>
-              <a href={linkedinShareUrl} target="_blank" rel="noopener noreferrer" class="share-btn" title="Share on LinkedIn" aria-label="Share on LinkedIn">
+              <a href={v.linkedinShareUrl} target="_blank" rel="noopener noreferrer" class="share-btn" title="Share on LinkedIn" aria-label="Share on LinkedIn">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 256 256">
                   <path d="M216,24H40A16,16,0,0,0,24,40V216a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V40A16,16,0,0,0,216,24Zm0,192H40V40H216V216ZM96,112v64a8,8,0,0,1-16,0V112a8,8,0,0,1,16,0Zm88,28v36a8,8,0,0,1-16,0V140a20,20,0,0,0-40,0v36a8,8,0,0,1-16,0V112a8,8,0,0,1,15.79-1.78A36,36,0,0,1,184,140ZM100,84A12,12,0,1,1,88,72,12,12,0,0,1,100,84Z"/>
                 </svg>
               </a>
-              <a href={redditShareUrl} target="_blank" rel="noopener noreferrer" class="share-btn" title="Share on Reddit" aria-label="Share on Reddit">
+              <a href={v.redditShareUrl} target="_blank" rel="noopener noreferrer" class="share-btn" title="Share on Reddit" aria-label="Share on Reddit">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 256 256">
                   <path d="M248,104a32,32,0,0,0-52.94-24.19c-16.75-8.9-36.76-14.28-57.66-15.53l5.19-31.17,17.72,2.72a24,24,0,1,0,2.87-15.74l-26-4a8,8,0,0,0-9.11,6.59L121.2,64.16c-21.84.94-42.82,6.38-60.26,15.65a32,32,0,0,0-42.59,47.74A59,59,0,0,0,16,144c0,21.93,12,42.35,33.91,57.49C70.88,216,98.61,224,128,224s57.12-8,78.09-22.51C228,186.35,240,165.93,240,144a59,59,0,0,0-2.35-16.45A32.16,32.16,0,0,0,248,104ZM184,24a8,8,0,1,1-8,8A8,8,0,0,1,184,24Zm40.13,93.78a8,8,0,0,0-3.29,10A43.58,43.58,0,0,1,224,144c0,16.53-9.59,32.27-27,44.33C178.67,201,154.17,208,128,208s-50.67-7-69-19.67C41.59,176.27,32,160.53,32,144a43.75,43.75,0,0,1,3.14-16.17,8,8,0,0,0-3.27-10A16,16,0,1,1,52.94,94.59a8,8,0,0,0,10.45,2.23l.36-.22C81.45,85.9,104.25,80,128,80h0c23.73,0,46.53,5.9,64.23,16.6l.42.25a8,8,0,0,0,10.39-2.26,16,16,0,1,1,21.07,23.19ZM88,144a16,16,0,1,1,16-16A16,16,0,0,1,88,144Zm96-16a16,16,0,1,1-16-16A16,16,0,0,1,184,128Zm-16.93,44.25a8,8,0,0,1-3.32,10.82,76.18,76.18,0,0,1-71.5,0,8,8,0,1,1,7.5-14.14,60.18,60.18,0,0,0,56.5,0A8,8,0,0,1,167.07,172.25Z"/>
                 </svg>
@@ -425,8 +491,8 @@ const keywordsString = keywords?.join(', ');
               </span>
             ) : (
               <img
-                src={tool.profile_image_url_https || `https://unavatar.io/twitter/${tool.screen_name}`}
-                alt={`@${tool.screen_name}`}
+                src={v.avatar}
+                alt={`@${v.screen_name}`}
                 class="author-avatar"
                 onerror="this.src='/favicons/default.png'"
                 loading="lazy"
@@ -434,23 +500,23 @@ const keywordsString = keywords?.join(', ');
             )}
             <div>
               <a
-                href={authorHref}
+                href={v.authorHref}
                 class="author-handle"
               >
-                {authorDisplayName}
+                {v.authorDisplayName}
               </a>
               {isPersonalPost ? (
-                <a href={authorHref} class="author-sub">
-                  {authorSubLabel}
+                <a href={v.authorHref} class="author-sub">
+                  {v.authorSubLabel}
                 </a>
               ) : (
                 <a
-                  href={authorUrl}
+                  href={v.authorUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   class="author-sub"
                 >
-                  {authorSubLabel}
+                  {v.authorSubLabel}
                 </a>
               )}
             </div>
@@ -463,17 +529,21 @@ const keywordsString = keywords?.join(', ');
           <dl class="detail-list">
             <div class="detail-row">
               <dt>{isPersonalPost ? 'الكاتب' : 'التصنيف'}</dt>
-              <dd><a href={categoryHref} class="detail-link">{categoryTitle}</a></dd>
+              <dd><a href={v.categoryHref} class="detail-link">{v.categoryTitle}</a></dd>
             </div>
             <div class="detail-row">
               <dt>تاريخ النشر</dt>
-              <dd>{formattedDate}</dd>
+              <dd>{v.dateAr}</dd>
             </div>
-            {tool.tag && (
-              <div class="detail-row">
-                <dt>الوسم</dt>
-                <dd>{tool.tag}</dd>
-              </div>
+            {v.tag && (
+              <Fragment>
+                <Fragment set:html={open("tag")} />
+                <div class="detail-row">
+                  <dt>الوسم</dt>
+                  <dd>{v.tag}</dd>
+                </div>
+                <Fragment set:html={close("tag")} />
+              </Fragment>
             )}
           </dl>
         </div>
@@ -487,36 +557,46 @@ const keywordsString = keywords?.join(', ');
     </div>
 
     <!-- Related articles -->
-    {relatedTools.length > 0 && (
-      <section class="related-section" aria-label="Related articles">
-        <h2 class="related-heading">{isPersonalPost ? `مقالات أخرى لـ ${categoryTitle}` : `المزيد في ${categoryTitle}`}</h2>
-        <div class="related-grid">
-          {relatedTools.map((t: any) => (
-            <a href={`/articles/${encodeURIComponent(t.slug)}/`} class="related-card">
-              <div class="related-cover">
-                <img
-                  src={t.original_img_url || `/favicons/${t.slug}.png`}
-                  alt={t.title}
-                  class="related-img"
-                  loading="lazy"
-                  onerror="this.src='/favicons/default.png'"
-                />
-                <span class="related-tag">{categoryTitle}</span>
-              </div>
-              <div class="related-body">
-                <strong class="related-title">{t.title}</strong>
-                {t.authorLabel && (
-                  <span class="related-author">{t.authorLabel}</span>
-                )}
-              </div>
-            </a>
-          ))}
-        </div>
-      </section>
+    {v.related.length > 0 && (
+      <Fragment>
+        <Fragment set:html={open("related")} />
+        <section class="related-section" aria-label="Related articles">
+          <h2 class="related-heading">{v.relatedHeading}</h2>
+          <div class="related-grid">
+            <Fragment set:html={eachOpen("related")} />
+            {v.related.map((t) => (
+              <a href={t.href} class="related-card">
+                <div class="related-cover">
+                  <img
+                    src={t.image}
+                    alt={t.title}
+                    class="related-img"
+                    loading="lazy"
+                    onerror="this.src='/favicons/default.png'"
+                  />
+                  <span class="related-tag">{v.categoryTitle}</span>
+                </div>
+                <div class="related-body">
+                  <strong class="related-title">{t.title}</strong>
+                  {t.author && (
+                    <Fragment>
+                      <Fragment set:html={open(".author")} />
+                      <span class="related-author">{t.author}</span>
+                      <Fragment set:html={close(".author")} />
+                    </Fragment>
+                  )}
+                </div>
+              </a>
+            ))}
+            <Fragment set:html={eachClose("related")} />
+          </div>
+        </section>
+        <Fragment set:html={close("related")} />
+      </Fragment>
     )}
 
     <div class="page-nav">
-      <a href={fallbackPath} class="back-link">العودة إلى {categoryTitle} →</a>
+      <a href={v.fallbackPath} class="back-link">العودة إلى {v.categoryTitle} →</a>
     </div>
 
   </main>

@@ -1,8 +1,10 @@
 import { getCollection } from 'astro:content';
-import data from '../data/articles.json';
+import { loadArticles } from '../lib/articles-data';
 import type { Article, Category } from '../types';
 import { personalBlogs } from '../data/personal-blogs';
 import authorNames from '../data/author-names.json';
+
+const data = loadArticles();
 
 export interface AuthorArticle extends Article {
     category: string;

@@ -8,9 +8,12 @@ import BreadcrumbSchema from "../../components/schema/BreadcrumbSchema.astro";
 import ItemListSchema from "../../components/schema/ItemListSchema.astro";
 import PersonSchema from "../../components/schema/PersonSchema.astro";
 import { getAuthors, type AuthorArticle } from "../../utils/authors";
-import data from "../../data/articles.json";
+import { loadArticles } from "../../lib/articles-data";
 import { categoryTiles } from "../../utils/exploreTiles";
-import type { ArticleWithCategory } from "../../types";
+import { getCategoryTitles } from "../../lib/feed-data";
+import { toFeedCard } from "../../lib/feed";
+
+const data = loadArticles();
 
 export async function getStaticPaths() {
   return (await getAuthors()).map((author) => ({
@@ -47,20 +50,7 @@ const sorted = [...articles].sort(
 );
 
 // Only what a card needs — the full entries carry tldr/keywords/etc.
-const feedArticles: ArticleWithCategory[] = sorted.map((a) => ({
-  id_str: a.id_str,
-  title: a.title,
-  preview_text: a.preview_text,
-  original_img_url: a.original_img_url,
-  screen_name: a.screen_name,
-  created_at: a.created_at,
-  slug: a.slug,
-  url: a.url,
-  internalHref: a.internalHref,
-  authorHref: a.authorHref,
-  authorName: a.authorName,
-  category: a.category,
-}));
+const feedCards = sorted.map((a) => toFeedCard(a, a.category));
 
 const authorLabel = displayName || `@${screen_name}`;
 const canonicalUrl = `https://elhellal.com/authors/${encodeURIComponent(screen_name)}/`;
@@ -185,7 +175,7 @@ const latestDate = sorted[0]
       moreLabel="كل التصنيفات"
       lessLabel="أقل"
     />
-    <MasonryFeed client:load articles={feedArticles} />
+    <MasonryFeed client:load cards={feedCards} categoryTitles={getCategoryTitles()} />
 
     <div class="page-nav">
       <a href="/authors/" class="back-link">كل الكتّاب →</a>

@@ -8,6 +8,8 @@ import BreadcrumbSchema from "../../components/schema/BreadcrumbSchema.astro";
 import ItemListSchema from "../../components/schema/ItemListSchema.astro";
 import { getQualifyingTags, type TaggedArticle } from "../../utils/tags";
 import { tagTiles } from "../../utils/exploreTiles";
+import { getCategoryTitles } from "../../lib/feed-data";
+import { toFeedCard } from "../../lib/feed";
 
 export async function getStaticPaths() {
   return getQualifyingTags().map((tag) => ({
@@ -22,7 +24,12 @@ const sorted = [...articles].sort(
   (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
 );
 
-const slugs = articles.map((a) => a.slug).filter((s): s is string => !!s);
+// An article listing the same keyword twice is indexed twice; show it once.
+const seen = new Set<string>();
+const cards = sorted
+  .filter((a) => a.slug && !seen.has(a.slug) && !!seen.add(a.slug))
+  .map((a) => toFeedCard(a, a.category));
+const categoryTitles = getCategoryTitles();
 // Tags that show up alongside this one
 const related = tagTiles(articles, [Astro.params.tag]);
 
@@ -65,7 +72,7 @@ const breadcrumbs = [
     </header>
 
     <ExploreTiles tiles={related} heading="وسوم ذات صلة" />
-    <MasonryFeed client:load slugs={slugs} />
+    <MasonryFeed client:load cards={cards} categoryTitles={categoryTitles} />
 
     <div class="page-nav">
       <a href="/tags/" class="back-link">كل الوسوم →</a>
