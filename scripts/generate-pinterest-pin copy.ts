@@ -2,7 +2,7 @@
 /**
  * Pinterest Pin Generator (Arabic / RTL) — الهلال
  * ------------------------------------------------
- * Renders a 1000x1500 Pinterest pin for every article in src/data/articles.json
+ * Renders a 1000x1500 Pinterest pin for every article in the catalog (src/data/catalog/)
  * and uploads it locally or to Cloudflare R2, alongside a Pinterest-ready RSS feed.
  *
  * Supports two storage backends — choose at runtime:
@@ -23,7 +23,7 @@
  *
  * Other flags:
  *   --batch 200        override batch size (default 10000)
- *   --articles-file     override articles.json path
+ *   --articles-file     use one articles.json-shaped file instead of the catalog
  *   --out-dir          override local output folder
  *
  * Besides one pin per article, this also generates collection pins for:
@@ -41,6 +41,7 @@ import http from 'http';
 import { tmpdir } from 'os';
 import { fileURLToPath } from 'url';
 import type { Article, ArticlesConfig } from '../src/types/index.ts';
+import { readArticles } from '../src/lib/articles-store.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -57,8 +58,16 @@ if (!['local', 'r2'].includes(STORAGE)) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ─── Config ───────────────────────────────────────────────────────────────────
-const ARTICLES_FILE = getArg('--articles-file')
-  || path.join(__dirname, '../src/data/articles.json');
+const ARTICLES_FILE = getArg('--articles-file');
+/** --articles-file overrides the catalog (src/data/catalog/) with one articles.json-shaped file. */
+function readArticleData(): ArticlesConfig {
+  if (!ARTICLES_FILE) return readArticles();
+  if (!fs.existsSync(ARTICLES_FILE)) {
+    console.error(`❌  articles file not found: ${ARTICLES_FILE}`);
+    process.exit(1);
+  }
+  return JSON.parse(fs.readFileSync(ARTICLES_FILE, 'utf-8'));
+}
 const LOCAL_PUBLIC = getArg('--out-dir')
   || path.join(__dirname, '../public/pins');
 const BATCH_SIZE = parseInt(getArg('--batch') || '10000', 10);
@@ -155,7 +164,7 @@ async function writeFeedXml(xml: string) {
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ─── Category accent colors (matches src/data/articles.json category slugs) ──
+// ─── Category accent colors (matches the catalog's category slugs) ──
 const CATEGORY_COLORS: Record<string, string> = {
   psychology: '#7B3FA0',
   quran: '#0E7C3A',
@@ -534,13 +543,9 @@ async function main() {
     await initR2();
   }
 
-  if (!fs.existsSync(ARTICLES_FILE)) {
-    console.error(`❌  articles.json not found: ${ARTICLES_FILE}`);
-    process.exit(1);
-  }
 
   // 1. Load articles
-  const data: ArticlesConfig = JSON.parse(fs.readFileSync(ARTICLES_FILE, 'utf-8'));
+  const data: ArticlesConfig = readArticleData();
   const allArticles: { article: Article; category: string; catLabel: string; color: string }[] = [];
 
   for (const cat of data.articles) {

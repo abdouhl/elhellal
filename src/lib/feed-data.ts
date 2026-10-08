@@ -4,7 +4,7 @@ import { compareAlpha, compareNewest, toFeedCard, type FeedCard } from './feed';
 
 /**
  * Build-time feed scopes: "all" plus one per category, each in the two
- * orderings MasonryFeed pages through. Node-only (reads articles.json and
+ * orderings MasonryFeed pages through. Node-only (reads the article catalog and
  * content collections); the browser gets these as static JSON pages.
  */
 export interface FeedScope {
@@ -20,7 +20,7 @@ async function build(): Promise<Map<string, FeedScope>> {
     const personal = await getPersonalBlogFeedArticles();
 
     // Base order matters for ties: Array.prototype.sort is stable, and the old
-    // client feed sorted [articles.json order..., personal posts...].
+    // client feed sorted [catalog order..., personal posts...].
     const all = [
         ...data.articles.flatMap((cat) => cat.content.map((a) => toFeedCard(a, cat.category))),
         ...personal.map((a) => toFeedCard(a, a.category)),

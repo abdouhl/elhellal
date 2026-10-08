@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Backfills src/data/author-names.json for every Substack author already in
- * articles.json. New authors get their name scraped automatically going
+ * the catalog. New authors get their name scraped automatically going
  * forward by import-substack2.ts — this script is for one-off backfills or
  * retrying authors that failed earlier (dead feed, timeout, etc).
  *
@@ -16,11 +16,11 @@ import { fileURLToPath } from 'url';
 import type { ArticlesConfig } from '../src/types/index.ts';
 import { personalBlogs } from '../src/data/personal-blogs.ts';
 import { fetchAuthorName, loadAuthorNames, saveAuthorNames } from './lib/author-names.ts';
+import { readArticles } from '../src/lib/articles-store.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const ARTICLES_PATH = path.join(__dirname, '../src/data/articles.json');
 const CONCURRENCY_LIMIT = 15;
 
 const LOCAL_BLOG_SCREEN_NAME = 'abdou_hll';
@@ -32,7 +32,7 @@ const NON_SUBSTACK_SCREEN_NAMES = new Set([
 const refresh = process.argv.includes('--refresh');
 
 function getAllSubstackScreenNames(): string[] {
-    const data: ArticlesConfig = JSON.parse(fs.readFileSync(ARTICLES_PATH, 'utf-8'));
+    const data: ArticlesConfig = readArticles();
     const names = new Set<string>();
     data.articles.forEach((cat) => {
         cat.content.forEach((a) => {

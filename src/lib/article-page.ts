@@ -9,6 +9,7 @@
  */
 
 import type { TemplateData } from './shell-template';
+import { fnv1a } from './hash';
 
 export const ARTICLE_SHELL_SLUG = '__shell__';
 
@@ -19,14 +20,8 @@ export const ARTICLE_SHELL_SLUG = '__shell__';
  */
 export const SHARD_COUNT = 2048;
 
-/** FNV-1a over UTF-16 code units — identical in bun and workerd. */
 export function shardOf(slug: string): number {
-    let hash = 0x811c9dc5;
-    for (let i = 0; i < slug.length; i++) {
-        hash ^= slug.charCodeAt(i);
-        hash = Math.imul(hash, 0x01000193);
-    }
-    return (hash >>> 0) % SHARD_COUNT;
+    return fnv1a(slug) % SHARD_COUNT;
 }
 
 export interface ArticleRecord {
@@ -168,6 +163,6 @@ export function articleTemplateData(r: ArticleRecord): TemplateData {
 }
 
 /** JSON for an inline <script>: "<" escaped so a value can't close the tag. */
-function jsonForScript(value: unknown): string {
+export function jsonForScript(value: unknown): string {
     return JSON.stringify(value).replace(/</g, '\\u003c');
 }

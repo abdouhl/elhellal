@@ -3,7 +3,7 @@ import { personalBlogs, PERSONAL_COLLECTIONS } from '../data/personal-blogs';
 import { getPlaceholderImage } from './placeholderImage';
 import type { ArticleWithCategory } from '../types';
 
-// Personal blog topics map onto existing (otherwise thin) articles.json categories
+// Personal blog topics map onto existing (otherwise thin) catalog categories
 // so they surface in the feed under nav tabs that already exist — no new category needed.
 const CATEGORY_BY_PERSON: Record<'omar' | 'layla' | 'youssef' | 'yacine', string> = {
     omar: 'technology',

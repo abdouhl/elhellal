@@ -1,6 +1,6 @@
 /**
  * Pure tag-slug helpers with no data dependency, split out of utils/tags.ts.
- * That file also pulls in the full articles.json for its article-tag index;
+ * That file also pulls in the full article catalog for its article-tag index;
  * importing anything from it drags that ~30MB dataset into whatever bundle
  * needs it, which blew past the Cloudflare Worker's 64MB size limit for the
  * on-demand quote routes. Quote code should import from here instead.

@@ -1,5 +1,5 @@
 /**
- * Registry of personal/independent blogs to pull into articles.json.
+ * Registry of personal/independent blogs to pull into the catalog.
  * Unlike Substack authors (identified by a username), these need a full URL
  * since they can live on any platform or custom domain.
  *
@@ -10,7 +10,7 @@
  */
 
 export interface PersonalBlogConfig {
-    slug: string;      // used as `screen_name` in articles.json
+    slug: string;      // used as `screen_name` in the catalog
     name: string;      // author/blog display name
     url: string;       // homepage URL (trailing slash optional)
     feedUrl?: string;  // set this only if feed auto-discovery fails for this blog

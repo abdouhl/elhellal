@@ -2,25 +2,19 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import type { ArticlesConfig, Category, Article, SlugMap } from '../src/types/index.ts';
+import { readArticles } from '../src/lib/articles-store.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 console.log('🗺️  Generating slug-to-category mapping...\n');
 
-// Read the tools.json file
-const toolsPath = path.join(__dirname, '../src/data/articles.json');
 let data: ArticlesConfig;
 
 try {
-    if (!fs.existsSync(toolsPath)) {
-        console.error(`❌ Error: articles.json not found at ${toolsPath}`);
-        process.exit(1);
-    }
-    const rawData = fs.readFileSync(toolsPath, 'utf-8');
-    data = JSON.parse(rawData);
+    data = readArticles();
 } catch (error: any) {
-    console.error(`❌ Error reading or parsing tools.json at ${toolsPath}:`, error.message);
+    console.error('❌ Error reading the article catalog:', error.message);
     process.exit(1);
 }
 

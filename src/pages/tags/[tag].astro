@@ -4,57 +4,35 @@ import MasonryFeed from "../../components/MasonryFeed";
 import ExploreTiles from "../../components/ExploreTiles.astro";
 import FeedChrome from "../../components/FeedChrome.astro";
 import "../../components/MasonryFeed.css";
-import BreadcrumbSchema from "../../components/schema/BreadcrumbSchema.astro";
-import ItemListSchema from "../../components/schema/ItemListSchema.astro";
-import { getQualifyingTags, type TaggedArticle } from "../../utils/tags";
-import { tagTiles } from "../../utils/exploreTiles";
-import { getCategoryTitles } from "../../lib/feed-data";
-import { toFeedCard } from "../../lib/feed";
+import { LISTING_SHELL_SLUG } from "../../lib/listing-page";
 
-export async function getStaticPaths() {
-  return getQualifyingTags().map((tag) => ({
-    params: { tag: tag.slug },
-    props: { label: tag.label, articles: tag.articles },
-  }));
+// Tag pages (one per tag with MIN_TAG_ARTICLES+ articles — thousands, and
+// growing with the data) aren't prerendered: this renders only the page's
+// *shell*, with {{tokens}} where the data goes (src/lib/shell-template.ts).
+// scripts/build-worker-data.ts moves it out of dist/ and the site Worker
+// (workers/site/) fills it per request from a record in dist/_data/listings/
+// — derivations in listingTemplateData() (src/lib/listing-page.ts), keep
+// them in sync with the markup below. The Worker also renders the
+// MasonryFeed island itself (the build swaps its props and HTML for tokens).
+export function getStaticPaths() {
+  return [{ params: { tag: LISTING_SHELL_SLUG } }];
 }
-
-const { label, articles } = Astro.props as { label: string; articles: TaggedArticle[] };
-
-const sorted = [...articles].sort(
-  (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-);
-
-// An article listing the same keyword twice is indexed twice; show it once.
-const seen = new Set<string>();
-const cards = sorted
-  .filter((a) => a.slug && !seen.has(a.slug) && !!seen.add(a.slug))
-  .map((a) => toFeedCard(a, a.category));
-const categoryTitles = getCategoryTitles();
-// Tags that show up alongside this one
-const related = tagTiles(articles, [Astro.params.tag]);
-
-const canonicalUrl = `https://elhellal.com/tags/${encodeURIComponent(Astro.params.tag)}/`;
-const breadcrumbs = [
-  { name: "الرئيسية", url: "https://elhellal.com" },
-  { name: "الوسوم", url: "https://elhellal.com/tags" },
-  { name: label },
-];
 ---
 
 <Layout
-  site={`الهلال - ${label}`}
+  site="الهلال - {{label}}"
   title="الهلال"
   tagline="دليل منتقى لأفضل المقالات العربية على الإنترنت"
-  pageTitle={`مقالات عن ${label} | الهلال`}
-  pageDescription={`أفضل المقالات العربية المتعلقة بـ"${label}" — ${sorted.length} مقالة منتقاة بعناية من مصادر متعددة.`}
-  canonicalUrl={canonicalUrl}
-  ogTitle={`مقالات عن ${label} | الهلال`}
-  ogDescription={`${sorted.length} مقالة عربية منتقاة عن ${label}`}
-  ogUrl={canonicalUrl}
+  pageTitle="مقالات عن {{label}} | الهلال"
+  pageDescription={`أفضل المقالات العربية المتعلقة بـ"{{label}}" — {{total}} مقالة منتقاة بعناية من مصادر متعددة.`}
+  canonicalUrl="{{canonicalUrl}}"
+  ogTitle="مقالات عن {{label}} | الهلال"
+  ogDescription="{{total}} مقالة عربية منتقاة عن {{label}}"
+  ogUrl="{{canonicalUrl}}"
   ogType="website"
 >
-  <ItemListSchema items={sorted} listName={`${label} Articles`} />
-  <BreadcrumbSchema items={breadcrumbs} />
+  <script type="application/ld+json" set:html="{{{itemListLd}}}" />
+  <script type="application/ld+json" set:html="{{{breadcrumbLd}}}" />
 
   <main id="main-content" class="tag-page">
     <FeedChrome />
@@ -63,16 +41,16 @@ const breadcrumbs = [
       <span aria-hidden="true">›</span>
       <a href="/tags/">الوسوم</a>
       <span aria-hidden="true">›</span>
-      <span>{label}</span>
+      <span>{"{{label}}"}</span>
     </nav>
 
     <header class="tag-header">
-      <h1>#{label}</h1>
-      <p class="tag-count">{sorted.length} مقالة</p>
+      <h1>#{"{{label}}"}</h1>
+      <p class="tag-count">{"{{total}}"} مقالة</p>
     </header>
 
-    <ExploreTiles tiles={related} heading="وسوم ذات صلة" />
-    <MasonryFeed client:load cards={cards} categoryTitles={categoryTitles} />
+    <ExploreTiles shell tiles={[]} heading="وسوم ذات صلة" />
+    <MasonryFeed client:load cards={[]} categoryTitles={{}} />
 
     <div class="page-nav">
       <a href="/tags/" class="back-link">كل الوسوم →</a>

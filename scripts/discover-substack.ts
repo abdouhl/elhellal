@@ -7,7 +7,7 @@
  * 2. Searches Substack posts for each keyword (the same API behind
  *    https://substack.com/search/<kw>?searching=all_posts).
  * 3. Keeps Arabic posts, groups them by publication subdomain, drops authors
- *    already in articles.json (and ones reported on previous runs), and ranks
+ *    already in the catalog (and ones reported on previous runs), and ranks
  *    the rest.
  *
  * Output goes to .substack-discovery/ (gitignored):
@@ -35,13 +35,13 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import type { ArticlesConfig } from '../src/types/index.ts';
+import { readArticles } from '../src/lib/articles-store.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const ARTICLES_PATH = path.join(__dirname, '../src/data/articles.json');
 const OUT_DIR       = path.join(__dirname, '../.substack-discovery');
 const SEEN_PATH     = path.join(OUT_DIR, 'seen.json');
 const UA            = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36';
@@ -239,7 +239,7 @@ function score(d: Discovered): number {
 }
 
 function loadKnownScreenNames(): Set<string> {
-    const config = JSON.parse(fs.readFileSync(ARTICLES_PATH, 'utf8')) as ArticlesConfig;
+    const config = readArticles();
     const names = new Set<string>();
     for (const cat of config.articles) for (const a of cat.content) {
         if (a.screen_name) names.add(a.screen_name.toLowerCase());

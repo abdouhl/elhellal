@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Import articles from a Substack author's full archive into articles.json.
+ * Import articles from a Substack author's full archive into the catalog.
  * Uses Ollama (local) with gemma4:e4b for Arabic SEO summaries.
  * The AI automatically picks the best category for each article.
  *
@@ -9,7 +9,7 @@
  * body via /api/v1/posts/{slug} instead of relying on the RSS preview text.
  *
  * Every run also re-checks the archive of every author already present
- * in articles.json (their screen_name is their Substack username), so new
+ * in the catalog (their screen_name is their Substack username), so new
  * posts from previously-imported authors get picked up automatically. Any
  * usernames passed on the CLI are merged into that set.
  *
@@ -29,6 +29,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import type { ArticlesConfig, Article } from '../src/types/index.ts';
 import { personalBlogs } from '../src/data/personal-blogs.ts';
+import { readArticles, writeArticles } from '../src/lib/articles-store.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,7 +38,6 @@ const __dirname = path.dirname(__filename);
 
 const MODEL     = 'gemma4:e4b';
 const OLLAMA_URL = 'http://localhost:11434/api/chat';
-const ARTICLES_PATH = path.join(__dirname, '../src/data/articles.json');
 const API_DELAY_MS  = 1500;
 const ARCHIVE_PAGE_DELAY_MS = 500;
 const POST_FETCH_DELAY_MS   = 500;
@@ -107,7 +107,7 @@ const CATEGORY_SLUGS = CATEGORIES.map(c => c.slug).join(', ');
 
 // ─── CLI args ─────────────────────────────────────────────────────────────────
 
-// screen_name values in articles.json that are NOT Substack usernames (skip these
+// screen_name values in the catalog that are NOT Substack usernames (skip these
 // when re-checking existing authors' archives)
 const NON_SUBSTACK_SCREEN_NAMES = new Set([
     LOCAL_BLOG_SCREEN_NAME,
@@ -115,7 +115,7 @@ const NON_SUBSTACK_SCREEN_NAMES = new Set([
 ]);
 
 function getExistingSubstackAuthors(): string[] {
-    const data: ArticlesConfig = JSON.parse(fs.readFileSync(ARTICLES_PATH, 'utf-8'));
+    const data: ArticlesConfig = readArticles();
     const screenNames = new Set(
         data.articles.flatMap(c => c.content.map(a => a.screen_name))
     );
@@ -129,13 +129,13 @@ const substackUsers: string[] = [...new Set([...cliUsers, ...existingAuthors])];
 if (substackUsers.length === 0) {
     console.error('Usage: bun run scripts/import-substack.ts [username] [username2] ...');
     console.error('Example: bun run scripts/import-substack.ts 99iov sabahlal');
-    console.error('(with no args, re-checks every author already in articles.json)');
+    console.error('(with no args, re-checks every author already in the catalog)');
     process.exit(1);
 }
 
 console.log(
     `👥 Checking ${substackUsers.length} author(s) total ` +
-    `(${existingAuthors.length} already known from articles.json` +
+    `(${existingAuthors.length} already known from the catalog` +
     (cliUsers.length > 0 ? `, ${cliUsers.length} passed on the CLI)` : ')') +
     '\n'
 );
@@ -512,11 +512,11 @@ async function processItem(
 const SAVE_EVERY_N_ITEMS = 20; // checkpoint mid-author too, not just between authors
 
 function saveData(data: ArticlesConfig) {
-    fs.writeFileSync(ARTICLES_PATH, JSON.stringify(data, null, 2));
+    writeArticles(data);
 }
 
 async function main() {
-    const data: ArticlesConfig = JSON.parse(fs.readFileSync(ARTICLES_PATH, 'utf-8'));
+    const data: ArticlesConfig = readArticles();
 
     // Duplicate check across ALL categories
     const allExistingIds = new Set(

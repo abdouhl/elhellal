@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import type { ArticlesConfig, Category, Article } from '../src/types/index.ts';
+import { readArticles } from '../src/lib/articles-store.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -9,17 +10,16 @@ const __dirname = path.dirname(__filename);
 /**
  * Client-hydrated React islands (MostRead, FavoritesView, CategoryNav,
  * CardsContainer) import an articles dataset directly so it gets bundled
- * into the browser JS. articles.json also carries several SEO-only fields
+ * into the browser JS. The article catalog also carries several SEO-only fields
  * (tldr, whyThisMatters, whoShouldRead, metaDescription, keywords) that are
  * only ever read server-side (in [slug].astro's <meta> tags) — never by any
- * client component. Those fields alone are ~12.5MB of the ~26MB file.
+ * client component. Those fields alone are about half its size.
  *
  * This script writes a stripped-down copy, articles.client.json, containing
  * only the fields client components actually render, so the client bundle
  * doesn't ship SEO metadata to every visitor's browser.
  */
 
-const SOURCE_PATH = path.join(__dirname, '../src/data/articles.json');
 const OUTPUT_PATH = path.join(__dirname, '../src/data/articles.client.json');
 
 // Fields the client components (Card, MostRead, FavoritesView, CategoryNav,
@@ -51,7 +51,7 @@ function pickClientFields(article: Article): Partial<Article> {
 }
 
 try {
-    const data: ArticlesConfig = JSON.parse(fs.readFileSync(SOURCE_PATH, 'utf-8'));
+    const data: ArticlesConfig = readArticles();
 
     const clientData: ArticlesConfig = {
         articles: data.articles.map((cat: Category) => ({
@@ -63,12 +63,8 @@ try {
 
     fs.writeFileSync(OUTPUT_PATH, JSON.stringify(clientData));
 
-    const sourceSize = fs.statSync(SOURCE_PATH).size;
     const outputSize = fs.statSync(OUTPUT_PATH).size;
-    console.log(
-        `✅ Generated articles.client.json: ${(outputSize / 1024 / 1024).toFixed(2)} MB ` +
-        `(source was ${(sourceSize / 1024 / 1024).toFixed(2)} MB)`
-    );
+    console.log(`✅ Generated articles.client.json: ${(outputSize / 1024 / 1024).toFixed(2)} MB`);
 } catch (error: any) {
     console.error('❌ Error generating client data:', error.message);
     process.exit(1);

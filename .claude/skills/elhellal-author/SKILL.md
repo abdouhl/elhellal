@@ -18,7 +18,7 @@ license: MIT
 
 - Each author is an Astro content collection: `src/content/<slug>/*.md`. The
   filename (kebab-case, English) is the slug — there is no add-slugs step like
-  `articles.json` has.
+  the article catalog (`src/data/catalog/`) has.
 - An author is registered in exactly three places:
   1. `src/data/personal-blogs.ts` — identity (`nameAr`, `nameLatin`, `tagline`,
      `bio`, `accent`), the `PersonalBlogPerson.slug`/`.collection` union type,
@@ -27,7 +27,7 @@ license: MIT
      `personalBlogSchema`: `title`, `description`, `pubDate`, optional `thumb`,
      optional `large`).
   3. `src/utils/personalBlogFeed.ts` — `CATEGORY_BY_PERSON`, which maps the
-     author onto an existing (thin) category in `src/data/articles.json` so
+     author onto an existing (thin) category in the catalog (`src/data/catalog/categories.json`) so
      their posts surface in the homepage feed under a nav tab that already
      exists.
 - Routing (`/articles/<slug>`), author pages (`/authors/<slug>`), and the
@@ -38,7 +38,7 @@ license: MIT
   thumbnail, fixed 2026-07-04). If no thumbnail image exists yet, omit the field
   entirely; `getPlaceholderImage()` in `src/utils/placeholderImage.ts` already
   supplies a designed fallback (`/thumbs/placeholder.png`).
-- `bun run add-slugs` / `check-data` / `split-data` only touch `articles.json`.
+- `bun run add-slugs` / `check-data` / `split-data` only touch the catalog.
   Never run them for personal-blog work.
 
 ## Command 1: write an article for an existing author

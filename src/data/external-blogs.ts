@@ -1,5 +1,5 @@
 /**
- * Registry of REAL, externally-hosted personal blogs to pull into articles.json
+ * Registry of REAL, externally-hosted personal blogs to pull into the catalog
  * via RSS/Atom (see scripts/import-external-blogs.ts).
  *
  * This is deliberately separate from src/data/personal-blogs.ts — that file
@@ -15,7 +15,7 @@
  */
 
 export interface ExternalBlogConfig {
-    slug: string;      // used as `screen_name` in articles.json
+    slug: string;      // used as `screen_name` in the catalog
     name: string;       // author/blog display name, for your own reference/logs
     url: string;        // homepage URL (trailing slash optional)
     feedUrl?: string;   // set this only if feed auto-discovery fails for this blog

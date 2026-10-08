@@ -3,11 +3,11 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { parse } from 'node-html-parser';
 import type { ArticlesConfig, Article, MetadataEntry, MetadataMap } from '../src/types/index.ts';
+import { readArticles } from '../src/lib/articles-store.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const toolsPath = path.join(__dirname, '../src/data/articles.json');
 const metadataPath = path.join(__dirname, '../src/data/metadata.json');
 const faviconsDir = path.join(__dirname, '../public/favicons');
 
@@ -117,8 +117,8 @@ async function fetchMetadata(tool: Article): Promise<MetadataEntry | null> {
 
 async function main() {
     console.log("🚀 Starting metadata and favicon update...\n");
-    console.log("Reading articles.json...");
-    const data: ArticlesConfig = JSON.parse(fs.readFileSync(toolsPath, 'utf-8'));
+    console.log("Reading the article catalog...");
+    const data: ArticlesConfig = readArticles();
 
     const allTools = data.articles.flatMap(cat => cat.content).filter(t => t.slug && t.original_img_url);
     console.log(`Found ${allTools.length} tools. Starting fetch (Concurrency: ${CONCURRENCY_LIMIT})...\n`);

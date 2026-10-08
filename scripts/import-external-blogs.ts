@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
 /**
- * Import articles from personal/independent blogs (non-Substack) into articles.json.
+ * Import articles from personal/independent blogs (non-Substack) into the catalog.
  * Works with any blog that exposes an RSS or Atom feed — WordPress.com blogs,
  * self-hosted WordPress, Ghost, Hugo, Jekyll, hand-rolled feeds, etc.
  * Uses Ollama (local) with gemma4:e4b for Arabic SEO summaries — same pipeline
- * as import-substack.ts, so both scripts write into the same articles.json shape.
+ * as import-substack.ts, so both scripts write into the same catalog shape.
  *
  * Feed discovery (in order):
  *   1. Tries common feed paths directly: /feed/, /feed, /rss/, /rss, /rss.xml,
@@ -50,6 +50,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import type { ArticlesConfig, Article } from '../src/types/index.ts';
 import { externalBlogs } from '../src/data/external-blogs.ts';
+import { readArticles, writeArticles } from '../src/lib/articles-store.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -59,7 +60,6 @@ const __dirname = path.dirname(__filename);
 const MODEL                = 'gemma4:e4b';
 const OLLAMA_URL           = 'http://localhost:11434/api/chat';
 const OLLAMA_TIMEOUT_MS    = 120_000; // model cold-start / load can be slow — give it real headroom
-const ARTICLES_PATH        = path.join(__dirname, '../src/data/articles.json');
 const API_DELAY_MS         = 1500; // between Ollama summary calls
 const PAGE_FETCH_DELAY_MS  = 500;  // between article-page fetches (full-content fallback)
 const MIN_FULL_CONTENT_CHARS = 600; // below this, the feed content counts as an "excerpt" and we fetch the page
@@ -586,11 +586,11 @@ async function processItem(
 const SAVE_EVERY_N_ITEMS = 20;
 
 function saveData(data: ArticlesConfig) {
-    fs.writeFileSync(ARTICLES_PATH, JSON.stringify(data, null, 2));
+    writeArticles(data);
 }
 
 async function main() {
-    const data: ArticlesConfig = JSON.parse(fs.readFileSync(ARTICLES_PATH, 'utf-8'));
+    const data: ArticlesConfig = readArticles();
     const allExistingIds = new Set(data.articles.flatMap(c => c.content.map(a => a.id_str)));
 
     let added = 0;

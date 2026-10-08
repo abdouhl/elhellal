@@ -3,9 +3,13 @@
 // "more / fewer" toggle that expands the full grid. Tiles come from
 // src/utils/exploreTiles.ts (categories or tags, depending on the page).
 import type { ExploreTile } from "../utils/exploreTiles";
+import { shellMarkers } from "../lib/shell-template";
 
 interface Props {
   tiles: ExploreTile[];
+  /** Render as a Worker shell (src/lib/shell-template.ts): tiles come from the
+   * `tiles` array token, the toggle shows when `manyTiles` is set. */
+  shell?: boolean;
   heading?: string;
   /** Toggle labels, e.g. "المزيد من الوسوم" / "وسوم أقل" */
   moreLabel?: string;
@@ -17,33 +21,55 @@ const {
   heading = "استكشف الوسوم",
   moreLabel = "المزيد من الوسوم",
   lessLabel = "وسوم أقل",
+  shell = false,
 } = Astro.props;
+
+const { open, close, eachOpen, eachClose } = shellMarkers(shell);
+const items: Array<{ href: string; label: string; count: number | string; image?: string | undefined }> = shell
+  ? [{ href: "{{.href}}", label: "{{.label}}", count: "{{.count}}", image: "{{.image}}" }]
+  : tiles;
 ---
 
-{tiles.length > 0 && (
+{(shell || tiles.length > 0) && (
+  <Fragment>
+  <Fragment set:html={open("tiles")} />
   <section class="tag-explorer" data-expanded="false">
     <div class="tag-explorer-head">
       <h2 class="tag-tiles-heading">{heading}</h2>
-      {tiles.length > 2 && (
+      {(shell || tiles.length > 2) && (
+        <Fragment>
+        <Fragment set:html={open("manyTiles")} />
         <button type="button" class="tag-toggle" aria-expanded="false" aria-controls="tag-tiles-grid">
           <span class="tag-toggle-more">{moreLabel}</span>
           <span class="tag-toggle-less">{lessLabel}</span>
           <span class="tag-toggle-icon" aria-hidden="true">+</span>
         </button>
+        <Fragment set:html={close("manyTiles")} />
+        </Fragment>
       )}
     </div>
     <ul role="list" class="tag-tiles" id="tag-tiles-grid">
-      {tiles.map((tile) => (
+      <Fragment set:html={eachOpen("tiles")} />
+      {items.map((tile) => (
         <li class="tag-tile">
           <a href={tile.href}>
-            {tile.image && <img src={tile.image} alt="" loading="lazy" decoding="async" />}
+            {tile.image && (
+              <Fragment>
+                <Fragment set:html={open(".image")} />
+                <img src={tile.image} alt="" loading="lazy" decoding="async" />
+                <Fragment set:html={close(".image")} />
+              </Fragment>
+            )}
             <span class="tag-tile-label">{tile.label}</span>
             <span class="tag-tile-count">{tile.count} مقالة</span>
           </a>
         </li>
       ))}
+      <Fragment set:html={eachClose("tiles")} />
     </ul>
   </section>
+  <Fragment set:html={close("tiles")} />
+  </Fragment>
 )}
 
 <script>

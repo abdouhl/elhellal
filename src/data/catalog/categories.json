@@ -1,0 +1,194 @@
+[
+  {
+    "category": "psychology",
+    "title": "علم النفس"
+  },
+  {
+    "category": "quran",
+    "title": "القرآن والتفسير"
+  },
+  {
+    "category": "islamic-fiqh",
+    "title": "الفقه الإسلامي"
+  },
+  {
+    "category": "writing",
+    "title": "الكتابة والتحرير"
+  },
+  {
+    "category": "self-development",
+    "title": "التطوير الذاتي"
+  },
+  {
+    "category": "religion",
+    "title": "الدين والروحانيات"
+  },
+  {
+    "category": "mental-health",
+    "title": "الصحة النفسية"
+  },
+  {
+    "category": "politics",
+    "title": "السياسة والشأن العام"
+  },
+  {
+    "category": "philosophy",
+    "title": "الفلسفة"
+  },
+  {
+    "category": "sociology",
+    "title": "علم الاجتماع"
+  },
+  {
+    "category": "marketing",
+    "title": "التسويق"
+  },
+  {
+    "category": "culture",
+    "title": "الثقافة والحضارة"
+  },
+  {
+    "category": "general",
+    "title": "عام ومتنوع"
+  },
+  {
+    "category": "management",
+    "title": "القيادة والإدارة"
+  },
+  {
+    "category": "health",
+    "title": "الصحة والطب"
+  },
+  {
+    "category": "relationships",
+    "title": "العلاقات الاجتماعية"
+  },
+  {
+    "category": "economics",
+    "title": "الاقتصاد والمال"
+  },
+  {
+    "category": "business",
+    "title": "الأعمال"
+  },
+  {
+    "category": "investing",
+    "title": "الاستثمار"
+  },
+  {
+    "category": "biology",
+    "title": "الأحياء والطبيعة"
+  },
+  {
+    "category": "literature",
+    "title": "الأدب والشعر"
+  },
+  {
+    "category": "language",
+    "title": "اللغة واللغويات"
+  },
+  {
+    "category": "science",
+    "title": "العلوم والاكتشافات"
+  },
+  {
+    "category": "history",
+    "title": "التاريخ"
+  },
+  {
+    "category": "entrepreneurship",
+    "title": "ريادة الأعمال"
+  },
+  {
+    "category": "travel",
+    "title": "السفر والسياحة"
+  },
+  {
+    "category": "technology",
+    "title": "التقنية"
+  },
+  {
+    "category": "environment",
+    "title": "البيئة والاستدامة"
+  },
+  {
+    "category": "law",
+    "title": "القانون والحقوق"
+  },
+  {
+    "category": "media",
+    "title": "الإعلام والصحافة"
+  },
+  {
+    "category": "art",
+    "title": "الفن والإبداع"
+  },
+  {
+    "category": "space",
+    "title": "الفضاء والكون"
+  },
+  {
+    "category": "communication",
+    "title": "التواصل والعلاقات العامة"
+  },
+  {
+    "category": "social-media",
+    "title": "وسائل التواصل الاجتماعي"
+  },
+  {
+    "category": "programming",
+    "title": "البرمجة والتطوير"
+  },
+  {
+    "category": "ai",
+    "title": "الذكاء الاصطناعي"
+  },
+  {
+    "category": "education",
+    "title": "التعليم والتدريس"
+  },
+  {
+    "category": "productivity",
+    "title": "الإنتاجية وإدارة الوقت"
+  },
+  {
+    "category": "parenting",
+    "title": "التربية والأسرة"
+  },
+  {
+    "category": "design",
+    "title": "التصميم والجماليات"
+  },
+  {
+    "category": "biography",
+    "title": "السيرة الذاتية والشخصيات"
+  },
+  {
+    "category": "food",
+    "title": "الطعام والطهي"
+  },
+  {
+    "category": "nutrition",
+    "title": "التغذية وأسلوب الحياة"
+  },
+  {
+    "category": "music",
+    "title": "الموسيقى والصوت"
+  },
+  {
+    "category": "cybersecurity",
+    "title": "الأمن الإلكتروني"
+  },
+  {
+    "category": "data-science",
+    "title": "علم البيانات"
+  },
+  {
+    "category": "cinema",
+    "title": "السينما والمسلسلات"
+  },
+  {
+    "category": "sports",
+    "title": "الرياضة"
+  }
+]

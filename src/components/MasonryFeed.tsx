@@ -9,7 +9,7 @@ import { isRecentlyAdded } from '../utils/dates';
 import {
     compareAlpha,
     feedPageCount,
-    feedPageUrl,
+    fetchFeedPage,
     matchesQuery,
     queryTokens,
     type FeedCard,
@@ -20,10 +20,11 @@ import {
 // right-to-left across rows instead of top-to-bottom per column.
 //
 // Data comes in one of two ways:
-//  - `cards`: the whole (small) list inline — tag and author pages.
-//  - `scope` + `total`: a big feed ("all" or a category) that lives in static
-//    JSON pages (src/pages/feed/…); only `initialCards` ship with the page
-//    and the rest is fetched as the reader scrolls or searches.
+//  - `cards`: the whole (small) list inline — small tag and author pages.
+//  - `scope` + `total`: a big feed ("all", a category, or a big tag/author)
+//    that lives in static JSON pages (see src/lib/feed.ts); only
+//    `initialCards` ship with the page and the rest is fetched as the reader
+//    scrolls or searches.
 const ITEMS_PER_PAGE = 100;
 const AD_INTERVAL = 12;
 const NEW_DAYS = 3;
@@ -77,7 +78,7 @@ interface Run {
 }
 
 interface MasonryFeedProps {
-    /** Big feeds: which static feed to page through ("all" or a category) */
+    /** Big feeds: which static feed to page through ("all", a category, "tag/<slug>", "author/<name>") */
     scope?: string;
     /** Big feeds: number of articles in the scope */
     total?: number;
@@ -133,12 +134,12 @@ export default function MasonryFeed({ scope, total = 0, initialCards = [], cards
 
     const loadPage = useCallback(
         (index: number): Promise<FeedCard[]> => {
-            const url = feedPageUrl(scope || 'all', order, index);
-            let page = pageCache.current.get(url);
+            const key = `${scope}/${order}/${index}`;
+            let page = pageCache.current.get(key);
             if (!page) {
-                page = fetch(url).then((res) => (res.ok ? (res.json() as Promise<FeedCard[]>) : Promise.reject(res.status)));
-                page.catch(() => pageCache.current.delete(url));
-                pageCache.current.set(url, page);
+                page = fetchFeedPage(scope || 'all', order, index);
+                page.catch(() => pageCache.current.delete(key));
+                pageCache.current.set(key, page);
             }
             return page;
         },

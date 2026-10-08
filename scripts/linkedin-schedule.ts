@@ -42,6 +42,7 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { Article, Category } from "../src/types";
+import { readArticles } from "../src/lib/articles-store.ts";
 
 const ROOT = join(import.meta.dir, "..");
 const OUT_DIR = join(ROOT, ".linkedin-schedule");
@@ -167,7 +168,7 @@ function buildPost(a: Article): string {
 }
 
 // ── pick articles ──────────────────────────────────────────────────────
-const data = JSON.parse(readFileSync(join(ROOT, "src/data/articles.json"), "utf8")) as { articles: Category[] };
+const data = readArticles() as { articles: Category[] };
 mkdirSync(OUT_DIR, { recursive: true });
 const posted: Record<string, string> = existsSync(STATE_FILE) ? JSON.parse(readFileSync(STATE_FILE, "utf8")) : {};
 

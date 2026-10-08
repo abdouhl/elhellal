@@ -1,26 +1,8 @@
 import { getCollection } from 'astro:content';
-import { loadArticles } from '../lib/articles-data';
-import type { Article, Category } from '../types';
 import { personalBlogs } from '../data/personal-blogs';
-import authorNames from '../data/author-names.json';
+import { buildAuthorIndex, type AuthorArticle, type AuthorEntry } from './author-index';
 
-const data = loadArticles();
-
-export interface AuthorArticle extends Article {
-    category: string;
-}
-
-export interface AuthorEntry {
-    screen_name: string;
-    profileImage?: string;
-    /** Set for personal-blog writers (Layla/Omar/Youssef) instead of an X/Substack handle */
-    displayName?: string;
-    tagline?: string;
-    bio?: string;
-    accent?: string;
-    isPersonal?: boolean;
-    articles: AuthorArticle[];
-}
+export { buildAuthorIndex, type AuthorArticle, type AuthorEntry } from './author-index';
 
 // Dev-only bridge to the local write.elhellal (WriteFreely) instance — see
 // elhellal-write's README. Add a blog's alias here once you've created it
@@ -136,34 +118,6 @@ async function getWriteFreelyAuthorEntries(): Promise<AuthorEntry[]> {
     return entries.filter((entry): entry is AuthorEntry => entry !== null);
 }
 
-let cachedIndex: Map<string, AuthorEntry> | null = null;
-
-export function buildAuthorIndex(): Map<string, AuthorEntry> {
-    if (cachedIndex) return cachedIndex;
-
-    const map = new Map<string, AuthorEntry>();
-    (data.articles as Category[]).forEach((cat) => {
-        cat.content.forEach((article) => {
-            if (!article.screen_name) return;
-            if (!map.has(article.screen_name)) {
-                map.set(article.screen_name, {
-                    screen_name: article.screen_name,
-                    displayName: (authorNames as Record<string, string>)[article.screen_name],
-                    articles: [],
-                });
-            }
-            const entry = map.get(article.screen_name)!;
-            entry.articles.push({ ...article, category: cat.category });
-            if (!entry.profileImage && article.profile_image_url_https) {
-                entry.profileImage = article.profile_image_url_https;
-            }
-        });
-    });
-
-    cachedIndex = map;
-    return map;
-}
-
 async function getPersonalAuthorEntries(): Promise<AuthorEntry[]> {
     const entries = await Promise.all(
         Object.values(personalBlogs).map(async (person): Promise<AuthorEntry> => {
@@ -191,11 +145,14 @@ async function getPersonalAuthorEntries(): Promise<AuthorEntry[]> {
     return entries;
 }
 
+/** Authors with prerendered pages: personal-blog and WriteFreely writers. */
+export async function getPersonalAuthors(): Promise<AuthorEntry[]> {
+    return [...(await getPersonalAuthorEntries()), ...(await getWriteFreelyAuthorEntries())];
+}
+
 export async function getAuthors(): Promise<AuthorEntry[]> {
     const substackAuthors = [...buildAuthorIndex().values()];
-    const personalAuthors = await getPersonalAuthorEntries();
-    const writeFreelyAuthors = await getWriteFreelyAuthorEntries();
-    return [...substackAuthors, ...personalAuthors, ...writeFreelyAuthors].sort(
+    return [...substackAuthors, ...(await getPersonalAuthors())].sort(
         (a, b) => b.articles.length - a.articles.length
     );
 }

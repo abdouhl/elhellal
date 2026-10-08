@@ -7,108 +7,156 @@ import "../../components/MasonryFeed.css";
 import BreadcrumbSchema from "../../components/schema/BreadcrumbSchema.astro";
 import ItemListSchema from "../../components/schema/ItemListSchema.astro";
 import PersonSchema from "../../components/schema/PersonSchema.astro";
-import { getAuthors, type AuthorArticle } from "../../utils/authors";
-import { loadArticles } from "../../lib/articles-data";
-import { categoryTiles } from "../../utils/exploreTiles";
+import { getPersonalAuthors, type AuthorArticle } from "../../utils/authors";
+import { categoryTiles, type ExploreTile } from "../../utils/exploreTiles";
 import { getCategoryTitles } from "../../lib/feed-data";
-import { toFeedCard } from "../../lib/feed";
+import { toFeedCard, type FeedCard } from "../../lib/feed";
+import { LISTING_SHELL_SLUG } from "../../lib/listing-page";
+import { shellMarkers } from "../../lib/shell-template";
 
-const data = loadArticles();
-
+// This page renders in two modes:
+// - Personal-blog (and dev-only WriteFreely) writers prerender as ordinary
+//   static pages.
+// - author === LISTING_SHELL_SLUG renders the page *shell* for every
+//   catalog author (hundreds, growing with the data): the same markup
+//   with {{tokens}} where the data goes. scripts/build-worker-data.ts moves it
+//   out of dist/ and the site Worker (workers/site/) fills it per request from
+//   a record in dist/_data/listings/ — derivations in listingTemplateData()
+//   (src/lib/listing-page.ts), keep them in sync with the markup below. The
+//   Worker also renders the MasonryFeed island itself.
 export async function getStaticPaths() {
-  return (await getAuthors()).map((author) => ({
+  const personal = (await getPersonalAuthors()).map((author) => ({
     params: { author: author.screen_name },
     props: {
       screen_name: author.screen_name,
-      profileImage: author.profileImage,
       articles: author.articles,
       displayName: author.displayName,
       tagline: author.tagline,
       bio: author.bio,
       accent: author.accent,
-      isPersonal: author.isPersonal,
     },
   }));
+  return [{ params: { author: LISTING_SHELL_SLUG }, props: {} }, ...personal];
 }
 
-const { screen_name, profileImage, articles, displayName, tagline, bio, accent, isPersonal } = Astro.props as {
-  screen_name: string;
-  profileImage?: string;
-  articles: AuthorArticle[];
-  displayName?: string;
-  tagline?: string;
-  bio?: string;
-  accent?: string;
-  isPersonal?: boolean;
-};
+const isShell = Astro.params.author === LISTING_SHELL_SLUG;
+const { open, close, eachOpen, eachClose } = shellMarkers(isShell);
 
-const categoryTitleMap: Record<string, string> = {};
-(data.articles as any[]).forEach((c) => { categoryTitleMap[c.category] = c.title; });
+interface AuthorView {
+  authorLabel: string;
+  canonicalUrl: string;
+  nameDir: string;
+  total: number | string;
+  latestDate?: string | undefined;
+  topCategories: Array<{ label: string; count: number | string }>;
+  tiles: ExploreTile[];
+  // Personal writers: initial avatar in their accent color, tagline and bio.
+  isPersonal: boolean;
+  accent?: string | undefined;
+  initial?: string | undefined;
+  tagline?: string | undefined;
+  bio?: string | undefined;
+  // catalog authors: photo and external profile link.
+  avatar?: string | undefined;
+  profileUrl?: string | undefined;
+  profileLinkLabel?: string | undefined;
+}
 
-const sorted = [...articles].sort(
-  (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-);
+let v: AuthorView;
+let personal: { screen_name: string; sorted: AuthorArticle[]; feedCards: FeedCard[] } | undefined;
 
-// Only what a card needs — the full entries carry tldr/keywords/etc.
-const feedCards = sorted.map((a) => toFeedCard(a, a.category));
+if (isShell) {
+  v = {
+    authorLabel: "{{authorLabel}}",
+    canonicalUrl: "{{canonicalUrl}}",
+    nameDir: "{{nameDir}}",
+    total: "{{total}}",
+    latestDate: "{{latestDateAr}}",
+    topCategories: [{ label: "{{.label}}", count: "{{.count}}" }],
+    tiles: [],
+    isPersonal: false,
+    avatar: "{{avatar}}",
+    profileUrl: "{{profileUrl}}",
+    profileLinkLabel: "{{profileLinkLabel}}",
+  };
+} else {
+  const { screen_name, articles, displayName, tagline, bio, accent } = Astro.props as {
+    screen_name: string;
+    articles: AuthorArticle[];
+    displayName?: string;
+    tagline?: string;
+    bio?: string;
+    accent?: string;
+  };
+  const categoryTitleMap = getCategoryTitles();
 
-const authorLabel = displayName || `@${screen_name}`;
-const canonicalUrl = `https://elhellal.com/authors/${encodeURIComponent(screen_name)}/`;
+  const sorted = [...articles].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+  // Only what a card needs — the full entries carry tldr/keywords/etc.
+  personal = { screen_name, sorted, feedCards: sorted.map((a) => toFeedCard(a, a.category)) };
+
+  // Top categories this author writes in — surfaces their range and doubles as
+  // internal links back into category pages.
+  const categoryCounts = new Map<string, number>();
+  articles.forEach((a) => {
+    const label = categoryTitleMap[a.category] || a.category;
+    categoryCounts.set(label, (categoryCounts.get(label) || 0) + 1);
+  });
+
+  v = {
+    authorLabel: displayName || `@${screen_name}`,
+    canonicalUrl: `https://elhellal.com/authors/${encodeURIComponent(screen_name)}/`,
+    nameDir: displayName ? "rtl" : "ltr",
+    total: sorted.length,
+    latestDate: sorted[0]
+      ? new Date(sorted[0].created_at).toLocaleDateString("ar", { year: "numeric", month: "long", day: "numeric" })
+      : undefined,
+    topCategories: [...categoryCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([label, count]) => ({ label, count })),
+    tiles: categoryTiles(articles),
+    isPersonal: true,
+    accent,
+    initial: displayName?.trim().charAt(0),
+    tagline,
+    bio,
+  };
+}
+
 const breadcrumbs = [
   { name: "الرئيسية", url: "https://elhellal.com" },
   { name: "الكتّاب", url: "https://elhellal.com/authors" },
-  { name: authorLabel },
+  { name: v.authorLabel },
 ];
-
-// Top categories this author writes in — surfaces their range and doubles as
-// internal links back into category pages.
-const categoryCounts = new Map<string, number>();
-articles.forEach((a) => {
-  const label = categoryTitleMap[a.category] || a.category;
-  categoryCounts.set(label, (categoryCounts.get(label) || 0) + 1);
-});
-const topCategories = [...categoryCounts.entries()]
-  .sort((a, b) => b[1] - a[1])
-  .slice(0, 5)
-  .map(([label, count]) => ({ label, count }));
-
-// External profile link (Substack/source site/X) — same derivation used on the article page.
-const firstUrl = !isPersonal ? articles.find((a) => a.url)?.url : undefined;
-const sourceHost = firstUrl ? new URL(firstUrl).hostname.replace(/^www\./, '') : null;
-const isSubstack = !!sourceHost && sourceHost.endsWith('substack.com');
-const profileUrl = isSubstack
-  ? `https://${screen_name}.substack.com`
-  : firstUrl
-    ? new URL(firstUrl).origin
-    : `https://x.com/${screen_name}`;
-const profileLinkLabel = isSubstack ? 'Substack' : (sourceHost ?? 'عرض على X');
-
-const latestDate = sorted[0]
-  ? new Date(sorted[0].created_at).toLocaleDateString("ar", { year: "numeric", month: "long", day: "numeric" })
-  : null;
 ---
 
 <Layout
-  site={`الهلال - ${authorLabel}`}
+  site={`الهلال - ${v.authorLabel}`}
   title="الهلال"
   tagline="دليل منتقى لأفضل المقالات العربية على الإنترنت"
-  pageTitle={`مقالات ${authorLabel} | الهلال`}
-  pageDescription={`تصفح ${sorted.length} مقالة منشورة بواسطة ${authorLabel} على الهلال.`}
-  canonicalUrl={canonicalUrl}
-  ogTitle={`مقالات ${authorLabel} | الهلال`}
-  ogDescription={`${sorted.length} مقالة بواسطة ${authorLabel}`}
-  ogUrl={canonicalUrl}
+  pageTitle={`مقالات ${v.authorLabel} | الهلال`}
+  pageDescription={`تصفح ${v.total} مقالة منشورة بواسطة ${v.authorLabel} على الهلال.`}
+  canonicalUrl={v.canonicalUrl}
+  ogTitle={`مقالات ${v.authorLabel} | الهلال`}
+  ogDescription={`${v.total} مقالة بواسطة ${v.authorLabel}`}
+  ogUrl={v.canonicalUrl}
   ogType="profile"
 >
-  <PersonSchema
-    name={authorLabel}
-    url={canonicalUrl}
-    description={isPersonal ? bio : tagline}
-    image={isPersonal ? undefined : (profileImage || `https://unavatar.io/twitter/${screen_name}`)}
-    sameAs={isPersonal ? undefined : profileUrl}
-  />
-  <ItemListSchema items={sorted} listName={`@${screen_name} Articles`} />
-  <BreadcrumbSchema items={breadcrumbs} />
+  {isShell ? (
+    <Fragment>
+      <script type="application/ld+json" set:html="{{{personLd}}}" />
+      <script type="application/ld+json" set:html="{{{itemListLd}}}" />
+      <script type="application/ld+json" set:html="{{{breadcrumbLd}}}" />
+    </Fragment>
+  ) : (
+    <Fragment>
+      <PersonSchema name={v.authorLabel} url={v.canonicalUrl} description={v.bio} />
+      <ItemListSchema items={personal!.sorted} listName={`@${personal!.screen_name} Articles`} />
+      <BreadcrumbSchema items={breadcrumbs} />
+    </Fragment>
+  )}
 
   <main id="main-content" class="author-page">
     <FeedChrome />
@@ -117,40 +165,42 @@ const latestDate = sorted[0]
       <span aria-hidden="true">›</span>
       <a href="/authors/">الكتّاب</a>
       <span aria-hidden="true">›</span>
-      <span>{authorLabel}</span>
+      <span>{v.authorLabel}</span>
     </nav>
 
-    <header class="author-header" style={isPersonal ? `--author-accent:${accent}` : ""}>
+    <header class="author-header" style={v.isPersonal ? `--author-accent:${v.accent}` : ""}>
       <div class="author-header-top">
-        {isPersonal ? (
-          <span class="author-avatar-lg author-avatar-initial" style={`background:${accent}`}>
-            {displayName?.trim().charAt(0)}
+        {v.isPersonal ? (
+          <span class="author-avatar-lg author-avatar-initial" style={`background:${v.accent}`}>
+            {v.initial}
           </span>
         ) : (
           <img
-            src={profileImage || `https://unavatar.io/twitter/${screen_name}`}
-            alt={authorLabel}
+            src={v.avatar}
+            alt={v.authorLabel}
             class="author-avatar-lg"
             onerror="this.src='/favicons/default.png'"
             loading="eager"
           />
         )}
         <div class="author-identity">
-          <h1 style={isPersonal ? `color:${accent}` : ""} dir={displayName ? "rtl" : "ltr"}>{authorLabel}</h1>
-          {isPersonal && tagline && <p class="author-tagline">{tagline}</p>}
+          <h1 style={v.isPersonal ? `color:${v.accent}` : ""} dir={v.nameDir}>{v.authorLabel}</h1>
+          {v.isPersonal && v.tagline && <p class="author-tagline">{v.tagline}</p>}
           <div class="author-stats">
-            <span class="author-stat">{sorted.length} مقالة</span>
-            {latestDate && (
+            <span class="author-stat">{v.total} مقالة</span>
+            {v.latestDate && (
               <>
+                <Fragment set:html={open("latestDateAr")} />
                 <span class="stat-dot" aria-hidden="true">·</span>
-                <span class="author-stat">آخر نشر {latestDate}</span>
+                <span class="author-stat">آخر نشر {v.latestDate}</span>
+                <Fragment set:html={close("latestDateAr")} />
               </>
             )}
           </div>
         </div>
-        {!isPersonal && (
-          <a href={profileUrl} target="_blank" rel="noopener noreferrer" class="author-profile-link">
-            {profileLinkLabel}
+        {!v.isPersonal && (
+          <a href={v.profileUrl} target="_blank" rel="noopener noreferrer" class="author-profile-link">
+            {v.profileLinkLabel}
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 256 256">
               <path d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z"/>
             </svg>
@@ -158,24 +208,35 @@ const latestDate = sorted[0]
         )}
       </div>
 
-      {isPersonal && bio && <p class="author-bio">{bio}</p>}
+      {v.isPersonal && v.bio && <p class="author-bio">{v.bio}</p>}
 
-      {topCategories.length > 0 && (
-        <div class="author-categories" aria-label="التصنيفات">
-          {topCategories.map((c) => (
-            <span class="author-category-pill">{c.label} <span class="pill-count">{c.count}</span></span>
-          ))}
-        </div>
+      {v.topCategories.length > 0 && (
+        <>
+          <Fragment set:html={open("topCategories")} />
+          <div class="author-categories" aria-label="التصنيفات">
+            <Fragment set:html={eachOpen("topCategories")} />
+            {v.topCategories.map((c) => (
+              <span class="author-category-pill">{c.label} <span class="pill-count">{c.count}</span></span>
+            ))}
+            <Fragment set:html={eachClose("topCategories")} />
+          </div>
+          <Fragment set:html={close("topCategories")} />
+        </>
       )}
     </header>
 
     <ExploreTiles
-      tiles={categoryTiles(articles)}
+      shell={isShell}
+      tiles={v.tiles}
       heading="يكتب في"
       moreLabel="كل التصنيفات"
       lessLabel="أقل"
     />
-    <MasonryFeed client:load cards={feedCards} categoryTitles={getCategoryTitles()} />
+    {isShell ? (
+      <MasonryFeed client:load cards={[]} categoryTitles={{}} />
+    ) : (
+      <MasonryFeed client:load cards={personal!.feedCards} categoryTitles={getCategoryTitles()} />
+    )}
 
     <div class="page-nav">
       <a href="/authors/" class="back-link">كل الكتّاب →</a>

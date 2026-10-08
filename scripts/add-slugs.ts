@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import type { ArticlesConfig, Category, Article } from '../src/types/index.ts';
+import { readArticles, writeArticles } from '../src/lib/articles-store.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,11 +32,10 @@ function slugify(text: string): string {
     return truncateToByteLength(slug, MAX_SLUG_BYTES).replace(/-+$/, '');
 }
 
-const toolsPath = path.join(__dirname, '../src/data/articles.json');
 
 try {
     // Process monolithic tools.json
-    const data: ArticlesConfig = JSON.parse(fs.readFileSync(toolsPath, 'utf-8'));
+    const data: ArticlesConfig = readArticles();
     let modified = false;
 
     // 1. Build a set of all existing slugs to detect collisions
@@ -85,10 +85,10 @@ try {
     });
 
     if (modified) {
-        fs.writeFileSync(toolsPath, JSON.stringify(data, null, 2));
-        console.log('✅ Updated tools.json (slugs & sorting)');
+        writeArticles(data);
+        console.log('✅ Updated the article catalog (slugs & sorting)');
     } else {
-        console.log('✅ tools.json already up to date (slugs & sorting)');
+        console.log('✅ Article catalog already up to date (slugs & sorting)');
     }
 
 } catch (error: any) {

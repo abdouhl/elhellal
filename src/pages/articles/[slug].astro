@@ -15,7 +15,7 @@ import { shellMarkers } from "../../lib/shell-template";
 // - slug === ARTICLE_SHELL_SLUG renders the article *shell*: the same markup
 //   with {{tokens}} where the data goes. scripts/build-worker-data.ts moves it
 //   out of dist/ and the site Worker (workers/site/) fills it per request for
-//   every articles.json article, from static JSON shards. Prerendering those
+//   every catalog article, from static JSON shards. Prerendering those
 //   (100k+) would blow past Cloudflare's file-count and build limits.
 //   Their data derivations live in articleTemplateData()
 //   (src/lib/article-page.ts) — keep it in sync with the markup below.

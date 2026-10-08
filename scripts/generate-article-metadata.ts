@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import type { ArticlesConfig, Category, Article } from '../src/types/index.ts';
+import { readArticles } from '../src/lib/articles-store.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -9,7 +10,6 @@ const __dirname = path.dirname(__filename);
 console.log('🔧 Generating individual article metadata files...\n');
 
 // Paths
-const toolsPath = path.join(__dirname, '../src/data/articles.json');
 const metadataPath = path.join(__dirname, '../src/data/metadata.json');
 const outputDir = path.join(__dirname, '../src/data/article-metadata');
 
@@ -20,11 +20,7 @@ if (!fs.existsSync(outputDir)) {
 }
 
 try {
-    // Read tools.json
-    if (!fs.existsSync(toolsPath)) {
-        throw new Error(`articles.json not found at ${toolsPath}`);
-    }
-    const toolsData: ArticlesConfig = JSON.parse(fs.readFileSync(toolsPath, 'utf-8'));
+    const toolsData: ArticlesConfig = readArticles();
 
     // Read metadata.json
     let metadataMap: Record<string, any> = {};

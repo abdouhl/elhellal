@@ -64,37 +64,45 @@ bun run preview    # preview the production build locally
 
 ## Data model
 
-`src/data/articles.json` is the **single source of truth** for every article on the site, organized by category:
+The article catalog in `src/data/catalog/` is the **single source of truth** for every article on the site. It's split into small files so no single file grows past GitHub's 100MB limit:
 
-```json
-{
-  "category": "technology",
-  "title": "تقنية",
-  "content": [
-    {
-      "id_str": "2026146182675013854",
-      "title": "Article title",
-      "preview_text": "Short description...",
-      "original_img_url": "https://img.xarticl.es/...",
-      "screen_name": "author_handle",
-      "created_at": "2026-02-24"
-    }
-  ]
-}
+```
+src/data/catalog/
+├── categories.json          # [{ "category": "technology", "title": "تقنية" }, ...] in display order
+└── technology/
+    ├── 2026-02.json         # that category's articles created that month, sorted by title
+    └── 2026-03.json
 ```
 
-On build, a data pipeline (`bun run prepare-data`) transforms this monolithic file into optimized, per-category and per-article files so each page only loads what it needs:
+Each month file is an array of articles:
+
+```json
+[
+  {
+    "id_str": "2026146182675013854",
+    "title": "Article title",
+    "preview_text": "Short description...",
+    "original_img_url": "https://img.xarticl.es/...",
+    "screen_name": "author_handle",
+    "created_at": "2026-02-24"
+  }
+]
+```
+
+Scripts read and write the whole catalog through `readArticles()` / `writeArticles()` in `src/lib/articles-store.ts`, which return and take the old single-file shape (`{ "articles": [{ "category", "title", "content": [...] }] }`).
+
+On build, a data pipeline (`bun run prepare-data`) derives per-category and per-article files from it:
 
 ```
 add-slugs → split-data → generate-slug-map → generate-article-metadata → generate-llms
 ```
 
-> **Never edit** `src/data/articles/*.json` or `src/data/article-metadata/*.json` directly — they're generated. Edit `src/data/articles.json` instead.
+> **Never edit** `src/data/articles/*.json` or `src/data/article-metadata/*.json` directly — they're generated. Edit the catalog instead.
 
 ### Adding an article
 
-1. Add an entry to the appropriate category in `src/data/articles.json`
-2. Run `bun run add-slugs` to generate a slug and keep the category alphabetically sorted
+1. Add an entry to `src/data/catalog/<category>/<YYYY-MM>.json`, where `YYYY-MM` is the month of its `created_at` (create the file if it doesn't exist)
+2. Run `bun run add-slugs` to generate a slug and keep each file alphabetically sorted
 3. Run `bun run check-data` to validate before committing
 
 ## Available scripts
@@ -116,7 +124,7 @@ add-slugs → split-data → generate-slug-map → generate-article-metadata →
 ```
 src/
 ├── components/       # React components (Card, Dashboard, CategoryNav, ...)
-├── data/             # articles.json (source of truth) + generated files
+├── data/             # catalog/ (source of truth) + generated files
 ├── layouts/          # Layout.astro — shared page shell
 ├── pages/            # File-based routes
 │   ├── index.astro
@@ -144,7 +152,7 @@ import slugMap from 'elhellal/slug-map';   // slug → category mapping
 
 ## Contributing
 
-Found a great Arabic article that deserves a spot? Contributions are welcome — open a PR against `src/data/articles.json` following the format above, or open an issue with a suggestion.
+Found a great Arabic article that deserves a spot? Contributions are welcome — open a PR against `src/data/catalog/` following the format above, or open an issue with a suggestion.
 
 Before submitting a PR:
 

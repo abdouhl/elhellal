@@ -55,6 +55,7 @@ import { fileURLToPath } from 'url';
 import readline from 'readline';
 import { spawnSync } from 'child_process';
 import type { Article, ArticlesConfig, Category } from '../src/types/index.ts';
+import { readArticles } from '../src/lib/articles-store.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -80,7 +81,16 @@ const MONTH = (() => {
   }
   return { m, y };
 })();
-const ARTICLES_FILE = getArg('--articles-file') || path.join(__dirname, '../src/data/articles.json');
+const ARTICLES_FILE = getArg('--articles-file');
+/** --articles-file overrides the catalog (src/data/catalog/) with one articles.json-shaped file. */
+function readArticleData(): ArticlesConfig {
+  if (!ARTICLES_FILE) return readArticles();
+  if (!fs.existsSync(ARTICLES_FILE)) {
+    console.error(`❌  articles file not found: ${ARTICLES_FILE}`);
+    process.exit(1);
+  }
+  return JSON.parse(fs.readFileSync(ARTICLES_FILE, 'utf-8'));
+}
 // Deliberately NOT under public/ — Astro copies everything in public/ verbatim into dist/,
 // so slideshow PNGs living there would ship to production and eat back into the Cloudflare
 // Workers static-asset budget (see the 20,000-file limit fix elsewhere in this project).
@@ -165,7 +175,7 @@ interface FeaturedArticle {
 }
 
 function loadCandidateArticles(): FeaturedArticle[] {
-  const data: ArticlesConfig = JSON.parse(fs.readFileSync(ARTICLES_FILE, 'utf-8'));
+  const data: ArticlesConfig = readArticleData();
   const all: FeaturedArticle[] = [];
   (data.articles as Category[]).forEach((cat) => {
     cat.content.forEach((article) => {

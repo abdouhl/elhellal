@@ -5,7 +5,7 @@
  * Every day gets three kinds of post, scheduled through x.com's own
  * "Schedule post" dialog using the session you are already logged into in
  * Chrome (no API keys):
- *   - 4 articles   tldr + elhellal.com link (from src/data/articles.json)
+ *   - 4 articles   tldr + elhellal.com link (from the catalog, src/data/catalog/)
  *   - 2 quizzes    a question + its quiz.elhellal.com/q/<id>/ link — X shows
  *                  the question's OG image (from ../elhellal-quiz)
  *   - 1 book       "الكتاب / الدرس" with 1-book.png + 2-lesson.png from
@@ -45,6 +45,7 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { Article, Category } from "../src/types";
+import { readArticles } from "../src/lib/articles-store.ts";
 
 const ROOT = join(import.meta.dir, "..");
 const OUT_DIR = join(ROOT, ".x-schedule");
@@ -183,7 +184,7 @@ function buildTweet(a: Article): string {
 }
 
 // ── pick articles ──────────────────────────────────────────────────────
-const data = JSON.parse(readFileSync(join(ROOT, "src/data/articles.json"), "utf8")) as { articles: Category[] };
+const data = readArticles() as { articles: Category[] };
 mkdirSync(OUT_DIR, { recursive: true });
 const posted: Record<string, string> = existsSync(STATE_FILE) ? JSON.parse(readFileSync(STATE_FILE, "utf8")) : {};
 

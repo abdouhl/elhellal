@@ -1,20 +1,25 @@
 /**
  * Post-build step (runs after `astro build`): prepares everything the site
- * Worker (workers/site/) needs to serve /articles/<slug>/ pages on demand.
+ * Worker (workers/site/) needs to serve article, tag and author pages on
+ * demand.
  *
- *  1. Writes every articles.json article as a precomputed ArticleRecord into
+ *  1. Writes every catalog article as a precomputed ArticleRecord into
  *     dist/_data/articles/<shard>.json (see src/lib/article-page.ts).
- *  2. Moves the article shell (dist/articles/__shell__/index.html) out of
- *     dist/ into .worker-build/, where the Worker bundles it as a string — so
- *     the token-filled template is never served as a page of its own.
- *  3. Writes .worker-build/meta.json with a build id the Worker uses to key
+ *  2. Writes every tag and catalog author as a ListingRecord into
+ *     dist/_data/listings/<shard>.json, and the feed pages of the big ones
+ *     into dist/_data/feeds/<shard>.json (see src/lib/listing-page.ts).
+ *  3. Moves the page shells (dist/{articles,tags,authors}/__shell__/) out of
+ *     dist/ into .worker-build/, where the Worker bundles them as strings — so
+ *     the token-filled templates are never served as pages of their own.
+ *  4. Writes .worker-build/meta.json with a build id the Worker uses to key
  *     its edge cache, so a deploy never serves pages cached from the last one.
+ *  5. Lists the Worker-rendered pages in sitemaps, since Astro doesn't know them.
  */
 
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import type { ArticlesConfig, Article } from '../src/types/index.ts';
+import type { Article } from '../src/types/index.ts';
 import {
     ARTICLE_SHELL_SLUG,
     SHARD_COUNT,
@@ -22,25 +27,50 @@ import {
     type ArticleRecord,
     type ArticleShard,
 } from '../src/lib/article-page.ts';
-import { normalizeTag, slugifyTag, MIN_TAG_ARTICLES } from '../src/utils/tag-slug.ts';
+import {
+    LISTING_INITIAL,
+    LISTING_SHARDS,
+    LISTING_SHELL_SLUG,
+    LISTING_TILES,
+    listingKey,
+    listingName,
+    listingShardOf,
+    type AuthorRecord,
+    type ListingRecord,
+    type ListingShard,
+} from '../src/lib/listing-page.ts';
+import {
+    FEED_PAGE_SIZE,
+    LISTING_FEED_SHARDS,
+    compareAlpha,
+    listingFeedKey,
+    listingFeedShardOf,
+    toFeedCard,
+    type FeedCard,
+    type FeedSort,
+} from '../src/lib/feed.ts';
+import { fnv1a } from '../src/lib/hash.ts';
+import { loadArticles } from '../src/lib/articles-data.ts';
+import { slugifyTag } from '../src/utils/tag-slug.ts';
+import { getQualifyingTags, getQualifyingTagSlugSet } from '../src/utils/tags.ts';
+import { categoryTiles, tagTiles } from '../src/utils/exploreTiles.ts';
+import { buildAuthorIndex } from '../src/utils/author-index.ts';
+import { personalBlogs } from '../src/data/personal-blogs.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 const DIST = path.join(ROOT, 'dist');
-const SHARD_DIR = path.join(DIST, '_data', 'articles');
-const SHELL_SRC = path.join(DIST, 'articles', ARTICLE_SHELL_SLUG, 'index.html');
+const DATA_DIR = path.join(DIST, '_data');
 const WORKER_BUILD = path.join(ROOT, '.worker-build');
 
-const RELATED_COUNT = 3;
+/** Prerendered shells: dist/<section>/__shell__/index.html → .worker-build/<name> */
+const SHELLS = [
+    { section: 'articles', slug: ARTICLE_SHELL_SLUG, out: 'article-shell.html' },
+    { section: 'tags', slug: LISTING_SHELL_SLUG, out: 'tag-shell.html' },
+    { section: 'authors', slug: LISTING_SHELL_SLUG, out: 'author-shell.html' },
+].map((s) => ({ ...s, src: path.join(DIST, s.section, s.slug, 'index.html') }));
 
-function fnv1a(text: string): number {
-    let hash = 0x811c9dc5;
-    for (let i = 0; i < text.length; i++) {
-        hash ^= text.charCodeAt(i);
-        hash = Math.imul(hash, 0x01000193);
-    }
-    return hash >>> 0;
-}
+const RELATED_COUNT = 3;
 
 /** Up to RELATED_COUNT other articles of the category, picked deterministically per slug. */
 function pickRelated(articles: Article[], self: Article): Article[] {
@@ -76,27 +106,22 @@ function formatDateAr(dateStr: string): string {
     return m && month ? `${Number(m[3])} ${month} ${m[1]}` : dateStr;
 }
 
-function main() {
-    if (!fs.existsSync(SHELL_SRC)) {
-        throw new Error(`Article shell not found at ${SHELL_SRC} — run \`astro build\` first.`);
-    }
+function writeShards(dir: string, shards: object[]): number {
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.mkdirSync(dir, { recursive: true });
+    let largest = 0;
+    shards.forEach((shard, i) => {
+        const json = JSON.stringify(shard);
+        largest = Math.max(largest, json.length);
+        fs.writeFileSync(path.join(dir, `${i}.json`), json);
+    });
+    return largest;
+}
 
-    const data: ArticlesConfig = JSON.parse(
-        fs.readFileSync(path.join(ROOT, 'src/data/articles.json'), 'utf-8')
-    );
-
-    // Same counting as buildTagIndex() in src/utils/tags.ts: a tag gets a page
-    // once it has MIN_TAG_ARTICLES keyword occurrences.
-    const tagCounts = new Map<string, number>();
-    for (const cat of data.articles) {
-        for (const article of cat.content) {
-            for (const kw of article.keywords || []) {
-                if (!normalizeTag(kw)) continue;
-                const slug = slugifyTag(kw);
-                if (slug) tagCounts.set(slug, (tagCounts.get(slug) || 0) + 1);
-            }
-        }
-    }
+function buildArticleShards(categoryTitles: Record<string, string>) {
+    const data = loadArticles();
+    // A tag gets a page once it has MIN_TAG_ARTICLES keyword occurrences.
+    const tagPages = getQualifyingTagSlugSet();
 
     const shards: ArticleShard[] = Array.from({ length: SHARD_COUNT }, () => ({}));
     let count = 0;
@@ -129,11 +154,11 @@ function main() {
                 whoShouldRead: a.whoShouldRead,
                 metaDescription: a.metaDescription,
                 category: cat.category,
-                categoryTitle: cat.title || cat.category.charAt(0).toUpperCase() + cat.category.slice(1),
+                categoryTitle: categoryTitles[cat.category]!,
                 dateAr: formatDateAr(a.created_at),
                 keywords: a.keywords?.map((kw): [string, string | null] => {
                     const slug = slugifyTag(kw);
-                    return [kw, (tagCounts.get(slug) || 0) >= MIN_TAG_ARTICLES ? slug : null];
+                    return [kw, tagPages.has(slug) ? slug : null];
                 }),
                 related: pickRelated(cat.content, a).map((r) => [
                     r.slug!,
@@ -146,41 +171,192 @@ function main() {
             count++;
         }
     }
+    return { shards, count, duplicates };
+}
 
-    fs.rmSync(SHARD_DIR, { recursive: true, force: true });
-    fs.mkdirSync(SHARD_DIR, { recursive: true });
-    let largest = 0;
-    shards.forEach((shard, i) => {
-        const json = JSON.stringify(shard);
-        largest = Math.max(largest, json.length);
-        fs.writeFileSync(path.join(SHARD_DIR, `${i}.json`), json);
+/** Newest first, like the static listing pages sorted (stable for equal dates). */
+function byNewest<T extends { created_at: string }>(a: T, b: T): number {
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+}
+
+function buildListingShards(categoryTitles: Record<string, string>) {
+    const listings: ListingShard[] = Array.from({ length: LISTING_SHARDS }, () => ({}));
+    const feeds: Array<Record<string, FeedCard[]>> = Array.from({ length: LISTING_FEED_SHARDS }, () => ({}));
+    let tagCount = 0;
+    let authorCount = 0;
+    let pagedCount = 0;
+
+    const add = (record: ListingRecord, cards: FeedCard[]) => {
+        const key = listingKey(record.kind, listingName(record));
+        listings[listingShardOf(key)]![key] = record;
+        if (cards.length <= LISTING_INITIAL) return;
+        // Big listings page through the rest (see fetchFeedPage in src/lib/feed.ts).
+        pagedCount++;
+        const sorts: Array<[FeedSort, FeedCard[]]> = [
+            ['newest', cards],
+            ['alpha', [...cards].sort(compareAlpha)],
+        ];
+        for (const [sort, list] of sorts) {
+            for (let page = 0; page * FEED_PAGE_SIZE < list.length; page++) {
+                const feedKey = listingFeedKey(key, sort, page);
+                feeds[listingFeedShardOf(feedKey)]![feedKey] = list.slice(page * FEED_PAGE_SIZE, (page + 1) * FEED_PAGE_SIZE);
+            }
+        }
+    };
+
+    for (const tag of getQualifyingTags()) {
+        // An article listing the same keyword twice is indexed twice; show it once.
+        const seen = new Set<string>();
+        const cards = [...tag.articles]
+            .sort(byNewest)
+            .filter((a) => a.slug && !seen.has(a.slug) && !!seen.add(a.slug))
+            .map((a) => toFeedCard(a, a.category));
+        add(
+            {
+                kind: 'tag',
+                slug: tag.slug,
+                label: tag.label,
+                total: cards.length,
+                cards: cards.slice(0, LISTING_INITIAL),
+                // Tags that show up alongside this one
+                tiles: tagTiles(tag.articles, [tag.slug], LISTING_TILES),
+            },
+            cards
+        );
+        tagCount++;
+    }
+
+    // Personal-blog writers keep their prerendered pages.
+    const personal = new Set(Object.values(personalBlogs).map((p) => p.slug as string));
+    for (const author of buildAuthorIndex().values()) {
+        if (personal.has(author.screen_name)) continue;
+        const sorted = [...author.articles].sort(byNewest);
+        const cards = sorted.map((a) => toFeedCard(a, a.category));
+
+        const categoryCounts = new Map<string, number>();
+        for (const a of author.articles) {
+            const label = categoryTitles[a.category] || a.category;
+            categoryCounts.set(label, (categoryCounts.get(label) || 0) + 1);
+        }
+
+        // External profile link: their Substack, else the source site, else X.
+        let source: URL | undefined;
+        try {
+            const firstUrl = author.articles.find((a) => a.url)?.url;
+            source = firstUrl ? new URL(firstUrl) : undefined;
+        } catch {
+            // Malformed URL: fall back to X.
+        }
+        const sourceHost = source?.hostname.replace(/^www\./, '');
+        const isSubstack = !!sourceHost && sourceHost.endsWith('substack.com');
+
+        const record: AuthorRecord = {
+            kind: 'author',
+            screen_name: author.screen_name,
+            displayName: author.displayName,
+            profileImage: author.profileImage,
+            latestDateAr: sorted[0] ? formatDateAr(sorted[0].created_at) : undefined,
+            profileUrl: isSubstack
+                ? `https://${author.screen_name}.substack.com`
+                : source?.origin ?? `https://x.com/${author.screen_name}`,
+            profileLinkLabel: isSubstack ? 'Substack' : (sourceHost ?? 'عرض على X'),
+            topCategories: [...categoryCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5),
+            total: cards.length,
+            cards: cards.slice(0, LISTING_INITIAL),
+            tiles: categoryTiles(author.articles, LISTING_TILES),
+        };
+        add(record, cards);
+        authorCount++;
+    }
+
+    return { listings, feeds, tagCount, authorCount, pagedCount };
+}
+
+/**
+ * The listing shells' MasonryFeed island is rendered by the Worker per page:
+ * swap its serialized props and server-rendered HTML for raw tokens.
+ */
+function tokenizeFeedIsland(html: string, name: string): string {
+    const island = /(<astro-island\b[^>]*component-url="[^"]*\/MasonryFeed\.[^"]*"[^>]*>)([\s\S]*?)(<\/astro-island>)/g;
+    let count = 0;
+    const result = html.replace(island, (_, open: string, inner: string, end: string) => {
+        count++;
+        const withProps = open.replace(/\sprops="[^"]*"/, ' props="{{{feedProps}}}"');
+        if (withProps === open) throw new Error(`${name}: MasonryFeed island has no props attribute`);
+        // Islands with await-children hydrate once this marker has been parsed.
+        const endMarker = inner.endsWith('<!--astro:end-->') ? '<!--astro:end-->' : '';
+        return `${withProps}{{{feedHtml}}}${endMarker}${end}`;
     });
+    if (count !== 1) throw new Error(`${name}: expected 1 MasonryFeed island, found ${count}`);
+    return result;
+}
 
-    // Island props are JSON inside an attribute, so the shell passes values
-    // there as {{jt:x}}. React's server render echoes those props into plain
-    // markup too (e.g. BookmarkButton's aria-label), where JSON escaping
-    // would show as stray backslashes — downgrade those to {{x}}.
-    const shell = fs
-        .readFileSync(SHELL_SRC, 'utf-8')
-        .split(/(\sprops="[^"]*")/)
-        .map((part, i) => (i % 2 === 1 ? part : part.replace(/\{\{jt:/g, '{{')))
-        .join('');
-
+function moveShells() {
     fs.mkdirSync(WORKER_BUILD, { recursive: true });
-    fs.writeFileSync(path.join(WORKER_BUILD, 'article-shell.html'), shell);
-    fs.rmSync(SHELL_SRC);
-    fs.rmSync(path.dirname(SHELL_SRC), { recursive: true, force: true });
+    for (const shell of SHELLS) {
+        let html = fs.readFileSync(shell.src, 'utf-8');
+        if (shell.section === 'articles') {
+            // Island props are JSON inside an attribute, so the shell passes values
+            // there as {{jt:x}}. React's server render echoes those props into plain
+            // markup too (e.g. BookmarkButton's aria-label), where JSON escaping
+            // would show as stray backslashes — downgrade those to {{x}}.
+            html = html
+                .split(/(\sprops="[^"]*")/)
+                .map((part, i) => (i % 2 === 1 ? part : part.replace(/\{\{jt:/g, '{{')))
+                .join('');
+        } else {
+            html = tokenizeFeedIsland(html, shell.out);
+        }
+        fs.writeFileSync(path.join(WORKER_BUILD, shell.out), html);
+        fs.rmSync(path.dirname(shell.src), { recursive: true, force: true });
+    }
+}
+
+function main() {
+    for (const shell of SHELLS) {
+        if (!fs.existsSync(shell.src)) {
+            throw new Error(`Shell not found at ${shell.src} — run \`astro build\` first.`);
+        }
+    }
+
+    const categoryTitles: Record<string, string> = {};
+    for (const cat of loadArticles().articles) {
+        categoryTitles[cat.category] = cat.title || cat.category.charAt(0).toUpperCase() + cat.category.slice(1);
+    }
+
+    const articles = buildArticleShards(categoryTitles);
+    const largestArticles = writeShards(path.join(DATA_DIR, 'articles'), articles.shards);
+
+    const listings = buildListingShards(categoryTitles);
+    const largestListings = writeShards(path.join(DATA_DIR, 'listings'), listings.listings);
+    const largestFeeds = writeShards(path.join(DATA_DIR, 'feeds'), listings.feeds);
+
+    moveShells();
     fs.writeFileSync(
         path.join(WORKER_BUILD, 'meta.json'),
-        JSON.stringify({ buildId: Date.now().toString(36) })
+        JSON.stringify({ buildId: Date.now().toString(36), categoryTitles })
     );
 
-    const sitemapCount = writeArticleSitemaps(shards);
+    const articlePaths = articles.shards
+        .flatMap((shard) => Object.values(shard))
+        .sort((a, b) => b.created_at.localeCompare(a.created_at) || a.slug.localeCompare(b.slug))
+        .map((r) => ({ path: `/articles/${encodeURIComponent(r.slug)}/`, lastmod: r.created_at }));
+    const listingPaths = listings.listings
+        .flatMap((shard) => Object.values(shard))
+        .map((r) => `/${r.kind === 'tag' ? 'tags' : 'authors'}/${encodeURIComponent(listingName(r))}/`)
+        .sort()
+        .map((p) => ({ path: p }));
+    const sitemapCount = writeSitemaps('articles', articlePaths) + writeSitemaps('listings', listingPaths);
 
+    const kb = (n: number) => `${(n / 1024).toFixed(0)} KB`;
     console.log(
-        `✅ Worker data: ${count} articles in ${SHARD_COUNT} shards ` +
-        `(largest ${(largest / 1024).toFixed(0)} KB), ${sitemapCount} article sitemaps` +
-        (duplicates ? `, skipped ${duplicates} duplicate slugs` : '')
+        `✅ Worker data: ${articles.count} articles in ${SHARD_COUNT} shards (largest ${kb(largestArticles)})` +
+        (articles.duplicates ? `, skipped ${articles.duplicates} duplicate slugs` : '')
+    );
+    console.log(
+        `✅ Listings: ${listings.tagCount} tags + ${listings.authorCount} authors in ${LISTING_SHARDS} shards ` +
+        `(largest ${kb(largestListings)}); ${listings.pagedCount} paged feeds in ${LISTING_FEED_SHARDS} shards ` +
+        `(largest ${kb(largestFeeds)}); ${sitemapCount} sitemaps`
     );
 }
 
@@ -193,32 +369,28 @@ function escapeXml(text: string): string {
 }
 
 /**
- * Worker-rendered articles aren't pages Astro knows about, so @astrojs/sitemap
- * doesn't list them. Writes dist/sitemap-articles-N.xml and adds them to the
+ * Worker-rendered pages aren't pages Astro knows about, so @astrojs/sitemap
+ * doesn't list them. Writes dist/sitemap-<name>-N.xml and adds them to the
  * sitemap-index.xml that @astrojs/sitemap generated.
  */
-function writeArticleSitemaps(shards: ArticleShard[]): number {
-    const records = shards
-        .flatMap((shard) => Object.values(shard))
-        .sort((a, b) => b.created_at.localeCompare(a.created_at) || a.slug.localeCompare(b.slug));
-
-    for (const old of fs.readdirSync(DIST).filter((f) => f.startsWith('sitemap-articles-'))) {
+function writeSitemaps(name: string, pages: Array<{ path: string; lastmod?: string }>): number {
+    const prefix = `sitemap-${name}-`;
+    for (const old of fs.readdirSync(DIST).filter((f) => f.startsWith(prefix))) {
         fs.rmSync(path.join(DIST, old));
     }
 
     const files: string[] = [];
-    for (let i = 0; i < records.length; i += SITEMAP_CHUNK) {
-        const urls = records.slice(i, i + SITEMAP_CHUNK).map((r) => {
-            const loc = `${SITE}/articles/${encodeURIComponent(r.slug)}/`;
-            const lastmod = /^\d{4}-\d{2}-\d{2}$/.test(r.created_at) ? `<lastmod>${r.created_at}</lastmod>` : '';
-            return `<url><loc>${escapeXml(loc)}</loc>${lastmod}</url>`;
+    for (let i = 0; i < pages.length; i += SITEMAP_CHUNK) {
+        const urls = pages.slice(i, i + SITEMAP_CHUNK).map((p) => {
+            const lastmod = p.lastmod && /^\d{4}-\d{2}-\d{2}$/.test(p.lastmod) ? `<lastmod>${p.lastmod}</lastmod>` : '';
+            return `<url><loc>${escapeXml(SITE + p.path)}</loc>${lastmod}</url>`;
         });
-        const name = `sitemap-articles-${files.length}.xml`;
+        const file = `${prefix}${files.length}.xml`;
         fs.writeFileSync(
-            path.join(DIST, name),
+            path.join(DIST, file),
             `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.join('')}</urlset>`
         );
-        files.push(name);
+        files.push(file);
     }
 
     const indexPath = path.join(DIST, 'sitemap-index.xml');
@@ -229,7 +401,7 @@ function writeArticleSitemaps(shards: ArticleShard[]): number {
     // Drop entries from a previous run so re-running stays idempotent.
     const index = fs
         .readFileSync(indexPath, 'utf-8')
-        .replace(/<sitemap><loc>[^<]*\/sitemap-articles-\d+\.xml<\/loc><\/sitemap>/g, '');
+        .replace(new RegExp(`<sitemap><loc>[^<]*/${prefix}\\d+\\.xml</loc></sitemap>`, 'g'), '');
     if (!index.includes('</sitemapindex>')) throw new Error('Unexpected sitemap-index.xml format');
     fs.writeFileSync(indexPath, index.replace('</sitemapindex>', `${entries}</sitemapindex>`));
     return files.length;

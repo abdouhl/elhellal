@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import type { ArticlesConfig, Category, Article } from '../src/types/index.ts';
+import { bucketFiles, bucketOf, readArticles } from '../src/lib/articles-store.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,7 +28,6 @@ const issues: ValidationIssues = {
 let totalTools = 0;
 let totalSplitTools = 0;
 
-const toolsPath = path.join(__dirname, '../src/data/articles.json');
 const splitDataDir = path.join(__dirname, '../src/data/articles');
 
 function validateTool(tool: Article, source: string) {
@@ -56,20 +56,31 @@ function validateTool(tool: Article, source: string) {
 }
 
 try {
-    // 1. Check monolithic tools.json
-    console.log("Checking articles.json...");
-    const data: ArticlesConfig = JSON.parse(fs.readFileSync(toolsPath, 'utf-8'));
+    // 1. Check the catalog files (src/data/catalog/): each must be an array of
+    //    articles from its month, in alphabetical order.
+    console.log("Checking the article catalog...");
+    const data: ArticlesConfig = readArticles();
     data.articles.forEach((category: Category) => {
-        let lastTool: Article | null = null;
-        category.content.forEach((tool: Article) => {
-            totalTools++;
-            validateTool(tool, "articles.json");
-
-            if (lastTool && tool.title.localeCompare(lastTool.title) < 0) {
-                issues.out_of_order.push(`${tool.title} (should be before ${lastTool.title}) in category ${category.category}`);
+        for (const file of bucketFiles(category.category)) {
+            const name = `${category.category}/${path.basename(file)}`;
+            const content = JSON.parse(fs.readFileSync(file, 'utf-8'));
+            if (!Array.isArray(content)) {
+                issues.invalid_structure.push(`File: ${name} - Expected Array, got ${typeof content}`);
+                continue;
             }
-            lastTool = tool;
-        });
+            let lastTool: Article | null = null;
+            (content as Article[]).forEach((tool) => {
+                totalTools++;
+                validateTool(tool, name);
+                if (`${bucketOf(tool)}.json` !== path.basename(file)) {
+                    issues.invalid_structure.push(`${tool.title} (created_at ${tool.created_at}) is in the wrong file: ${name}`);
+                }
+                if (lastTool && tool.title.localeCompare(lastTool.title) < 0) {
+                    issues.out_of_order.push(`${tool.title} (should be before ${lastTool.title}) in ${name}`);
+                }
+                lastTool = tool;
+            });
+        }
     });
 
     // 2. Check split files
@@ -131,7 +142,7 @@ try {
     }
 
     if (issues.invalid_structure.length > 0) {
-        console.log("\n❌ Invalid JSON Structure (Split Files):");
+        console.log("\n❌ Invalid JSON Structure:");
         issues.invalid_structure.forEach(i => console.log(`   - ${i}`));
     }
 
