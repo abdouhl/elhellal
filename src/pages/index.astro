@@ -50,9 +50,9 @@ const categoryTitles = getCategoryTitles();
       moreLabel="المزيد من التصنيفات"
       lessLabel="تصنيفات أقل"
     />
-    <MostRead client:load categoryTitles={categoryTitles} />
+    <MostRead client:idle categoryTitles={categoryTitles} />
     <MasonryFeed
-      client:load
+      client:idle
       scope="all"
       total={feed.newest.length}
       initialCards={feed.newest.slice(0, FEED_INITIAL)}

@@ -233,9 +233,9 @@ const breadcrumbs = [
       lessLabel="أقل"
     />
     {isShell ? (
-      <MasonryFeed client:load cards={[]} categoryTitles={{}} />
+      <MasonryFeed client:idle cards={[]} categoryTitles={{}} />
     ) : (
-      <MasonryFeed client:load cards={personal!.feedCards} categoryTitles={getCategoryTitles()} />
+      <MasonryFeed client:idle cards={personal!.feedCards} categoryTitles={getCategoryTitles()} />
     )}
 
     <div class="page-nav">

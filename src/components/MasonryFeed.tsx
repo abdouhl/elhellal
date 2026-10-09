@@ -95,7 +95,10 @@ export default function MasonryFeed({ scope, total = 0, initialCards = [], cards
     const [seed, setSeed] = useState(42);
     const [searchQuery, setSearchQuery] = useState('');
     const [filterNew, setFilterNew] = useState(false);
-    const [displayedCount, setDisplayedCount] = useState(ITEMS_PER_PAGE);
+    // Big feeds start with just their server-rendered cards and grow on scroll.
+    const [displayedCount, setDisplayedCount] = useState(
+        cards === undefined && initialCards.length > 0 ? initialCards.length : ITEMS_PER_PAGE
+    );
     const loaderRef = useRef<HTMLDivElement>(null);
     const columnCount = useColumnCount();
     const pageCache = useRef(new Map<string, Promise<FeedCard[]>>());
@@ -159,7 +162,12 @@ export default function MasonryFeed({ scope, total = 0, initialCards = [], cards
     const [run, setRun] = useState<Run>(initialRun);
     const current = run.key === runKey ? run : initialRun();
 
+    const mounted = useRef(false);
     useEffect(() => {
+        if (!mounted.current) {
+            mounted.current = true;
+            return;
+        }
         setDisplayedCount(ITEMS_PER_PAGE);
     }, [runKey, seed, sort]);
 
@@ -229,7 +237,7 @@ export default function MasonryFeed({ scope, total = 0, initialCards = [], cards
             if (entries[0]?.isIntersecting && hasMore && !current.loading) {
                 setDisplayedCount((prev) => prev + ITEMS_PER_PAGE);
             }
-        }, { threshold: 0.1 });
+        }, { rootMargin: '0px 0px 800px 0px' });
         if (loaderRef.current) observer.observe(loaderRef.current);
         return () => observer.disconnect();
     }, [hasMore, current.loading, filteredCards.length]);
