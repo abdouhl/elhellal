@@ -101,10 +101,12 @@ const {
         <link rel="apple-touch-icon" href="/icon-192.png" />
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#000000" />
-        <!-- Only the body font is preloaded: the ROM fonts are Latin-only (Arabic
-             text renders in system fonts), so they only matter for digits and Latin
-             words, and three preloads competed with the LCP image on mobile. -->
+        <!-- Body and heading fonts are preloaded: once one loads it sets the line
+             height of its text (Arabic included), so a late swap would shift the
+             page. ROM-Mono only styles small labels and isn't worth the bandwidth
+             competing with the LCP image. -->
         <link rel="preload" href="/fonts/rom-regular-latin.woff2" as="font" type="font/woff2" crossorigin />
+        <link rel="preload" href="/fonts/rom-bold-latin.woff2" as="font" type="font/woff2" crossorigin />
         <meta name="generator" content={Astro.generator} />
         <title>
             {
