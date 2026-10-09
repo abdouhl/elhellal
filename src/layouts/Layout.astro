@@ -329,7 +329,12 @@ const {
     :root {
         --accent: var(--link);
         --body-copy: "ROM-Regular", var(--system-ui);
-        --monospace: "ROM-Mono", var(--monospace-code);
+        /* ROM-Mono has no Arabic glyphs, and with a monospace primary font the
+           browser's last-resort fallback sets Arabic in Courier New, which
+           spaces out every letter and breaks joining. Name proportional Arabic
+           system fonts explicitly (the same ones body text falls back to). */
+        --monospace: "ROM-Mono", "Geeza Pro", "Noto Sans Arabic", "Segoe UI",
+            Tahoma, var(--system-ui);
         --body-strong: "ROM-Bold", var(--system-ui);
         font-synthesis: none;
         text-rendering: optimizeLegibility;
@@ -370,6 +375,15 @@ const {
         padding: 0;
         width: 100%;
         overflow-x: hidden;
+    }
+
+    /* Tracking breaks Arabic letter joining — never letter-space Arabic text.
+       !important so it also beats component-scoped label styles. */
+    :lang(ar),
+    :lang(ar) *,
+    [dir="rtl"],
+    [dir="rtl"] * {
+        letter-spacing: 0 !important;
     }
     
     /* Skip link for accessibility */
@@ -753,6 +767,7 @@ const {
         font-family: var(--monospace);
         font-size: var(--desktop-caption);
         line-height: var(--lh-desktop-caption);
+        white-space: nowrap;
         text-decoration: none;
         transition: color 0.15s ease;
     }
@@ -861,10 +876,93 @@ const {
             margin: auto var(--spacing-06);
         }
         .site-header-inner {
-            padding: var(--spacing-05) var(--spacing-05) 0;
+            padding: var(--spacing-03) 16px 0;
         }
         .container {
             margin: var(--spacing-06);
+        }
+
+        /* Header stacks: icons in a slim top bar, then logo, then tagline. */
+        .site-header-top {
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: var(--spacing-02);
+            padding-bottom: var(--spacing-05);
+        }
+        .header-actions {
+            order: -1;
+            flex: 1 0 100%;
+            justify-content: flex-end;
+            gap: var(--spacing-01);
+        }
+        .social-links,
+        .new-filter-toggle {
+            margin-right: 0;
+        }
+        .header-brand {
+            flex: 1 0 100%;
+        }
+        .brand-tagline {
+            font-size: 13.5px;
+            line-height: 1.6;
+            text-wrap: balance;
+            margin-top: var(--spacing-02);
+        }
+
+        /* Sister-site nav: one swipeable row with a fade on the overflow edge
+           (the left, in RTL). The end padding lets the last item clear the fade. */
+        .sister-sites {
+            gap: 0;
+            padding: 0 0 0 32px;
+            scroll-snap-type: x proximity;
+            -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 32px), transparent);
+            mask-image: linear-gradient(to left, #000 calc(100% - 32px), transparent);
+        }
+        .sister-site {
+            display: inline-flex;
+            align-items: center;
+            min-height: 44px;
+            padding: 0 var(--spacing-04);
+            border-radius: 0;
+            font-size: 14px;
+            scroll-snap-align: start;
+        }
+        .sister-site:hover {
+            background-color: transparent;
+        }
+        .sister-site.is-current {
+            box-shadow: inset 0 -2px 0 var(--accent);
+        }
+
+        .header-search-row {
+            padding: var(--spacing-03) 0 var(--spacing-04);
+        }
+        .header-search-row .search-input {
+            font-size: 16px; /* below 16px iOS Safari zooms in on focus */
+        }
+
+        /* Footer: an even grid of whole links, copyright on its own row, and
+           room at the bottom so an anchor ad never covers the links. */
+        .footer {
+            padding: var(--spacing-06) 16px
+                calc(env(safe-area-inset-bottom, 0px) + 96px);
+        }
+        .footer-nav {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0 var(--spacing-02);
+            margin-bottom: var(--spacing-04);
+        }
+        .footer-separator {
+            display: none;
+        }
+        .footer-nav a {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 44px;
+            font-size: 13px;
+            white-space: nowrap;
         }
     }
 

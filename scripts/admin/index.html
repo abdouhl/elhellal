@@ -6,88 +6,117 @@
 <title>elhellal admin</title>
 <style>
   :root {
-    --bg: #f6f6f4; --panel: #fff; --text: #1d1d1b; --muted: #6b6b66; --line: #e3e3de;
-    --accent: #2459d6; --danger: #c62f2f; --ok: #1f8a4c; --warn-bg: #fff4d6; --warn: #7a5800;
+    --bg: #f5f5f3; --panel: #fff; --side: #fbfbfa; --text: #1c1c1a; --muted: #6e6e68; --line: #e6e6e1; --hover: #f0f0ed;
+    --accent: #2459d6; --accent-soft: #e8eefc; --danger: #c62f2f; --danger-soft: #fdecec; --ok: #1f8a4c; --warn-bg: #fff4d6; --warn: #7a5800;
+    --radius: 10px; --shadow: 0 1px 2px rgba(0,0,0,.04);
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #141414; --panel: #1d1d1d; --text: #ececea; --muted: #9a9a94; --line: #2f2f2d;
-      --accent: #7aa2ff; --danger: #ff6b6b; --ok: #4cc283; --warn-bg: #3a3014; --warn: #f3d47a;
+      --bg: #121212; --panel: #1b1b1b; --side: #161616; --text: #ececea; --muted: #9a9a94; --line: #2c2c2a; --hover: #232323;
+      --accent: #7aa2ff; --accent-soft: #1d2740; --danger: #ff6b6b; --danger-soft: #3a1c1c; --ok: #4cc283; --warn-bg: #3a3014; --warn: #f3d47a;
+      --shadow: none;
     }
   }
   * { box-sizing: border-box; }
-  body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif; background: var(--bg); color: var(--text); }
-  header { position: sticky; top: 0; z-index: 5; background: var(--panel); border-bottom: 1px solid var(--line); padding: 10px 16px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
-  header h1 { font-size: 16px; margin: 0; }
-  nav { display: flex; gap: 4px; flex-wrap: wrap; }
-  nav button { background: none; border: 0; padding: 6px 10px; border-radius: 6px; color: var(--muted); cursor: pointer; font: inherit; }
-  nav button.active { background: var(--bg); color: var(--text); font-weight: 600; }
-  .stats { color: var(--muted); margin-inline-start: auto; font-size: 13px; }
-  main { max-width: 1100px; margin: 0 auto; padding: 16px; }
-  .banner { background: var(--warn-bg); color: var(--warn); padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; }
+  body { margin: 0; font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif; background: var(--bg); color: var(--text); }
+
+  /* Layout: sidebar + content */
+  .app { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+  aside { position: sticky; top: 0; height: 100vh; overflow: auto; background: var(--side); border-inline-end: 1px solid var(--line); padding: 18px 12px; display: flex; flex-direction: column; gap: 4px; }
+  aside .brand { font-weight: 700; font-size: 16px; padding: 0 10px 14px; }
+  aside .group { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 14px 10px 4px; }
+  aside nav { display: flex; flex-direction: column; gap: 2px; }
+  aside nav button { text-align: start; background: none; border: 0; padding: 7px 10px; border-radius: 8px; color: var(--text); cursor: pointer; font: inherit; display: flex; gap: 10px; align-items: center; }
+  aside nav button .ic { width: 18px; text-align: center; opacity: .75; }
+  aside nav button:hover { background: var(--hover); }
+  aside nav button.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  aside .foot .stats { white-space: pre-line; }
+  aside .foot { margin-top: auto; padding: 14px 10px 0; color: var(--muted); font-size: 12px; display: grid; gap: 8px; }
+  .content { min-width: 0; }
+  .pagehead { padding: 22px 28px 0; max-width: 1140px; margin: 0 auto; }
+  .pagehead h1 { font-size: 22px; margin: 0 0 2px; }
+  .pagehead p { margin: 0; color: var(--muted); }
+  main { max-width: 1140px; margin: 0 auto; padding: 18px 28px 40px; }
+
+  .banner { background: var(--warn-bg); color: var(--warn); padding: 10px 14px; border-radius: var(--radius); margin-bottom: 12px; }
   .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
-  input, select, textarea { font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+  input, select, textarea { font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+  input[type=checkbox], input[type=radio] { accent-color: var(--accent); }
   input[type=search] { flex: 1; min-width: 200px; }
-  button.btn { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 6px; padding: 5px 10px; cursor: pointer; white-space: nowrap; }
-  button.btn:hover { border-color: var(--muted); }
+  button.btn { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 8px; padding: 6px 12px; cursor: pointer; white-space: nowrap; box-shadow: var(--shadow); }
+  button.btn:hover:not(:disabled) { background: var(--hover); }
   button.danger { color: var(--danger); }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-  button:disabled { opacity: .5; cursor: default; }
-  .list { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
-  .row { display: flex; gap: 12px; padding: 10px 12px; border-top: 1px solid var(--line); align-items: flex-start; }
+  button.danger:hover:not(:disabled) { background: var(--danger-soft); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.primary:hover:not(:disabled) { background: var(--accent); filter: brightness(1.08); }
+  button.big { padding: 9px 16px; }
+  button:disabled { opacity: .45; cursor: default; }
+  .list { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+  .row { display: flex; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--line); align-items: flex-start; }
   .row:first-child { border-top: 0; }
-  .row img { width: 64px; height: 44px; object-fit: cover; border-radius: 4px; background: var(--bg); flex: none; }
+  .row:hover { background: color-mix(in srgb, var(--hover) 50%, transparent); }
+  .row img { width: 72px; height: 48px; object-fit: cover; border-radius: 6px; background: var(--bg); flex: none; }
   .row .body { flex: 1; min-width: 0; }
   .row .title { font-weight: 600; }
   .row .preview { color: var(--muted); font-size: 13px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .meta { color: var(--muted); font-size: 12px; display: flex; gap: 10px; flex-wrap: wrap; margin-top: 2px; }
   .meta a, .link { color: var(--accent); text-decoration: none; cursor: pointer; }
   .actions { display: flex; gap: 6px; flex: none; flex-wrap: wrap; justify-content: flex-end; }
-  .pill { font-size: 11px; padding: 1px 6px; border-radius: 99px; background: var(--bg); border: 1px solid var(--line); }
+  .pill { font-size: 11px; padding: 1px 8px; border-radius: 99px; background: var(--bg); border: 1px solid var(--line); }
   .pill.bad { color: var(--danger); border-color: currentColor; }
   .pill.ok { color: var(--ok); border-color: currentColor; }
-  .empty { padding: 30px; text-align: center; color: var(--muted); }
-  .pager { display: flex; gap: 8px; justify-content: center; align-items: center; margin: 12px 0; color: var(--muted); }
-  .edit { display: grid; gap: 6px; margin-top: 8px; }
+  .empty { padding: 36px; text-align: center; color: var(--muted); }
+  .pager { display: flex; gap: 8px; justify-content: center; align-items: center; margin: 14px 0; color: var(--muted); }
+  .edit { display: grid; gap: 6px; margin-top: 10px; }
   .edit textarea { min-height: 70px; }
   .edit .two { display: flex; gap: 6px; flex-wrap: wrap; }
-  h2 { font-size: 15px; margin: 18px 0 8px; }
-  #toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 8px 14px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  h2 { font-size: 15px; margin: 22px 0 10px; }
+  details > summary { cursor: pointer; }
+  #toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 9px 16px; border-radius: 10px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 20; max-width: 90vw; }
   #toast.show { opacity: 1; }
   #toast.err { background: var(--danger); color: #fff; }
   table { width: 100%; border-collapse: collapse; }
-  th, td { text-align: start; padding: 7px 12px; border-top: 1px solid var(--line); }
+  th, td { text-align: start; padding: 8px 12px; border-top: 1px solid var(--line); }
   th { color: var(--muted); font-weight: 500; font-size: 12px; border-top: 0; }
   td.num, th.num { text-align: end; font-variant-numeric: tabular-nums; }
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); }
+  .card + .card { margin-top: 12px; }
   .card .toolbar:last-child { margin-bottom: 0; }
-  .log { background: #111; color: #ddd; font: 12px/1.5 ui-monospace, Menlo, monospace; padding: 10px 12px; border-radius: 8px; height: 420px; overflow: auto; white-space: pre-wrap; word-break: break-word; margin: 0; }
+  .card h3 { margin: 0 0 4px; font-size: 15px; display: flex; gap: 8px; align-items: center; }
+  .card h3 .n { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-size: 12px; }
+  .steps { display: grid; gap: 12px; }
+  .big-num { font-size: 15px; margin: 8px 0; }
+  .mono { font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+  .log { background: #111; color: #ddd; font: 12px/1.5 ui-monospace, Menlo, monospace; padding: 10px 12px; border-radius: var(--radius); height: 320px; overflow: auto; white-space: pre-wrap; word-break: break-word; margin: 0; }
   .ok { color: var(--ok); } .bad { color: var(--danger); }
+  @media (max-width: 860px) {
+    .app { grid-template-columns: 1fr; }
+    aside { position: sticky; z-index: 10; height: auto; flex-direction: row; align-items: center; overflow-x: auto; padding: 8px 10px; border-inline-end: 0; border-bottom: 1px solid var(--line); }
+    aside .brand, aside .group, aside .foot .stats { display: none; }
+    aside nav { flex-direction: row; }
+    aside nav button { white-space: nowrap; }
+    aside .foot { margin: 0; padding: 0 0 0 8px; }
+    .pagehead, main { padding-inline: 16px; }
+  }
   @media (max-width: 640px) { .row { flex-wrap: wrap; } .row img { display: none; } .actions { width: 100%; justify-content: flex-start; } }
 </style>
 </head>
 <body>
-<header>
-  <h1>elhellal admin</h1>
-  <nav id="tabs">
-    <button data-tab="articles" class="active">Articles</button>
-    <button data-tab="authors">Authors</button>
-    <button data-tab="review">Review</button>
-    <button data-tab="blocked">Blocked</button>
-    <button data-tab="pins">Pins</button>
-    <button data-tab="import">Import</button>
-    <button data-tab="health">Health</button>
-    <button data-tab="publish">Publish</button>
-    <button data-tab="social">Social</button>
-    <button data-tab="stats">Stats</button>
-    <button data-tab="sites">Sites</button>
-  </nav>
-  <span class="stats" id="stats"></span>
-  <button class="btn" id="reload" title="Re-read the catalog from disk">Reload</button>
-</header>
-<main>
-  <div id="view"></div>
-</main>
+<div class="app">
+  <aside>
+    <div class="brand">elhellal admin</div>
+    <div id="tabs"></div>
+    <div class="foot">
+      <span class="stats" id="stats"></span>
+      <button class="btn" id="reload" title="Re-read the catalog from disk">↻ Reload data</button>
+    </div>
+  </aside>
+  <div class="content">
+    <div class="pagehead"><h1 id="pagetitle"></h1><p id="pagedesc"></p></div>
+    <main><div id="view"></div></main>
+  </div>
+</div>
 <div id="toast"></div>
 
 <script>
@@ -132,18 +161,53 @@ let stats = { categories: [] };
 async function refreshStats() {
   stats = await api('/api/stats');
   document.getElementById('stats').textContent =
-    `${stats.articles.toLocaleString()} articles · ${stats.blockedArticles} blocked · ${stats.blockedAuthors} blocked authors`;
+    `${stats.articles.toLocaleString()} articles\n${stats.blockedArticles} blocked · ${stats.blockedAuthors} blocked authors`;
 }
 
-document.getElementById('tabs').addEventListener('click', (e) => {
-  const tab = e.target.dataset?.tab; if (!tab) return;
-  state.tab = tab; state.page = 1; state.selected.clear(); state.editing = null;
-  for (const b of document.querySelectorAll('#tabs button')) b.classList.toggle('active', b.dataset.tab === tab);
-  render();
-});
+// Sidebar: tabs grouped by what you do with them.
+const TABS = [
+  ['Catalog', [
+    ['articles', '▤', 'Articles', 'Search, edit, move or remove articles in the catalog.'],
+    ['authors', '◉', 'Authors', 'Every author by article count — view their articles or remove & block them.'],
+    ['review', '⚑', 'Review', 'Articles flagged by bun run moderate — keep or remove each one.'],
+    ['health', '✚', 'Health', 'Data problems found by check-data, fixable in place.'],
+    ['blocked', '⊘', 'Blocked', 'Blocked authors and removed articles — restore or unblock.'],
+  ]],
+  ['Add content', [
+    ['import', '⇣', 'Import', 'Find Substack authors and import their articles, or import external blogs.'],
+    ['leads', '✎', 'Leads', 'Functional-food leads for the abderahmane blog — write, deploy and post.'],
+  ]],
+  ['Share', [
+    ['publish', '⇡', 'Publish', 'Commit & push to GitHub, then build and deploy the site.'],
+    ['social', '✦', 'Social', 'Schedule X / LinkedIn posts and generate TikTok slideshows.'],
+    ['pins', '📌', 'Pins', 'Generate or remove Pinterest pin images on R2.'],
+  ]],
+  ['More', [
+    ['stats', '▥', 'Stats', 'Weekly volume, sources, top authors and most-read articles.'],
+    ['sites', '❖', 'Other sites', 'Quotes, books, biographies and quiz — edit, build and deploy.'],
+  ]],
+];
+const TAB_INFO = Object.fromEntries(TABS.flatMap(([, tabs]) => tabs.map(([id, icon, label, desc]) => [id, { icon, label, desc }])));
+
+function renderNav() {
+  document.getElementById('tabs').replaceChildren(...TABS.map(([group, tabs]) => [
+    h('div', { class: 'group' }, group),
+    h('nav', {}, tabs.map(([id, icon, label]) => h('button', { 'data-tab': id, class: state.tab === id ? 'active' : '',
+      onclick: () => { state.tab = id; state.page = 1; state.selected.clear(); state.editing = null; syncTabs(); render(); scrollTo(0, 0); } },
+      h('span', { class: 'ic' }, icon), label))),
+  ]).flat());
+}
+renderNav();
+
 document.getElementById('reload').onclick = () => act(() => api('/api/reload', {}), 'Reloaded from disk');
 
-function render() { ({ articles: renderArticles, authors: renderAuthors, review: renderReview, blocked: renderBlocked, pins: renderPins, import: renderImport, health: renderHealth, publish: renderPublish, social: renderSocial, stats: renderStats, sites: renderSites })[state.tab](); }
+function render() {
+  const info = TAB_INFO[state.tab];
+  document.getElementById('pagetitle').textContent = info.label;
+  document.getElementById('pagedesc').textContent = info.desc;
+  document.title = `${info.label} · elhellal admin`;
+  ({ articles: renderArticles, authors: renderAuthors, review: renderReview, blocked: renderBlocked, pins: renderPins, import: renderImport, health: renderHealth, publish: renderPublish, social: renderSocial, stats: renderStats, sites: renderSites, leads: renderLeads })[state.tab]();
+}
 const view = () => document.getElementById('view');
 /** Fills the page for `tab` — unless the user has switched tabs while it was loading. */
 function paint(tab, ...children) { if (state.tab === tab) view().replaceChildren(...children); }
@@ -722,7 +786,7 @@ async function renderHealth() {
 
 // ─── Publish ───
 const publish = jobPoller('pub', '/api/publish/job', 'publish', async () => { await loadGit(); await refreshStats(); if (state.tab === 'publish') renderPublish(); });
-const gitInfo = { data: null, message: '', loading: false };
+const gitInfo = { data: null, message: '', loading: false, all: false };
 
 async function loadGit() {
   gitInfo.loading = true;
@@ -741,49 +805,75 @@ async function renderPublish() {
   if (!gitInfo.data && !gitInfo.loading) loadGit().then(() => { if (state.tab === 'publish') renderPublish(); });
   const g = gitInfo.data;
   const running = !!publish.job?.running;
-  const msg = h('input', { value: gitInfo.message || (g ? defaultMessage(g) : ''), style: 'flex:1;min-width:260px', oninput: (e) => { gitInfo.message = e.target.value; } });
   const step = (s, label, cls = '', confirmText) => h('button', { class: 'btn ' + cls, disabled: running, onclick: () => {
     if (confirmText && !confirm(confirmText)) return;
     publish.start('/api/publish/run', { step: s });
   } }, label);
+  const fileTable = (files) => h('table', {}, files.map((f) => h('tr', {},
+    h('td', { class: 'mono', style: 'width:3em' }, f.status),
+    h('td', { class: 'mono' }, f.path),
+    h('td', { class: 'num ok' }, f.add != null ? '+' + f.add : ''), h('td', { class: 'num bad' }, f.del != null ? '−' + f.del : ''))));
 
-  paint('publish', 
-    h('div', { class: 'toolbar' }, h('h2', { style: 'margin:0' }, 'Data changes'),
-      h('button', { class: 'btn', disabled: gitInfo.loading, onclick: async () => { await loadGit(); renderPublish(); } }, 'Refresh')),
-    !g ? h('div', { class: 'card' }, 'Reading git…') : h('div', { class: 'card' },
-      h('div', { class: 'meta', style: 'margin-bottom:8px' },
-        h('span', {}, `branch ${g.branch}`), h('span', {}, `last: ${g.last}`),
-        g.ahead != null ? h('span', {}, `${g.ahead} ahead / ${g.behind} behind upstream`) : null),
-      g.totalFiles ? h('div', {},
-        h('div', { style: 'font-size:15px;margin-bottom:4px' },
-          g.delta ? [h('strong', { class: 'ok' }, `+${g.delta.added.toLocaleString()}`), ' articles · ', h('strong', { class: 'bad' }, `−${g.delta.removed.toLocaleString()}`), ' removed · '] : null,
-          `${g.totalFiles} files changed`, g.shortstat ? h('span', { class: 'meta', style: 'display:inline' }, ` (${g.shortstat})`) : null),
-        h('details', {}, h('summary', { class: 'meta', style: 'cursor:pointer' }, 'Files'),
-          h('table', {}, g.files.map((f) => h('tr', {},
-            h('td', { style: 'font-family:ui-monospace,monospace;width:3em' }, f.status),
-            h('td', { style: 'font-family:ui-monospace,monospace;font-size:12px' }, f.path),
-            h('td', { class: 'num ok' }, f.add != null ? '+' + f.add : ''), h('td', { class: 'num bad' }, f.del != null ? '−' + f.del : '')))),
-          g.totalFiles > g.files.length ? h('div', { class: 'meta' }, `…and ${g.totalFiles - g.files.length} more`) : null),
-        h('div', { class: 'toolbar', style: 'margin-top:10px' }, msg,
-          h('button', { class: 'btn primary', disabled: running, onclick: () => act(async () => {
-            const r = await api('/api/publish/commit', { message: msg.value });
-            gitInfo.message = ''; await loadGit(); return r;
-          }, (r) => r.output.split('\n')[0]) }, 'Commit data changes')),
-        h('div', { class: 'meta' }, `Commits only ${g.dataPaths.join(', ')}. `,
-          g.otherChanges > 0 ? `${g.otherChanges} other changed path(s) (code etc.) are left alone.` : ''),
-      ) : h('div', { class: 'meta' }, 'No uncommitted data changes.'),
-    ),
-    h('h2', {}, 'Release'),
-    h('div', { class: 'card' },
+  let gitCard;
+  if (!g) gitCard = h('div', { class: 'card meta' }, 'Reading git…');
+  else {
+    const toCommit = gitInfo.all ? g.totalFiles + g.otherChanges : g.totalFiles;
+    const msg = h('input', { value: gitInfo.message || defaultMessage(g), style: 'flex:1;min-width:260px', dir: 'auto',
+      oninput: (e) => { gitInfo.message = e.target.value; } });
+    const commit = (push) => act(async () => {
+      const r = await api('/api/publish/commit', { message: msg.value, all: gitInfo.all, push });
+      gitInfo.message = ''; await loadGit();
+      if (r.pushing) { publish.lines = []; publish.next = 0; publish.job = null; await publish.poll(); }
+      return r;
+    }, (r) => r.pushing ? 'Committed — pushing to GitHub…' : r.output.split('\n')[0]);
+    const notPushed = g.ahead ?? 0;
+    gitCard = h('div', { class: 'card' },
+      h('h3', {}, h('span', { class: 'n' }, '1'), 'Save to GitHub',
+        h('button', { class: 'btn', style: 'margin-inline-start:auto', disabled: gitInfo.loading, onclick: async () => { await loadGit(); renderPublish(); } }, gitInfo.loading ? 'Reading…' : '↻ Refresh')),
+      h('div', { class: 'meta' },
+        h('span', {}, `branch ${g.branch}`), h('span', {}, `last commit: ${g.last}`),
+        g.remote ? h('a', { href: g.remote.replace(/\.git$/, ''), target: '_blank', rel: 'noreferrer' }, g.remote.replace(/^https:\/\/|\.git$/g, '') + ' ↗') : null),
+      h('div', { class: 'big-num' },
+        g.totalFiles
+          ? [g.delta ? [h('strong', { class: 'ok' }, `+${g.delta.added.toLocaleString()}`), ' articles · ', h('strong', { class: 'bad' }, `−${g.delta.removed.toLocaleString()}`), ' removed · '] : null,
+             `${g.totalFiles} data file(s) changed`]
+          : 'No data changes.',
+        g.otherChanges ? h('span', { class: 'meta', style: 'display:inline' }, ` · ${g.otherChanges} other file(s) changed (code etc.)`) : null),
+      g.totalFiles ? h('details', {}, h('summary', { class: 'meta' }, 'Data files'), fileTable(g.files),
+        g.totalFiles > g.files.length ? h('div', { class: 'meta' }, `…and ${g.totalFiles - g.files.length} more`) : null) : null,
+      g.otherChanges ? h('details', {}, h('summary', { class: 'meta' }, 'Other files'), fileTable(g.otherFiles),
+        g.otherChanges > g.otherFiles.length ? h('div', { class: 'meta' }, `…and ${g.otherChanges - g.otherFiles.length} more`) : null) : null,
+      h('div', { class: 'toolbar', style: 'margin-top:12px' },
+        h('label', { title: 'Off: commit only ' + g.dataPaths.join(', ') },
+          h('input', { type: 'checkbox', checked: !!gitInfo.all, disabled: running, onchange: (e) => { gitInfo.all = e.target.checked; renderPublish(); } }),
+          ' Include code changes too')),
+      h('div', { class: 'toolbar' }, msg),
       h('div', { class: 'toolbar' },
-        step('check', '1. Check data'),
-        step('build', '2. Build', 'primary'),
-        step('deploy', '3. Deploy', '', 'Deploy dist/ to Cloudflare with wrangler deploy? The live site changes right away.'),
-        h('span', { class: 'meta' }, 'or'),
-        step('build+deploy', 'Build & deploy', 'primary', 'Build, then deploy to Cloudflare if the build succeeds?'),
-        h('button', { class: 'btn danger', disabled: !running, onclick: () => act(() => api('/api/publish/stop', {}), 'Stopping…') }, 'Stop'),
+        h('button', { class: 'btn primary big', disabled: running || !toCommit, onclick: () => commit(true) }, 'Commit & push'),
+        h('button', { class: 'btn', disabled: running || !toCommit, onclick: () => commit(false) }, 'Commit only'),
+        h('button', { class: 'btn', disabled: running || !notPushed, onclick: () => publish.start('/api/publish/run', { step: 'push' }, 'Pushing to GitHub…') },
+          notPushed ? `Push ${notPushed} commit(s)` : 'Push'),
+        h('span', { class: 'meta' },
+          g.ahead == null ? 'No upstream yet — Push sets it.' : g.behind ? `⚠️ ${g.behind} commit(s) behind GitHub — pull in a terminal before pushing.` : notPushed ? `${notPushed} commit(s) not on GitHub yet.` : 'GitHub is up to date.')),
+    );
+  }
+
+  paint('publish',
+    h('div', { class: 'steps' },
+      gitCard,
+      h('div', { class: 'card' },
+        h('h3', {}, h('span', { class: 'n' }, '2'), 'Put it live'),
+        h('div', { class: 'meta', style: 'margin-bottom:12px' }, 'Builds the site and deploys it to Cloudflare. Catalog edits and imports wait while it runs.'),
+        h('div', { class: 'toolbar' },
+          step('build+deploy', 'Build & deploy', 'primary big', 'Build, then deploy to Cloudflare if the build succeeds?'),
+          h('button', { class: 'btn danger', disabled: !running, onclick: () => act(() => api('/api/publish/stop', {}), 'Stopping…') }, 'Stop')),
+        h('details', {}, h('summary', { class: 'meta' }, 'Single steps'),
+          h('div', { class: 'toolbar', style: 'margin-top:8px' },
+            step('check', 'Check data'),
+            step('build', 'Build only'),
+            step('deploy', 'Deploy only', '', 'Deploy dist/ to Cloudflare with wrangler deploy? The live site changes right away.')),
+          h('div', { class: 'meta' }, 'Check data exits non-zero while any Health issue remains — that does not block the build.')),
       ),
-      h('div', { class: 'meta' }, 'Build runs prepare-data (add-slugs, split, metadata, llms.txt), astro build and build-worker-data. Catalog edits and imports are blocked while it runs. check-data exits non-zero while any Health issue remains — that does not block the build.'),
     ),
     ...publish.view(),
   );
@@ -1316,6 +1406,147 @@ function reportsSection() {
           h('td', { class: 'num' }, x.answered ? Math.round((x.ok / x.answered) * 100) + '%' : '—'),
           h('td', {}, x.i != null ? h('button', { class: 'btn', onclick: () => { sites.q = 'b' + x.i; sites.cat = ''; sites.untranslated = false; sites.editing = 'b' + x.i; state.page = 1; render(); } }, 'Fix') : x.id))))),
   );
+}
+
+// ─── Leads (abderahmane blog: /functional-food-leads) ───
+const leads = { status: 'pending', q: '', sel: new Set(), editing: null, text: '', xEdit: null, addUrl: '', live: {} };
+const leadJob = jobPoller('lead', '/api/leads/job', 'leads', async () => { if (state.tab === 'leads') renderLeads(); });
+const LEAD_STATUSES = { pending: 'Pending', written: 'Written', published: 'Published', skipped: 'Skipped' };
+
+const openedClaude = () => 'Opened Claude Code in Terminal — Reload here when it is done';
+
+async function renderLeads() {
+  if (!leadJob.loaded) await leadJob.poll();
+  let data;
+  try { data = await api('/api/leads?' + new URLSearchParams({ status: leads.status, q: leads.q, page: state.page })); }
+  catch (e) { return paint('leads', h('div', { class: 'card bad' }, e.message)); }
+  const running = !!leadJob.job?.running;
+  const sel = [...leads.sel];
+  const all = Object.values(data.counts).reduce((a, b) => a + b, 0);
+  const chip = (key, label, n) => h('button', { class: 'btn' + (leads.status === key ? ' primary' : ''), onclick: () => {
+    leads.status = key; leads.sel.clear(); leads.editing = null; state.page = 1; render();
+  } }, `${label} · ${n}`);
+  const search = h('input', { type: 'search', placeholder: 'Search title, slug or URL…', value: leads.q,
+    oninput: (e) => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { leads.q = e.target.value; state.page = 1; render(); }, 250); } });
+  queueMicrotask(() => { if (document.activeElement === document.body && leads.q) { search.focus(); search.setSelectionRange(leads.q.length, leads.q.length); } });
+  const addInput = h('input', { placeholder: 'https://www.news-medical.net/news/…aspx', value: leads.addUrl, style: 'flex:1;min-width:280px', oninput: (e) => { leads.addUrl = e.target.value; } });
+  const selectable = data.items.filter((x) => !x.article);
+
+  paint('leads',
+    h('div', { class: 'card' },
+      h('div', { class: 'toolbar' },
+        h('h2', { style: 'margin:0' }, 'Functional-food leads'),
+        h('a', { class: 'link', href: 'https://www.news-medical.net/condition/Functional-Food', target: '_blank', rel: 'noreferrer' }, 'news-medical.net ↗'),
+        h('a', { class: 'link', href: data.blogUrl, target: '_blank', rel: 'noreferrer' }, data.blogUrl.replace('https://', '') + ' ↗')),
+      h('div', { class: 'toolbar' },
+        h('button', { class: 'btn', disabled: running, onclick: () => leadJob.start('/api/leads/scrape', {}) }, 'Scrape new leads'),
+        h('button', { class: 'btn', disabled: running, onclick: () => leadJob.start('/api/leads/build', {}) }, 'Build blog'),
+        h('button', { class: 'btn danger', disabled: !running, onclick: () => act(() => api('/api/leads/stop', {}), 'Stopping…') }, 'Stop'),
+        h('span', { class: 'meta' }, `Scrape fetches page 1 and merges the ${data.savedPages} saved listing page(s) in pages/ (pages 2+ are behind a Cloudflare check: save them from your browser).`)),
+      h('div', { class: 'toolbar' }, addInput,
+        h('button', { class: 'btn', onclick: () => act(async () => { const r = await api('/api/leads/add', { url: leads.addUrl }); leads.addUrl = ''; leads.status = 'pending'; return r; }, 'Lead added') }, 'Add lead by URL')),
+    ),
+    h('div', { class: 'toolbar', style: 'margin-top:12px' },
+      chip('', 'All', all), ...Object.entries(LEAD_STATUSES).map(([k, label]) => chip(k, label, data.counts[k] ?? 0)), search),
+    h('div', { class: 'toolbar' },
+      h('label', { class: 'meta' }, h('input', { type: 'checkbox', checked: selectable.length > 0 && selectable.every((x) => leads.sel.has(x.url)), disabled: !selectable.length, onchange: (e) => {
+        for (const x of selectable) e.target.checked ? leads.sel.add(x.url) : leads.sel.delete(x.url); render();
+      } }), ' Select page'),
+      h('span', { class: 'meta' }, `${sel.length} selected`),
+      h('button', { class: 'btn primary', disabled: !sel.length, onclick: () => {
+        if (sel.length > 1 && !confirm(`Open one Claude Code session that writes ${sel.length} articles, one after another?`)) return;
+        act(async () => { const r = await api('/api/leads/write', { urls: sel }); leads.sel.clear(); return r; }, openedClaude);
+      } }, sel.length > 1 ? `Write ${sel.length} articles` : 'Write article'),
+      h('button', { class: 'btn', disabled: !sel.length, onclick: () => act(async () => { const r = await api('/api/leads/status', { urls: sel, status: 'skipped' }); leads.sel.clear(); return r; }, (r) => `Skipped ${r.changed}`) }, 'Skip'),
+      h('button', { class: 'btn', disabled: !sel.length, onclick: () => act(async () => { const r = await api('/api/leads/status', { urls: sel, status: 'pending' }); leads.sel.clear(); return r; }, (r) => `${r.changed} back to pending`) }, 'Mark pending'),
+      h('button', { class: 'btn danger', disabled: !sel.length, onclick: () => {
+        if (confirm(`Remove ${sel.length} lead(s) from leads.json? (A new scrape adds them back if they are still listed.)`))
+          act(async () => { const r = await api('/api/leads/remove', { urls: sel }); leads.sel.clear(); return r; }, (r) => `Removed ${r.removed}`);
+      } }, 'Remove leads')),
+    h('div', { class: 'list' }, data.items.length ? data.items.map(leadRow) : h('div', { class: 'empty' }, 'No leads here')),
+    pager(data),
+    h('p', { class: 'meta' }, 'Write opens an interactive Claude Code session in Terminal (approve its tools as usual); it saves the article and marks the lead written. Come back and Reload to see it. Deploy commits only that article file and pushes main.'),
+    ...leadJob.view(),
+  );
+  leadJob.update(true);
+}
+
+function leadRow(x) {
+  const a = x.article, running = !!leadJob.job?.running;
+  const editing = leads.editing === x.slug && a;
+  const live = leads.live[x.slug];
+  const changeLabel = { '??': 'new, not deployed', M: 'edited, not deployed', D: 'deleted, not deployed', A: 'new, not deployed' };
+  return h('div', { class: 'row' },
+    a ? null : h('input', { type: 'checkbox', checked: leads.sel.has(x.url), onchange: (e) => { e.target.checked ? leads.sel.add(x.url) : leads.sel.delete(x.url); render(); } }),
+    a?.thumb ? h('img', { src: a.thumb, loading: 'lazy', alt: '', referrerpolicy: 'no-referrer' }) : null,
+    h('div', { class: 'body' },
+      a ? h('div', { class: 'title', dir: 'rtl' }, a.title) : null,
+      h('div', { class: a ? 'meta' : 'title' }, `#${x.n} `, x.title),
+      a?.description ? h('div', { class: 'preview', dir: 'rtl' }, a.description) : null,
+      h('div', { class: 'meta' },
+        h('span', { class: 'pill' + (x.status === 'published' ? ' ok' : '') }, x.status),
+        h('span', {}, x.date),
+        h('a', { href: x.url, target: '_blank', rel: 'noreferrer' }, 'news ↗'),
+        x.slug && !a ? h('span', { class: 'bad' }, `${x.slug}.md is missing`) : null,
+        a ? [h('span', {}, `${a.words.toLocaleString()} words`), h('span', {}, x.slug),
+          x.change ? h('span', { class: 'pill bad' }, changeLabel[x.change] ?? x.change) : x.onMain ? h('span', { class: 'pill ok' }, 'on main') : h('span', { class: 'pill bad' }, 'not deployed'),
+          x.onMain ? h('a', { href: `https://abderahmane.elhellal.com/article/${x.slug}/`, target: '_blank', rel: 'noreferrer' }, 'blog ↗') : null,
+          live ? h('span', { class: live.live ? 'ok' : 'bad' }, live.live ? 'live ✓' : 'not live yet') : null] : null,
+        x.x_url ? h('a', { href: x.x_url, target: '_blank', rel: 'noreferrer' }, 'X ↗') : null),
+      leads.xEdit === x.url ? xUrlForm(x) : null,
+      editing ? articleEditor(x) : null),
+    h('div', { class: 'actions' },
+      !a && x.status !== 'written' && x.status !== 'published' ? h('button', { class: 'btn', onclick: () => act(() => api('/api/leads/write', { urls: [x.url] }), openedClaude) }, 'Write') : null,
+      a ? [
+        h('button', { class: 'btn', onclick: () => openArticle(x.slug, !!editing) }, editing ? 'Close' : 'Edit'),
+        h('button', { class: 'btn primary', disabled: running || !x.change, title: x.change ? 'Commit this file and push main' : 'Nothing to deploy', onclick: () => {
+          if (confirm(`Commit ${x.slug}.md and push main? The blog redeploys and the article goes live.`)) leadJob.start('/api/leads/deploy', { slug: x.slug });
+        } }, 'Deploy'),
+        h('button', { class: 'btn', onclick: async () => {
+          try { leads.live[x.slug] = await api('/api/leads/live?slug=' + x.slug); render(); } catch (e) { toast(e.message, true); }
+        } }, 'Check live'),
+        h('button', { class: 'btn', onclick: () => act(() => api('/api/leads/copy-x', { slug: x.slug }), () => 'Copied as rich text — paste it into a new X Article') }, 'Copy for X'),
+        h('button', { class: 'btn', title: 'Opens Claude Code with the skill\'s publish mode (deploys, builds the X draft, asks you before publishing)', onclick: () => {
+          if (confirm('Open Claude Code to publish this article (deploy + X Article)? It asks you before publishing on X.')) act(() => api('/api/leads/publish', { slug: x.slug }), openedClaude);
+        } }, 'Publish to X…'),
+        h('button', { class: 'btn', onclick: () => { leads.xEdit = leads.xEdit === x.url ? null : x.url; render(); } }, x.x_url ? 'X link' : 'Set X link'),
+        h('button', { class: 'btn danger', onclick: () => removeArticle(x) }, 'Delete article'),
+      ] : null),
+  );
+}
+
+function xUrlForm(x) {
+  const input = h('input', { value: x.x_url ?? '', placeholder: 'https://x.com/…/status/…', style: 'flex:1;min-width:260px' });
+  return h('div', { class: 'edit' }, h('div', { class: 'two' }, input,
+    h('button', { class: 'btn primary', onclick: () => act(async () => { const r = await api('/api/leads/x-url', { url: x.url, x_url: input.value }); leads.xEdit = null; return r; }, input.value.trim() ? 'Marked published' : 'X link cleared') }, 'Save'),
+    h('span', { class: 'meta' }, 'Saving a link marks the lead published; clearing it puts it back to written.')));
+}
+
+async function openArticle(slug, open) {
+  if (open) { leads.editing = null; return render(); }
+  try { const r = await api('/api/leads/article?slug=' + slug); leads.editing = slug; leads.text = r.text; render(); }
+  catch (e) { toast(e.message, true); }
+}
+
+function articleEditor(x) {
+  const area = h('textarea', { dir: 'auto', spellcheck: 'false', style: 'min-height:480px;font:13px/1.6 ui-monospace,Menlo,monospace' }, leads.text);
+  area.addEventListener('input', () => { leads.text = area.value; });
+  return h('div', { class: 'edit' },
+    h('div', { class: 'meta' }, `src/content/article/${x.slug}.md (frontmatter + markdown)`), area,
+    h('div', { class: 'two' },
+      h('button', { class: 'btn primary', onclick: () => act(async () => { const r = await api('/api/leads/article', { slug: x.slug, text: area.value }); leads.editing = null; return r; }, 'Saved — Deploy to put it live') }, 'Save'),
+      h('button', { class: 'btn', onclick: () => { leads.editing = null; render(); } }, 'Cancel')));
+}
+
+function removeArticle(x) {
+  const typed = prompt(`Delete src/content/article/${x.slug}.md? Type the slug to confirm:\n${x.slug}`);
+  if (typed === null) return;
+  const skip = confirm('Skip this lead from now on?\nOK = mark it skipped, Cancel = put it back to pending (so it can be rewritten).');
+  act(async () => {
+    const r = await api('/api/leads/article/remove', { slug: x.slug, confirm: typed.trim(), status: skip ? 'skipped' : 'pending' });
+    if (r.live && confirm(`${x.slug} is on the live blog. Commit the deletion and push main now to take it down?`)) await leadJob.start('/api/leads/deploy', { slug: x.slug, message: `Remove article ${x.slug}` });
+    return r;
+  }, (r) => r.live ? 'Article deleted' : 'Article deleted (it was never deployed)');
 }
 
 refreshStats().then(render).catch((e) => toast(e.message, true));

@@ -1,6 +1,7 @@
 ---
 // Imgur-style page chrome for listing pages:
-//  - a top banner ad whose close button unlocks after 5 seconds
+//  - a top banner ad (no close button: a dismiss control on an ad invites
+//    accidental clicks, which AdSense policy discourages)
 //  - a floating "back to top" pill that appears once you scroll
 //  - a fixed footer bar that shows on load and slides away when you scroll
 import AdUnit from "./AdUnit.astro";
@@ -13,12 +14,8 @@ interface Props {
 const { adSlot = "2951250905" } = Astro.props;
 ---
 
-<div class="top-ad" data-closable="false">
-  <button type="button" class="top-ad-close" aria-label="إغلاق الإعلان" disabled>
-    <span class="top-ad-countdown">5</span>
-    <span class="top-ad-x" aria-hidden="true">×</span>
-  </button>
-  <AdUnit slot={adSlot} minHeight={90} />
+<div class="top-ad">
+  <AdUnit slot={adSlot} minHeight={90} mobileMinHeight={250} />
 </div>
 
 <button type="button" class="to-top" aria-label="العودة إلى الأعلى">
@@ -44,34 +41,8 @@ const { adSlot = "2951250905" } = Astro.props;
 </footer>
 
 <script>
-  const AD_CLOSE_DELAY = 5;
   const SHOW_TO_TOP_AFTER = 600; // px scrolled
   const HIDE_FOOTER_AFTER = 40;
-
-  const initTopAd = () => {
-    const ad = document.querySelector<HTMLElement>(".top-ad");
-    const button = ad?.querySelector<HTMLButtonElement>(".top-ad-close");
-    const counter = ad?.querySelector<HTMLElement>(".top-ad-countdown");
-    if (!ad || !button || !counter || ad.dataset.bound) return;
-    ad.dataset.bound = "1";
-
-    let remaining = AD_CLOSE_DELAY;
-    const timer = window.setInterval(() => {
-      remaining -= 1;
-      counter.textContent = String(remaining);
-      if (remaining > 0) return;
-      window.clearInterval(timer);
-      ad.dataset.closable = "true";
-      button.disabled = false;
-    }, 1000);
-
-    button.addEventListener("click", () => {
-      ad.classList.add("is-closing");
-      // Remove after the collapse animation (0.3s); a timer is more reliable
-      // than transitionend, which may not fire if nothing actually animates.
-      window.setTimeout(() => ad.remove(), 350);
-    });
-  };
 
   const onScroll = () => {
     const y = window.scrollY;
@@ -99,14 +70,10 @@ const { adSlot = "2951250905" } = Astro.props;
     }
   });
 
-  // Both are idempotent: run now (astro:page-load may already have fired by the
-  // time this module executes) and again after each view-transition navigation.
-  const init = () => {
-    initTopAd();
-    onScroll();
-  };
-  init();
-  document.addEventListener("astro:page-load", init);
+  // Run now (astro:page-load may already have fired by the time this module
+  // executes) and again after each view-transition navigation.
+  onScroll();
+  document.addEventListener("astro:page-load", onScroll);
 </script>
 
 <style>
@@ -118,62 +85,10 @@ const { adSlot = "2951250905" } = Astro.props;
     border-radius: 12px;
     background-color: #111111;
     box-shadow: 0px 0px 0px 0.5px rgba(255, 255, 255, 0.08);
-    overflow: hidden;
-    max-height: 400px;
-    transition: opacity 0.25s ease, max-height 0.3s ease, margin 0.3s ease, padding 0.3s ease;
-  }
-
-  .top-ad.is-closing {
-    opacity: 0;
-    max-height: 0;
-    margin-top: 0;
-    padding-block: 0;
   }
 
   .top-ad:has(ins.adsbygoogle[data-ad-status="unfilled"]) {
     display: none;
-  }
-
-  .top-ad-close {
-    position: absolute;
-    top: 8px;
-    left: 8px; /* RTL: opposite the "إعلان" label */
-    z-index: 2;
-    width: 26px;
-    height: 26px;
-    display: grid;
-    place-items: center;
-    border-radius: 50%;
-    border: 0.5px solid rgba(255, 255, 255, 0.15);
-    background: rgba(0, 0, 0, 0.62);
-    color: rgba(255, 255, 255, 0.45);
-    font-family: var(--monospace);
-    font-size: 12px;
-    cursor: default;
-  }
-
-  .top-ad-x {
-    display: none;
-    font-size: 18px;
-    line-height: 1;
-  }
-
-  .top-ad[data-closable="true"] .top-ad-countdown {
-    display: none;
-  }
-
-  .top-ad[data-closable="true"] .top-ad-x {
-    display: block;
-  }
-
-  .top-ad[data-closable="true"] .top-ad-close {
-    color: #f0f0f0;
-    cursor: var(--c-pointer);
-  }
-
-  .top-ad[data-closable="true"] .top-ad-close:hover {
-    border-color: DarkOrange;
-    color: DarkOrange;
   }
 
   /* Back to top pill */
@@ -243,6 +158,7 @@ const { adSlot = "2951250905" } = Astro.props;
   }
 
   .feed-footer a {
+    white-space: nowrap;
     font-family: var(--monospace);
     font-size: 12px;
     color: var(--content-secondary);
@@ -264,12 +180,27 @@ const { adSlot = "2951250905" } = Astro.props;
 
   @media (max-width: 639px) {
     .feed-footer {
-      padding: 10px 16px;
+      padding: 0 16px env(safe-area-inset-bottom, 0px);
     }
+    /* One swipeable row of whole links — a multi-row grid would cover a big
+       slice of the screen, since this bar is fixed until you scroll. */
     .feed-footer-nav {
       flex-wrap: nowrap;
+      gap: 0 4px;
       overflow-x: auto;
       scrollbar-width: none;
+      scroll-snap-type: x proximity;
+    }
+    .feed-footer-nav::-webkit-scrollbar {
+      display: none;
+    }
+    .feed-footer a {
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+      padding: 0 8px;
+      font-size: 13px;
+      scroll-snap-align: start;
     }
     .feed-footer-copy {
       display: none;

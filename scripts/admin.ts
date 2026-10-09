@@ -11,6 +11,9 @@
  * LinkedIn schedulers and TikTok generators and deletes the media they wrote; Stats charts the catalog.
  * Sites does the same for the sibling repos (../elhellal-quotes, -books,
  * -biographies, -quiz): edit their data, run their scripts, build, deploy, commit.
+ * Leads manages the abderahmane blog's /functional-food-leads queue: pick leads to
+ * write (opens an interactive Claude Code session), edit / remove / deploy the
+ * articles, copy them for X and record X links.
  *
  *   bun run admin                # http://localhost:4322
  *   bun run admin --port 5000
@@ -764,7 +767,7 @@ function discoverState(params: URLSearchParams) {
 
 // ─── Publish ──────────────────────────────────────────────────────────────────
 // check-data → build → wrangler deploy, one step at a time in one slot, plus a
-// git summary of the data changes and a commit of just those paths.
+// git summary of the changes, a commit (data paths, or everything) and git push.
 
 /** What the admin and the importers change. Commits only ever include these. */
 const DATA_PATHS = ['src/data/catalog', 'src/data/moderation', 'src/data/author-names.json', 'src/data/external-blogs.ts', 'public/llms.txt'];
@@ -775,6 +778,7 @@ const PUBLISH_STEPS: Record<string, { cmd: string[]; display: string }> = {
     build: { cmd: [BUN, 'run', 'build'], display: 'bun run build' },
     deploy: { cmd: [BUN, 'x', 'wrangler', 'deploy'], display: 'bunx wrangler deploy' },
     'build+deploy': { cmd: ['sh', '-c', `"${BUN}" run build && "${BUN}" x wrangler deploy`], display: 'bun run build && bunx wrangler deploy' },
+    push: { cmd: ['git', 'push'], display: 'git push' },
 };
 /** Steps that rewrite the catalog (prepare-data runs add-slugs). */
 const WRITES_CATALOG = new Set(['add-slugs', 'build', 'build+deploy']);
@@ -789,7 +793,16 @@ function runPublish(body: Body) {
         throw new HttpError(409, 'An import is running — building now would race its catalog writes');
     }
     if (step === 'deploy' && !fs.existsSync(path.join(ROOT, 'dist/_data'))) throw new HttpError(400, 'No build in dist/ — run Build first');
+    if (step === 'push') return startPush();
     return startCommand(publishSlot, def.cmd, def.display, { mode: step, scopes: [] });
+}
+
+/** git push in the publish slot; sets the upstream on a branch's first push. */
+function startPush() {
+    if (publishSlot.proc) throw new HttpError(409, 'A publish step is already running');
+    const branch = git('rev-parse', '--abbrev-ref', 'HEAD').out.trim();
+    const cmd = git('rev-parse', '--abbrev-ref', '@{u}').ok ? ['git', 'push'] : ['git', 'push', '-u', 'origin', branch];
+    return startCommand(publishSlot, cmd, cmd.join(' '), { mode: 'push', scopes: [] });
 }
 
 function git(...args: string[]) {
@@ -846,7 +859,12 @@ function gitState() {
     const all = files.flatMap((f) => f.paths);
     const upstream = git('rev-list', '--left-right', '--count', '@{u}...HEAD');
     const [behind, ahead] = upstream.ok ? upstream.out.trim().split(/\s+/).map(Number) : [null, null];
-    const otherChanges = git('status', '--porcelain').out.split('\n').filter(Boolean).length - files.length;
+    const dataSet = new Set(all);
+    const others = git('status', '--porcelain', '-z', '--untracked-files=all')
+        .out.split('\0')
+        .filter((e) => /^[ MADRCU?!]{2} /.test(e))
+        .map((e) => ({ status: e.slice(0, 2), path: e.slice(3) }))
+        .filter((f) => !dataSet.has(f.path));
     return {
         branch: git('rev-parse', '--abbrev-ref', 'HEAD').out.trim(),
         last: git('log', '-1', '--format=%h %s (%cr)').out.trim(),
@@ -855,25 +873,37 @@ function gitState() {
         dataPaths: DATA_PATHS,
         shortstat: git('diff', 'HEAD', '--shortstat', '--', ...DATA_PATHS).out.trim(),
         delta: all.length <= 600 ? catalogDelta(all) : null,
-        otherChanges,
+        otherChanges: others.length,
+        otherFiles: others.slice(0, 100),
+        remote: git('remote', 'get-url', 'origin').out.trim(),
         files: files.slice(0, 300).map((f) => ({ status: f.status, path: f.paths.join(' → '), ...(numstat.get(f.paths.at(-1)!) ?? {}) })),
         totalFiles: files.length,
     };
 }
 
+/** Commits the data paths (or, with `all`, every change), then optionally starts git push. */
 function commitData(body: Body) {
     const message = str(body.message).trim();
     if (!message) throw new HttpError(400, 'Write a commit message');
     if (importSlot.proc || otherImports().length) throw new HttpError(409, 'An import is running — commit when it has finished');
-    if (publishSlot.proc && WRITES_CATALOG.has(publishSlot.job?.mode ?? '')) throw new HttpError(409, 'A build is running — commit when it has finished');
-    if (!changedDataFiles().length) throw new HttpError(400, 'No data changes to commit');
-    const add = git('add', '-A', '--', ...DATA_PATHS);
-    if (!add.ok) throw new HttpError(500, add.err);
-    // --only semantics: commits just these paths, other staged work stays staged.
-    const paths = [...new Set(changedDataFiles().flatMap((f) => f.paths))];
-    const commit = git('commit', '-m', message, '--', ...paths);
+    if (publishSlot.proc) throw new HttpError(409, 'A publish step is running — commit when it has finished');
+    let commit;
+    if (body.all) {
+        if (!git('status', '--porcelain').out.trim()) throw new HttpError(400, 'Nothing to commit');
+        const add = git('add', '-A');
+        if (!add.ok) throw new HttpError(500, add.err);
+        commit = git('commit', '-m', message);
+    } else {
+        if (!changedDataFiles().length) throw new HttpError(400, 'No data changes to commit');
+        const add = git('add', '-A', '--', ...DATA_PATHS);
+        if (!add.ok) throw new HttpError(500, add.err);
+        // --only semantics: commits just these paths, other staged work stays staged.
+        const paths = [...new Set(changedDataFiles().flatMap((f) => f.paths))];
+        commit = git('commit', '-m', message, '--', ...paths);
+    }
     if (!commit.ok) throw new HttpError(500, commit.err || commit.out);
-    return { ok: true, output: commit.out.trim() };
+    if (body.push) startPush();
+    return { ok: true, output: commit.out.trim(), pushing: !!body.push };
 }
 
 // ─── Data health ──────────────────────────────────────────────────────────────
@@ -1791,6 +1821,300 @@ async function quizReports(params: URLSearchParams) {
     return value;
 }
 
+// ─── Functional-food leads ────────────────────────────────────────────────────
+// news-medical.net "Functional Food" items queued by the abderahmane blog's
+// /functional-food-leads skill (../abderahmane/.claude/skills/functional-food-leads).
+// Writing and X publishing open an interactive Claude Code session in Terminal,
+// so tools are approved as usual and the skill asks before posting to X. Leads,
+// the articles they produced, deploys and X links are managed here directly.
+
+const BLOG_DIR = siteDir('abderahmane');
+const BLOG_URL = 'https://abderahmane.elhellal.com';
+const LEADS_DIR = path.join(BLOG_DIR, '.claude/skills/functional-food-leads');
+const LEADS_JSON = path.join(LEADS_DIR, 'leads.json');
+const BLOG_ARTICLES = 'src/content/article';
+const LEAD_STATUSES = ['pending', 'written', 'published', 'skipped'] as const;
+const LEAD_URL_RE = /^https:\/\/www\.news-medical\.net\/news\/(\d{8})\/[^\s"'<>]+\.aspx$/;
+const BLOG_SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const leadSlot: Slot = { job: null, proc: null };
+
+interface Lead {
+    title: string;
+    url: string;
+    date: string;
+    status: (typeof LEAD_STATUSES)[number];
+    slug: string | null;
+    x_url?: string;
+}
+
+const readLeads = () => readJson<Lead[]>(LEADS_JSON);
+const articleFile = (slug: string) => path.join(BLOG_DIR, BLOG_ARTICLES, `${slug}.md`);
+
+function blogSlug(v: unknown) {
+    const slug = str(v);
+    if (!BLOG_SLUG_RE.test(slug)) throw new HttpError(400, 'Invalid slug');
+    return slug;
+}
+
+function leadByUrl(leads: Lead[], url: unknown) {
+    const lead = leads.find((l) => l.url === str(url));
+    if (!lead) throw new HttpError(404, 'Lead not found');
+    return lead;
+}
+
+function leadUrls(leads: Lead[], v: unknown) {
+    const urls = ids(v);
+    if (!urls.size) throw new HttpError(400, 'Pick at least one lead');
+    const picked = leads.filter((l) => urls.has(l.url));
+    if (picked.length !== urls.size) throw new HttpError(404, 'Some leads were not found — reload');
+    return picked;
+}
+
+function articleInfo(slug: string) {
+    const file = articleFile(slug);
+    if (!fs.existsSync(file)) return null;
+    const text = fs.readFileSync(file, 'utf-8');
+    const fm = /^---\n([\s\S]*?)\n---\n?/.exec(text);
+    const field = (k: string) => {
+        const m = fm && new RegExp(`^${k}:\\s*(.*)$`, 'm').exec(fm[1]!);
+        return m ? m[1]!.trim().replace(/^"(.*)"$/, '$1') : '';
+    };
+    const body = fm ? text.slice(fm[0].length) : text;
+    return {
+        title: field('title'),
+        description: field('description'),
+        pubDate: field('pubDate'),
+        thumb: field('thumb') || null,
+        draft: field('draft') === 'true',
+        words: body.split(/\s+/).filter(Boolean).length,
+        modified: fs.statSync(file).mtimeMs,
+    };
+}
+
+/** Which article files are on origin/main, and which differ from HEAD (new, edited or deleted). */
+function blogGitState() {
+    const onMain = new Set(gitIn(BLOG_DIR, 'ls-tree', '-r', '--name-only', 'origin/main', '--', BLOG_ARTICLES).out.split('\n').filter(Boolean));
+    const changed = new Map<string, string>();
+    for (const entry of gitIn(BLOG_DIR, 'status', '--porcelain', '-z', '--untracked-files=all', '--', BLOG_ARTICLES).out.split('\0')) {
+        if (entry) changed.set(entry.slice(3), entry.slice(0, 2).trim());
+    }
+    return { onMain, changed };
+}
+
+function listLeads(params: URLSearchParams) {
+    if (!fs.existsSync(LEADS_JSON)) throw new HttpError(404, `${LEADS_JSON} not found`);
+    const leads = readLeads();
+    const status = params.get('status') ?? '';
+    const q = (params.get('q') ?? '').trim().toLowerCase();
+    const counts: Record<string, number> = Object.fromEntries(LEAD_STATUSES.map((s) => [s, 0]));
+    for (const l of leads) counts[l.status] = (counts[l.status] ?? 0) + 1;
+    const git = blogGitState();
+    const matches = leads
+        .map((lead, i) => ({ lead, n: i + 1 }))
+        .filter(({ lead }) => (!status || lead.status === status) && (!q || `${lead.title} ${lead.slug ?? ''} ${lead.url}`.toLowerCase().includes(q)));
+    const page = Math.max(1, Number(params.get('page')) || 1);
+    const items = matches.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map(({ lead, n }) => {
+        const rel = lead.slug ? `${BLOG_ARTICLES}/${lead.slug}.md` : '';
+        return {
+            ...lead,
+            n,
+            article: lead.slug ? articleInfo(lead.slug) : null,
+            onMain: rel ? git.onMain.has(rel) : false,
+            change: rel ? git.changed.get(rel) ?? null : null,
+        };
+    });
+    return {
+        counts,
+        total: matches.length,
+        page,
+        pages: Math.max(1, Math.ceil(matches.length / PAGE_SIZE)),
+        items,
+        savedPages: fs.existsSync(path.join(LEADS_DIR, 'pages')) ? fs.readdirSync(path.join(LEADS_DIR, 'pages')).filter((f) => f.endsWith('.html')).length : 0,
+        blogUrl: BLOG_URL,
+    };
+}
+
+function setLeadStatus(body: Body) {
+    const status = str(body.status) as Lead['status'];
+    if (status !== 'pending' && status !== 'skipped') throw new HttpError(400, 'status must be pending or skipped');
+    const leads = readLeads();
+    const picked = leadUrls(leads, body.urls);
+    const withArticle = picked.find((l) => l.slug && fs.existsSync(articleFile(l.slug)));
+    if (withArticle) throw new HttpError(409, `"${withArticle.title}" has an article — remove the article first`);
+    for (const l of picked) {
+        l.status = status;
+        l.slug = null;
+        delete l.x_url;
+    }
+    writeJson(LEADS_JSON, leads);
+    return { changed: picked.length };
+}
+
+function addLead(body: Body) {
+    const url = str(body.url).trim().replace(/[?#].*$/, '');
+    const m = LEAD_URL_RE.exec(url);
+    if (!m) throw new HttpError(400, 'Expected a https://www.news-medical.net/news/YYYYMMDD/….aspx URL');
+    const leads = readLeads();
+    if (leads.some((l) => l.url === url)) throw new HttpError(409, 'That lead is already in the list');
+    const d = m[1]!;
+    const fromUrl = decodeURIComponent(url.split('/').pop()!.replace(/\.aspx$/, '')).replace(/-/g, ' ');
+    leads.push({ title: str(body.title).trim() || fromUrl, url, date: `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6)}`, status: 'pending', slug: null });
+    leads.sort((a, b) => b.date.localeCompare(a.date));
+    writeJson(LEADS_JSON, leads);
+    return { ok: true };
+}
+
+function removeLeads(body: Body) {
+    const leads = readLeads();
+    const picked = new Set(leadUrls(leads, body.urls));
+    const withArticle = [...picked].find((l) => l.slug && fs.existsSync(articleFile(l.slug)));
+    if (withArticle) throw new HttpError(409, `"${withArticle.title}" has an article — remove the article first`);
+    writeJson(LEADS_JSON, leads.filter((l) => !picked.has(l)));
+    return { removed: picked.size };
+}
+
+function runLeadScrape() {
+    if (leadSlot.proc) throw new HttpError(409, `${leadSlot.job?.mode} is already running`);
+    const pages = fs.existsSync(path.join(LEADS_DIR, 'pages'));
+    const args = pages ? ['--html-dir', 'pages'] : [];
+    return startCommand(leadSlot, ['python3', 'scrape.py', ...args], ['python3 scrape.py', ...args].join(' '), { mode: 'scrape', scopes: [] }, LEADS_DIR);
+}
+
+function runBlogBuild() {
+    if (leadSlot.proc) throw new HttpError(409, `${leadSlot.job?.mode} is already running`);
+    return startCommand(leadSlot, [BUN, 'run', 'build'], 'bun run build', { mode: 'build', scopes: [] }, BLOG_DIR);
+}
+
+/** Commits just this article's file (new, edited or deleted) and pushes main, which deploys the blog. */
+function deployArticle(body: Body) {
+    if (leadSlot.proc) throw new HttpError(409, `${leadSlot.job?.mode} is already running`);
+    const slug = blogSlug(body.slug);
+    const rel = `${BLOG_ARTICLES}/${slug}.md`;
+    const branch = gitIn(BLOG_DIR, 'branch', '--show-current').out.trim();
+    if (branch !== 'main') throw new HttpError(409, `The blog repo is on ${branch || 'a detached HEAD'}, not main`);
+    if (!blogGitState().changed.has(rel)) throw new HttpError(400, 'Nothing to deploy — the article matches the last commit');
+    const exists = fs.existsSync(articleFile(slug));
+    const message = str(body.message).trim() || (exists ? `Add new article ${slug}` : `Remove article ${slug}`);
+    return startCommand(
+        leadSlot,
+        ['sh', '-c', 'git add -A -- "$1" && git commit -m "$2" -- "$1" && git push origin main', 'sh', rel, message],
+        `git add -A -- ${rel} && git commit -m ${JSON.stringify(message)} && git push origin main`,
+        { mode: `deploy ${slug}`, scopes: [slug] },
+        BLOG_DIR,
+    );
+}
+
+async function checkLive(params: URLSearchParams) {
+    const slug = blogSlug(params.get('slug'));
+    const info = articleInfo(slug);
+    if (!info) throw new HttpError(404, 'No article file');
+    const url = `${BLOG_URL}/article/${slug}/`;
+    // The site answers 200 with a generic page for any path, so look for the title.
+    const html = await fetch(url, { headers: { 'cache-control': 'no-cache' } }).then((r) => r.text()).catch(() => '');
+    return { url, live: !!info.title && html.includes(info.title) };
+}
+
+function readBlogArticle(params: URLSearchParams) {
+    const slug = blogSlug(params.get('slug'));
+    if (!fs.existsSync(articleFile(slug))) throw new HttpError(404, 'No article file');
+    return { text: fs.readFileSync(articleFile(slug), 'utf-8'), path: `${BLOG_ARTICLES}/${slug}.md` };
+}
+
+function saveBlogArticle(body: Body) {
+    const slug = blogSlug(body.slug);
+    if (!fs.existsSync(articleFile(slug))) throw new HttpError(404, 'No article file');
+    const text = str(body.text).replace(/\r\n/g, '\n');
+    if (!/^---\n[\s\S]*?\ntitle:[\s\S]*?\n---\n/.test(text)) throw new HttpError(400, 'The file must start with a --- frontmatter block that has a title');
+    fs.writeFileSync(articleFile(slug), text.endsWith('\n') ? text : text + '\n');
+    return { ok: true };
+}
+
+/** Deletes the article file and puts its lead back to pending or skipped. Deploy afterwards to take it off the site. */
+function removeBlogArticle(body: Body) {
+    const slug = blogSlug(body.slug);
+    if (str(body.confirm) !== slug) throw new HttpError(400, 'Removal not confirmed');
+    const status = str(body.status) === 'skipped' ? 'skipped' : 'pending';
+    const leads = readLeads();
+    const lead = leads.find((l) => l.slug === slug);
+    if (fs.existsSync(articleFile(slug))) fs.rmSync(articleFile(slug));
+    if (lead) {
+        lead.status = status;
+        lead.slug = null;
+        delete lead.x_url;
+        writeJson(LEADS_JSON, leads);
+    }
+    return { ok: true, live: gitIn(BLOG_DIR, 'cat-file', '-e', `origin/main:${BLOG_ARTICLES}/${slug}.md`).ok };
+}
+
+function setXUrl(body: Body) {
+    const leads = readLeads();
+    const lead = leadByUrl(leads, body.url);
+    const x = str(body.x_url).trim();
+    if (!x) {
+        delete lead.x_url;
+        if (lead.status === 'published') lead.status = 'written';
+    } else {
+        if (!/^https:\/\/(x|twitter)\.com\/\w+\/(status|article)\/\d+/.test(x)) throw new HttpError(400, 'Expected an x.com post or article URL');
+        if (!lead.slug) throw new HttpError(400, 'This lead has no article yet');
+        lead.x_url = x;
+        lead.status = 'published';
+    }
+    writeJson(LEADS_JSON, leads);
+    return { ok: true };
+}
+
+/** The skill's X paste step: the built <article> as rich text on the clipboard, plus the blog link. */
+function copyForX(body: Body) {
+    const slug = blogSlug(body.slug);
+    const built = path.join(BLOG_DIR, 'dist/article', slug, 'index.html');
+    if (!fs.existsSync(built)) throw new HttpError(400, 'Not built yet — run "Build blog" first');
+    if (fs.statSync(built).mtimeMs < fs.statSync(articleFile(slug)).mtimeMs) throw new HttpError(400, 'The article changed since the last build — run "Build blog" first');
+    const article = /<article[\s\S]*?<\/article>/.exec(fs.readFileSync(built, 'utf-8'))?.[0];
+    if (!article) throw new HttpError(500, 'No <article> in the built page');
+    const clean = article
+        .replace(/<(script|style)[\s\S]*?<\/\1>/g, '')
+        .replace(/\s(?:class|style|id|data-[\w-]+)=("[^"]*"|'[^']*')/g, '');
+    const link = `${BLOG_URL}/article/${slug}`;
+    const html = `<html dir="rtl"><meta charset="utf-8"><body>${clean}<p>نُشر أولا على مدونتي: ${link}</p></body></html>`;
+    const rtf = Bun.spawnSync(['textutil', '-convert', 'rtf', '-format', 'html', '-stdin', '-stdout'], { stdin: Buffer.from(html) });
+    if (rtf.exitCode !== 0) throw new HttpError(500, rtf.stderr.toString() || 'textutil failed');
+    const copy = Bun.spawnSync(['pbcopy', '-Prefer', 'rtf'], { stdin: rtf.stdout });
+    if (copy.exitCode !== 0) throw new HttpError(500, 'pbcopy failed');
+    return { ok: true, thumb: articleInfo(slug)?.thumb ?? null };
+}
+
+const shellQuote = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
+
+/** Opens Terminal on the blog repo running an interactive `claude <prompt>`. */
+function openClaude(prompt: string, flags: string[] = []) {
+    const command = `cd ${shellQuote(BLOG_DIR)} && claude ${flags.join(' ')} ${shellQuote(prompt)}`.replace(/ {2,}/g, ' ');
+    const script = `tell application "Terminal"\nactivate\ndo script "${command.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"\nend tell`;
+    const res = Bun.spawnSync(['osascript', '-e', script]);
+    if (res.exitCode !== 0) throw new HttpError(500, res.stderr.toString() || 'Could not open Terminal');
+    return { ok: true, command };
+}
+
+function writeLeads(body: Body) {
+    const picked = leadUrls(readLeads(), body.urls);
+    const taken = picked.find((l) => l.slug && fs.existsSync(articleFile(l.slug)));
+    if (taken) throw new HttpError(409, `"${taken.title}" already has an article`);
+    const [first, ...rest] = picked.map((l) => l.url);
+    const prompt = rest.length
+        ? `/functional-food-leads write ${first} — then run Mode write the same way, one at a time, for each of these leads too: ${rest.join(' ')}`
+        : `/functional-food-leads write ${first}`;
+    return openClaude(prompt);
+}
+
+function publishLead(body: Body) {
+    const slug = blogSlug(body.slug);
+    if (!fs.existsSync(articleFile(slug))) throw new HttpError(404, 'No article file');
+    return openClaude(`/functional-food-leads publish ${slug}`, ['--chrome']);
+}
+
+function leadJob(params: URLSearchParams) {
+    return { job: leadSlot.job ? publicJob(leadSlot.job, Number(params.get('from')) || 0) : null };
+}
+
 // ─── Stats ────────────────────────────────────────────────────────────────────
 // Everything is by created_at (the post's publish date): the catalog doesn't
 // record when an article was imported.
@@ -1941,6 +2265,19 @@ const POST: Record<string, (body: Body) => unknown | Promise<unknown>> = {
     '/api/entries/remove': removeEntry,
     '/api/entries/markdown': saveMarkdown,
     '/api/quiz/bank/edit': editBank,
+    '/api/leads/status': setLeadStatus,
+    '/api/leads/add': addLead,
+    '/api/leads/remove': removeLeads,
+    '/api/leads/scrape': runLeadScrape,
+    '/api/leads/build': runBlogBuild,
+    '/api/leads/deploy': deployArticle,
+    '/api/leads/stop': () => stopJob(leadSlot),
+    '/api/leads/article': saveBlogArticle,
+    '/api/leads/article/remove': removeBlogArticle,
+    '/api/leads/x-url': setXUrl,
+    '/api/leads/copy-x': copyForX,
+    '/api/leads/write': writeLeads,
+    '/api/leads/publish': publishLead,
 };
 
 const GET: Record<string, (params: URLSearchParams) => unknown | Promise<unknown>> = {
@@ -1968,6 +2305,10 @@ const GET: Record<string, (params: URLSearchParams) => unknown | Promise<unknown
     '/api/entries/markdown': readMarkdown,
     '/api/quiz/bank': listBank,
     '/api/quiz/reports': quizReports,
+    '/api/leads': listLeads,
+    '/api/leads/job': leadJob,
+    '/api/leads/live': checkLive,
+    '/api/leads/article': readBlogArticle,
 };
 
 Bun.serve({
