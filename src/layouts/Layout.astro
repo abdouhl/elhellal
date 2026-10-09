@@ -68,8 +68,9 @@ const {
 <html lang="ar" dir="rtl" data-new-ui-theme="dark">
     
     <head>
-        <!-- Google Funding Choices (ad-blocking recovery / Offerwall consent) — must load as early as possible in <head>, unprocessed and unbundled -->
-        <script async is:inline src="https://fundingchoicesmessages.google.com/i/pub-3610150616518651?ers=1"></script>
+        <!-- Google Funding Choices (consent / ad-blocking recovery) and AdSense are
+             loaded by the ad loader below, after the first interaction or once the
+             page is idle. This inline signal stays here, unprocessed and unbundled. -->
         <script is:inline>
             (function () {
                 function signalGooglefcPresent() {
@@ -166,12 +167,50 @@ const {
             gtag("config", "G-MLVB12BM2C");
         </script>
 
-        <!-- Google AdSense (runs on the main thread — ad rendering needs direct DOM access, so it can't go through Partytown) -->
-        <script
-            async
-            src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3610150616518651"
-            crossorigin="anonymous"
-        ></script>
+        <!-- Ad loader. AdSense runs on the main thread (ad rendering needs direct DOM
+             access, so it can't go through Partytown), so it stays out of the way of
+             first paint: both scripts load on the first scroll/tap/key press, or 3s
+             after the load event once the browser is idle. Funding Choices goes first
+             and AdSense only after it has run, so its consent API (__tcfapi) is in
+             place before any ad request. Slots queue their adsbygoogle.push({}) calls
+             until then (see loadAds below). -->
+        <script is:inline>
+            (function () {
+                if (window.__elhellalAdsBoot) return;
+                window.__elhellalAdsBoot = true;
+                var events = ["scroll", "pointerdown", "keydown", "touchstart"];
+                var started = false;
+                function inject(src, crossOrigin, done) {
+                    var s = document.createElement("script");
+                    s.async = true;
+                    s.src = src;
+                    if (crossOrigin) s.crossOrigin = "anonymous";
+                    if (done) s.onload = s.onerror = done;
+                    document.head.appendChild(s);
+                }
+                function start() {
+                    if (started) return;
+                    started = true;
+                    events.forEach(function (e) {
+                        window.removeEventListener(e, start, { passive: true });
+                    });
+                    inject("https://fundingchoicesmessages.google.com/i/pub-3610150616518651?ers=1", false, function () {
+                        inject("https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3610150616518651", true);
+                    });
+                }
+                events.forEach(function (e) {
+                    window.addEventListener(e, start, { passive: true });
+                });
+                function whenIdle() {
+                    setTimeout(function () {
+                        if (window.requestIdleCallback) window.requestIdleCallback(start, { timeout: 2000 });
+                        else start();
+                    }, 3000);
+                }
+                if (document.readyState === "complete") whenIdle();
+                else window.addEventListener("load", whenIdle);
+            })();
+        </script>
 
         <ViewTransitions />
         <WebSiteSchema />
