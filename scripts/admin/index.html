@@ -19,7 +19,7 @@
   body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif; background: var(--bg); color: var(--text); }
   header { position: sticky; top: 0; z-index: 5; background: var(--panel); border-bottom: 1px solid var(--line); padding: 10px 16px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
   header h1 { font-size: 16px; margin: 0; }
-  nav { display: flex; gap: 4px; }
+  nav { display: flex; gap: 4px; flex-wrap: wrap; }
   nav button { background: none; border: 0; padding: 6px 10px; border-radius: 6px; color: var(--muted); cursor: pointer; font: inherit; }
   nav button.active { background: var(--bg); color: var(--text); font-weight: 600; }
   .stats { color: var(--muted); margin-inline-start: auto; font-size: 13px; }
@@ -45,6 +45,7 @@
   .actions { display: flex; gap: 6px; flex: none; flex-wrap: wrap; justify-content: flex-end; }
   .pill { font-size: 11px; padding: 1px 6px; border-radius: 99px; background: var(--bg); border: 1px solid var(--line); }
   .pill.bad { color: var(--danger); border-color: currentColor; }
+  .pill.ok { color: var(--ok); border-color: currentColor; }
   .empty { padding: 30px; text-align: center; color: var(--muted); }
   .pager { display: flex; gap: 8px; justify-content: center; align-items: center; margin: 12px 0; color: var(--muted); }
   .edit { display: grid; gap: 6px; margin-top: 8px; }
@@ -54,6 +55,14 @@
   #toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 8px 14px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; }
   #toast.show { opacity: 1; }
   #toast.err { background: var(--danger); color: #fff; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: start; padding: 7px 12px; border-top: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; border-top: 0; }
+  td.num, th.num { text-align: end; font-variant-numeric: tabular-nums; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+  .card .toolbar:last-child { margin-bottom: 0; }
+  .log { background: #111; color: #ddd; font: 12px/1.5 ui-monospace, Menlo, monospace; padding: 10px 12px; border-radius: 8px; height: 420px; overflow: auto; white-space: pre-wrap; word-break: break-word; margin: 0; }
+  .ok { color: var(--ok); } .bad { color: var(--danger); }
   @media (max-width: 640px) { .row { flex-wrap: wrap; } .row img { display: none; } .actions { width: 100%; justify-content: flex-start; } }
 </style>
 </head>
@@ -65,12 +74,18 @@
     <button data-tab="authors">Authors</button>
     <button data-tab="review">Review</button>
     <button data-tab="blocked">Blocked</button>
+    <button data-tab="pins">Pins</button>
+    <button data-tab="import">Import</button>
+    <button data-tab="health">Health</button>
+    <button data-tab="publish">Publish</button>
+    <button data-tab="social">Social</button>
+    <button data-tab="stats">Stats</button>
+    <button data-tab="sites">Sites</button>
   </nav>
   <span class="stats" id="stats"></span>
   <button class="btn" id="reload" title="Re-read the catalog from disk">Reload</button>
 </header>
 <main>
-  <div id="banner"></div>
   <div id="view"></div>
 </main>
 <div id="toast"></div>
@@ -106,7 +121,7 @@ function toast(msg, err) {
 }
 
 async function act(fn, ok) {
-  try { const r = await fn(); if (ok) toast(typeof ok === 'function' ? ok(r) : ok); await refreshStats(); render(); }
+  try { const r = await fn(); dash = null; if (ok) toast(typeof ok === 'function' ? ok(r) : ok); await refreshStats(); render(); }
   catch (e) { toast(e.message, true); }
 }
 
@@ -118,9 +133,6 @@ async function refreshStats() {
   stats = await api('/api/stats');
   document.getElementById('stats').textContent =
     `${stats.articles.toLocaleString()} articles · ${stats.blockedArticles} blocked · ${stats.blockedAuthors} blocked authors`;
-  document.getElementById('banner').replaceChildren(stats.legacyFile ? h('div', { class: 'banner' },
-    'src/data/articles.json still exists (P6 cutover pending). migrate-to-catalog skips blocklisted articles, ',
-    'but title/category edits made here would be overwritten by it. Prefer removals until the cutover is done.') : '');
 }
 
 document.getElementById('tabs').addEventListener('click', (e) => {
@@ -131,8 +143,10 @@ document.getElementById('tabs').addEventListener('click', (e) => {
 });
 document.getElementById('reload').onclick = () => act(() => api('/api/reload', {}), 'Reloaded from disk');
 
-function render() { ({ articles: renderArticles, authors: renderAuthors, review: renderReview, blocked: renderBlocked })[state.tab](); }
+function render() { ({ articles: renderArticles, authors: renderAuthors, review: renderReview, blocked: renderBlocked, pins: renderPins, import: renderImport, health: renderHealth, publish: renderPublish, social: renderSocial, stats: renderStats, sites: renderSites })[state.tab](); }
 const view = () => document.getElementById('view');
+/** Fills the page for `tab` — unless the user has switched tabs while it was loading. */
+function paint(tab, ...children) { if (state.tab === tab) view().replaceChildren(...children); }
 
 // ─── Articles ───
 function categoryOptions(selected, withAll) {
@@ -152,7 +166,7 @@ async function renderArticles() {
   const visibleIds = data.items.map((a) => a.id_str);
   const allChecked = visibleIds.length > 0 && visibleIds.every((id) => state.selected.has(id));
 
-  view().replaceChildren(
+  paint('articles', 
     h('div', { class: 'toolbar' },
       search,
       h('select', { onchange: (e) => { state.category = e.target.value; state.page = 1; render(); } }, categoryOptions(state.category, true)),
@@ -167,7 +181,7 @@ async function renderArticles() {
       state.selected.size ? h('button', { class: 'btn danger', onclick: () => removeSelected() }, `Remove ${state.selected.size} selected`) : null,
       state.selected.size ? h('button', { class: 'btn', onclick: () => { state.selected.clear(); render(); } }, 'Clear selection') : null,
     ),
-    data.items.length ? h('div', { class: 'list' }, data.items.map(articleRow)) : h('div', { class: 'list' }, h('div', { class: 'empty' }, 'No articles')),
+    data.items.length ? h('div', { class: 'list' }, data.items.map((a) => articleRow(a))) : h('div', { class: 'list' }, h('div', { class: 'empty' }, 'No articles')),
     pager(data),
   );
   if (document.activeElement === document.body && state.q) { search.focus(); search.setSelectionRange(state.q.length, state.q.length); }
@@ -194,7 +208,7 @@ function articleMeta(a) {
 
 function syncTabs() { for (const b of document.querySelectorAll('#tabs button')) b.classList.toggle('active', b.dataset.tab === state.tab); }
 
-function articleRow(a) {
+function articleRow(a, extra) {
   const editing = state.editing === a.id_str;
   return h('div', { class: 'row' },
     h('input', { type: 'checkbox', checked: state.selected.has(a.id_str),
@@ -204,6 +218,7 @@ function articleRow(a) {
       h('div', { class: 'title', dir: 'auto' }, a.title),
       h('div', { class: 'preview', dir: 'auto' }, a.preview_text),
       articleMeta(a),
+      extra,
       editing ? editForm(a) : null,
     ),
     h('div', { class: 'actions' },
@@ -248,7 +263,7 @@ async function renderAuthors() {
   const data = await api('/api/authors?' + new URLSearchParams({ q: authorQuery }));
   const search = h('input', { type: 'search', placeholder: 'Search authors…', value: authorQuery,
     oninput: (e) => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { authorQuery = e.target.value; render(); }, 250); } });
-  view().replaceChildren(
+  paint('authors', 
     h('div', { class: 'toolbar' }, search, h('span', { class: 'meta' }, `${data.total.toLocaleString()} authors (top 200 by article count shown)`)),
     h('div', { class: 'list' }, data.items.length ? data.items.map((au) => h('div', { class: 'row' },
       au.image ? h('img', { src: au.image, loading: 'lazy', alt: '', style: 'width:40px;height:40px;border-radius:50%' }) : null,
@@ -273,7 +288,7 @@ function blockAuthor(name, count) {
 // ─── Review ───
 async function renderReview() {
   const data = await api('/api/review');
-  view().replaceChildren(
+  paint('review', 
     h('p', { class: 'meta' }, `${data.total} articles flagged "review" by bun run moderate. Keep or remove writes to overrides.json.`),
     h('div', { class: 'list' }, data.items.length ? data.items.map((a) => h('div', { class: 'row' },
       h('div', { class: 'body' },
@@ -293,7 +308,7 @@ async function renderReview() {
 // ─── Blocked ───
 async function renderBlocked() {
   const data = await api('/api/blocked');
-  view().replaceChildren(
+  paint('blocked', 
     h('h2', {}, `Blocked authors (${data.authors.length})`),
     h('div', { class: 'list' }, data.authors.length ? data.authors.map((name) => h('div', { class: 'row' },
       h('div', { class: 'body title' }, '@' + name),
@@ -314,6 +329,992 @@ async function renderBlocked() {
         (r) => r.restored ? 'Restored' : 'Unblocked (content not in this session — importer may re-add it)') },
         a.restorable ? 'Restore' : 'Unblock'),
     )) : h('div', { class: 'empty' }, 'None')),
+  );
+}
+
+// ─── Pins (R2) ───
+const pins = { scopes: new Set(['articles']), mode: 'generate', batch: '', status: null, statusError: '', loadingStatus: false, job: null, next: 0, lines: [], timer: null };
+const MODES = {
+  generate: 'Generate & upload new pins (adds them to the feed)',
+  fix: 'Fix feeds — add images already in the bucket but missing from their feed',
+  remove: 'Remove — delete images, record them in published.json, empty the feeds',
+};
+
+async function loadPinStatus() {
+  pins.loadingStatus = true; pins.statusError = ''; if (state.tab === 'pins') renderPins();
+  try { pins.status = await api('/api/pins/status'); }
+  catch (e) { pins.statusError = e.message; }
+  pins.loadingStatus = false; if (state.tab === 'pins') renderPins();
+}
+
+async function pollPinJob() {
+  clearTimeout(pins.timer);
+  const r = await api('/api/pins/job?from=' + pins.next).catch(() => null);
+  if (!r) return;
+  pins.allScopes = r.scopes;
+  if (r.job && pins.job && r.job.id !== pins.job.id) { pins.lines = []; }
+  const wasRunning = pins.job?.running;
+  pins.job = r.job;
+  if (r.job) { pins.lines.push(...r.job.lines); pins.next = r.job.next; if (pins.lines.length > 5000) pins.lines.splice(0, pins.lines.length - 5000); }
+  if (state.tab === 'pins') updatePinJob();
+  if (r.job?.running) pins.timer = setTimeout(pollPinJob, 1000);
+  else if (wasRunning) { if (state.tab === 'pins') renderPins(); toast(r.job.exitCode === 0 ? 'Pin job finished' : `Pin job exited with code ${r.job.exitCode}`, r.job.exitCode !== 0); loadPinStatus(); }
+}
+
+function scopeLabel(s) { return s.startsWith('quiz-') ? `quiz (${s.slice(5)})` : s; }
+
+async function renderPins() {
+  if (!pins.allScopes) await pollPinJob();
+  if (!pins.status && !pins.loadingStatus && !pins.statusError) loadPinStatus();
+  const running = !!pins.job?.running;
+  const st = pins.status;
+
+  const statusCard = h('div', { class: 'list' },
+    pins.statusError ? h('div', { class: 'empty bad' }, pins.statusError)
+    : !st ? h('div', { class: 'empty' }, 'Listing the bucket…')
+    : h('table', {},
+        h('tr', {}, h('th', {}, 'Content'), h('th', { class: 'num' }, 'Images in R2'), h('th', { class: 'num' }, 'Feed items'), h('th', {}, 'Feed')),
+        st.scopes.map((r) => h('tr', {},
+          h('td', {}, scopeLabel(r.scope)),
+          h('td', { class: 'num' }, r.images.toLocaleString()),
+          h('td', { class: 'num' }, r.feedItems === null ? '—' : r.feedItems.toLocaleString()),
+          h('td', {}, h('a', { class: 'link', href: r.feedUrl, target: '_blank', rel: 'noreferrer' }, r.feedUrl.split('/').pop() + ' ↗')),
+        )),
+      ),
+  );
+
+  const scopeBoxes = (pins.allScopes || []).map((s) => h('label', {},
+    h('input', { type: 'checkbox', checked: pins.scopes.has(s), disabled: running,
+      onchange: (e) => { e.target.checked ? pins.scopes.add(s) : pins.scopes.delete(s); renderPins(); } }), ' ', scopeLabel(s)));
+  const modeRadios = Object.entries(MODES).map(([m, label]) => h('label', { style: 'display:block' },
+    h('input', { type: 'radio', name: 'pinmode', checked: pins.mode === m, disabled: running,
+      onchange: () => { pins.mode = m; renderPins(); } }), ' ', m === 'remove' ? h('span', { class: 'bad' }, label) : label));
+
+  paint('pins', 
+    h('div', { class: 'toolbar' },
+      h('h2', { style: 'margin:0' }, st ? `R2 bucket: ${st.bucket}` : 'R2 bucket'),
+      st ? h('span', { class: 'meta' }, `${st.published.toLocaleString()} URLs in published.json (never regenerated) · checked ${new Date(st.checkedAt).toLocaleTimeString()}`) : null,
+      h('button', { class: 'btn', disabled: pins.loadingStatus, onclick: loadPinStatus }, pins.loadingStatus ? 'Listing…' : 'Refresh'),
+    ),
+    statusCard,
+    h('h2', {}, 'Run'),
+    h('div', { class: 'card' },
+      h('div', { class: 'toolbar' }, ...scopeBoxes),
+      h('div', { style: 'margin-bottom:12px' }, ...modeRadios),
+      h('div', { class: 'toolbar' },
+        pins.mode === 'generate' ? h('input', { type: 'number', min: 1, placeholder: 'Batch (default 10000)', value: pins.batch, disabled: running,
+          oninput: (e) => { pins.batch = e.target.value; } }) : null,
+        h('button', { class: 'btn ' + (pins.mode === 'remove' ? 'danger' : 'primary'), disabled: running || !pins.scopes.size, onclick: startPinJob },
+          pins.mode === 'remove' ? 'Remove pins from R2' : pins.mode === 'fix' ? 'Fix feeds' : 'Generate pins'),
+        h('button', { class: 'btn danger', disabled: !running, onclick: () => act(() => api('/api/pins/stop', {}), 'Stopping…') }, 'Stop'),
+      ),
+    ),
+    h('h2', { id: 'pinjobtitle' }),
+    h('pre', { class: 'log', id: 'pinlog' }),
+  );
+  updatePinJob(true);
+}
+
+function updatePinJob(force) {
+  const title = document.getElementById('pinjobtitle'), log = document.getElementById('pinlog');
+  if (!title || !log) return;
+  const j = pins.job;
+  if (!j) { title.textContent = 'Log'; log.textContent = 'No job run since the admin server started.'; return; }
+  const status = j.running ? 'running…' : j.stopped ? 'stopped' : j.exitCode === 0 ? 'done' : `failed (exit ${j.exitCode})`;
+  const secs = Math.round(((j.endedAt || Date.now()) - j.startedAt) / 1000);
+  title.replaceChildren(`Job #${j.id} — ${j.mode} ${j.scopes.map(scopeLabel).join(' + ')} — `,
+    h('span', { class: j.running ? '' : j.exitCode === 0 ? 'ok' : 'bad' }, status), h('span', { class: 'meta', style: 'display:inline' }, ` ${secs}s`));
+  const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 30;
+  log.textContent = '$ ' + j.command + '\n' + pins.lines.join('\n');
+  if (atBottom || force) log.scrollTop = log.scrollHeight;
+}
+
+function startPinJob() {
+  const scopes = [...pins.scopes];
+  const body = { mode: pins.mode, scopes, batch: pins.batch };
+  if (pins.mode === 'remove') {
+    const word = scopes.join('+');
+    const typed = prompt(`This deletes every ${scopes.map(scopeLabel).join(', ')} pin image from R2, records their URLs in published.json and empties those feeds.\n\nOnly do this once Pinterest has picked them up. Type "${word}" to confirm:`, '');
+    if (typed === null) return;
+    if (typed.trim() !== word) return toast('Confirmation did not match', true);
+    body.confirm = word;
+  }
+  act(async () => { await api('/api/pins/run', body); pins.lines = []; pins.next = 0; pins.job = null; await pollPinJob(); }, 'Started');
+}
+
+// ─── Import (Substack / blogs) ───
+const imp = { source: 'substack', only: true, save: true, text: { substack: '', blogs: '' }, job: null, next: 0, lines: [], others: [], blogs: [], timer: null, loaded: false };
+// Substack authors to pick from (filled by hand or by discovery runs), and the discovery job.
+const cands = { items: [], sel: new Set(), add: '', loaded: false };
+const disc = { geo: '', pages: '', days: '', all: false, open: false, job: null, next: 0, lines: [], timer: null, loaded: false };
+
+async function loadCandidates() {
+  cands.items = (await api('/api/candidates')).items; cands.loaded = true;
+  const names = new Set(cands.items.map((c) => c.username));
+  for (const u of cands.sel) if (!names.has(u)) cands.sel.delete(u);
+}
+
+async function pollDiscover() {
+  clearTimeout(disc.timer);
+  const r = await api('/api/discover/job?from=' + disc.next).catch(() => null);
+  if (!r) return;
+  disc.loaded = true;
+  if (r.job && disc.job && r.job.id !== disc.job.id) disc.lines = [];
+  const wasRunning = disc.job?.running;
+  disc.job = r.job;
+  if (r.job) { disc.lines.push(...r.job.lines); disc.next = r.job.next; if (disc.lines.length > 5000) disc.lines.splice(0, disc.lines.length - 5000); }
+  if (state.tab === 'import') updateDiscoverJob();
+  if (r.job?.running) disc.timer = setTimeout(pollDiscover, 1000);
+  else if (wasRunning) {
+    toast(r.job.exitCode === 0 ? 'Discovery finished — new authors added to the list' : `Discovery exited with code ${r.job.exitCode}`, r.job.exitCode !== 0);
+    await loadCandidates(); if (state.tab === 'import') renderImport();
+  }
+}
+
+function updateDiscoverJob(force) {
+  const title = document.getElementById('discjobtitle'), log = document.getElementById('disclog');
+  if (!title || !log) return;
+  const j = disc.job;
+  if (!j) { title.textContent = 'Discovery log'; log.textContent = 'No discovery run since the admin server started.'; return; }
+  const status = j.running ? 'running…' : j.stopped ? 'stopped' : j.exitCode === 0 ? 'done' : `failed (exit ${j.exitCode})`;
+  const secs = Math.round(((j.endedAt || Date.now()) - j.startedAt) / 1000);
+  title.replaceChildren(`Discovery #${j.id} — `, h('span', { class: j.running ? '' : j.exitCode === 0 ? 'ok' : 'bad' }, status), ` ${secs}s`);
+  const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 30;
+  log.textContent = '$ ' + j.command + '\n' + disc.lines.join('\n');
+  if (atBottom || force) log.scrollTop = log.scrollHeight;
+}
+
+function startDiscover() {
+  const body = { geo: disc.geo, pages: disc.pages, days: disc.days, all: disc.all };
+  act(async () => { await api('/api/discover/run', body); disc.lines = []; disc.next = 0; disc.job = null; await pollDiscover(); }, 'Discovery started');
+}
+
+function addCandidates() {
+  act(async () => {
+    const r = await api('/api/candidates/add', { items: cands.add });
+    cands.add = ''; await loadCandidates();
+    return r;
+  }, (r) => `Added ${r.added}` + (r.skipped.length ? ` · skipped blocked: ${r.skipped.join(', ')}` : ''));
+}
+
+function removeCandidates() {
+  const usernames = [...cands.sel];
+  if (!confirm(`Remove ${usernames.length} author(s) from the import list?`)) return;
+  act(async () => { const r = await api('/api/candidates/remove', { usernames }); cands.sel.clear(); await loadCandidates(); return r; }, (r) => `Removed ${r.removed}`);
+}
+
+/** The Substack source's body: discovery controls + the pickable author list. */
+function substackPanel(running) {
+  const discRunning = !!disc.job?.running;
+  const selCount = h('span', { class: 'meta', id: 'candsel' }, `${cands.sel.size} selected`);
+  const setSel = (names) => { cands.sel = new Set(names); renderImport(); };
+  const pickable = cands.items.filter((c) => !c.blocked);
+  const discover = h('details', { open: disc.open || discRunning, style: 'margin-bottom:12px', ontoggle: (e) => { disc.open = e.target.open; } },
+    h('summary', { style: 'cursor:pointer;font-weight:600' }, 'Discover new authors (Google Trends → Substack search)'),
+    h('div', { class: 'toolbar', style: 'margin-top:8px' },
+      h('input', { placeholder: 'Countries, e.g. SA EG MA (default: all Arab)', value: disc.geo, disabled: discRunning, style: 'flex:1;min-width:220px', dir: 'ltr',
+        oninput: (e) => { disc.geo = e.target.value; } }),
+      h('input', { type: 'number', min: 1, placeholder: 'Pages (2)', value: disc.pages, disabled: discRunning, style: 'width:110px', oninput: (e) => { disc.pages = e.target.value; } }),
+      h('input', { type: 'number', min: 0, placeholder: 'Max age days', value: disc.days, disabled: discRunning, style: 'width:130px', oninput: (e) => { disc.days = e.target.value; } }),
+      h('label', { title: 'Include authors already in the catalog or reported by earlier runs' },
+        h('input', { type: 'checkbox', checked: disc.all, disabled: discRunning, onchange: (e) => { disc.all = e.target.checked; } }), ' --all'),
+      h('button', { class: 'btn primary', disabled: discRunning, onclick: startDiscover }, discRunning ? 'Discovering…' : 'Run discovery'),
+      h('button', { class: 'btn danger', disabled: !discRunning, onclick: () => act(() => api('/api/discover/stop', {}), 'Stopping…') }, 'Stop'),
+      h('button', { class: 'btn', disabled: discRunning, title: 'Add the results of the last run (e.g. one started in a terminal) from .substack-discovery/latest.json',
+        onclick: () => act(async () => { const r = await api('/api/candidates/merge', {}); await loadCandidates(); return r; }, (r) => `Added ${r.added} author(s) from the last run`) }, 'Load last run'),
+    ),
+    h('div', { class: 'meta', id: 'discjobtitle', style: 'margin-bottom:4px' }),
+    h('pre', { class: 'log', id: 'disclog', style: 'height:200px' }),
+  );
+  const add = h('div', { class: 'toolbar' },
+    h('input', { placeholder: 'Add usernames (space separated), e.g. 99iov sabahlal', value: cands.add, disabled: running, style: 'flex:1;min-width:220px', dir: 'ltr',
+      oninput: (e) => { cands.add = e.target.value; }, onkeydown: (e) => { if (e.key === 'Enter') addCandidates(); } }),
+    h('button', { class: 'btn', disabled: running, onclick: addCandidates }, 'Add to list'),
+  );
+  const tools = h('div', { class: 'toolbar' },
+    h('strong', {}, `Import list (${cands.items.length})`),
+    h('button', { class: 'btn', disabled: running, onclick: () => setSel(pickable.map((c) => c.username)) }, 'All'),
+    h('button', { class: 'btn', disabled: running, onclick: () => setSel(pickable.filter((c) => !c.articles).map((c) => c.username)) }, 'Not imported yet'),
+    h('button', { class: 'btn', disabled: running, onclick: () => setSel([]) }, 'None'),
+    h('button', { class: 'btn danger', disabled: running || !cands.sel.size, onclick: removeCandidates }, 'Remove selected'),
+    selCount,
+  );
+  const list = h('div', { class: 'list', style: 'max-height:420px;overflow:auto' }, cands.items.length ? cands.items.map((c) => h('label', { class: 'row', style: 'cursor:pointer' },
+    h('input', { type: 'checkbox', checked: cands.sel.has(c.username), disabled: running || c.blocked, style: 'margin-top:3px',
+      onchange: (e) => { e.target.checked ? cands.sel.add(c.username) : cands.sel.delete(c.username); document.getElementById('candsel').textContent = `${cands.sel.size} selected`; } }),
+    h('div', { class: 'body' },
+      h('div', { class: 'title' }, '@' + c.username, ' ', c.name ? h('span', { class: 'meta', style: 'display:inline' }, c.name) : null, ' ',
+        h('span', { class: 'pill' }, c.source), ' ',
+        c.blocked ? h('span', { class: 'pill bad' }, 'blocked') : c.articles ? h('span', { class: 'pill ok' }, `${c.articles} in catalog`) : null),
+      h('div', { class: 'meta' },
+        h('a', { href: `https://${c.username}.substack.com`, target: '_blank', rel: 'noreferrer', onclick: (e) => e.stopPropagation() }, `${c.username}.substack.com`),
+        `added ${c.added_at}`,
+        c.score != null ? `score ${c.score}` : null,
+        c.matches != null ? `${c.matches} matching posts` : null,
+        c.reactions ? `${c.reactions} likes` : null,
+        c.latest_post ? `latest ${c.latest_post}` : null,
+        c.keywords?.length ? h('span', { dir: 'rtl' }, c.keywords.join('، ')) : null),
+      c.sample ? h('div', { class: 'meta' }, h('a', { href: c.sample.url, target: '_blank', rel: 'noreferrer', dir: 'auto', onclick: (e) => e.stopPropagation() }, c.sample.title)) : null,
+    ),
+  )) : h('div', { class: 'empty' }, 'No authors yet — add usernames above or run discovery.'));
+  return [discover, add, tools, list];
+}
+
+
+async function pollImport() {
+  clearTimeout(imp.timer);
+  const r = await api('/api/import/job?from=' + imp.next).catch(() => null);
+  if (!r) return;
+  imp.loaded = true; imp.others = r.others; imp.blogs = r.blogs;
+  if (r.job && imp.job && r.job.id !== imp.job.id) imp.lines = [];
+  const wasRunning = imp.job?.running;
+  imp.job = r.job;
+  if (r.job) { imp.lines.push(...r.job.lines); imp.next = r.job.next; if (imp.lines.length > 5000) imp.lines.splice(0, imp.lines.length - 5000); }
+  if (state.tab === 'import') updateImportJob();
+  if (r.job?.running) imp.timer = setTimeout(pollImport, 1000);
+  else if (wasRunning) {
+    toast(r.job.exitCode === 0 ? 'Import finished — run bun run prepare-data to rebuild' : `Import exited with code ${r.job.exitCode}`, r.job.exitCode !== 0);
+    await refreshStats(); await loadCandidates().catch(() => {}); if (state.tab === 'import') renderImport();
+  }
+}
+
+async function renderImport() {
+  if (!imp.loaded) await pollImport();
+  if (!disc.loaded) await pollDiscover();
+  if (!cands.loaded) await loadCandidates().catch((e) => toast(e.message, true));
+  const running = !!imp.job?.running;
+  const blogs = imp.source === 'blogs';
+  const sourceRadios = [['substack', 'Substack authors'], ['blogs', 'External blogs (RSS/Atom)'], ['substack-fix', 'Clean catalog (--fix: drop non-Arabic / empty titles)']]
+    .map(([v, label]) => h('label', { style: 'display:block' },
+      h('input', { type: 'radio', name: 'impsrc', checked: imp.source === v, disabled: running, onchange: () => { imp.source = v; renderImport(); } }), ' ', label));
+  const textarea = imp.source === 'substack-fix' ? null : imp.source === 'substack' ? substackPanel(running) : h('textarea', {
+    rows: 5, style: 'width:100%', disabled: running, dir: 'ltr',
+    placeholder: blogs ? 'One blog URL per line, e.g.\nhttps://alfarhan.ws' : 'Substack usernames or URLs, one per line, e.g.\n99iov\nhttps://sabahlal.substack.com',
+    oninput: (e) => { imp.text[imp.source] = e.target.value; },
+  }, imp.text[imp.source]);
+
+  paint('import', 
+    imp.others.length ? h('div', { class: 'banner' }, 'An importer is running outside the admin — wait for it to finish (catalog edits are blocked meanwhile):',
+      ...imp.others.map((o) => h('div', { style: 'font:12px ui-monospace,monospace;margin-top:4px' }, o))) : '',
+    h('div', { class: 'card' },
+      h('div', { style: 'margin-bottom:10px' }, ...sourceRadios),
+      textarea,
+      imp.source === 'substack-fix' ? null : h('div', { style: 'margin:8px 0' },
+        h('label', { style: 'display:block' }, h('input', { type: 'checkbox', checked: imp.only, disabled: running, onchange: (e) => { imp.only = e.target.checked; renderImport(); } }),
+          ' Only these ', blogs ? 'blogs' : 'authors',
+          h('span', { class: 'meta', style: 'display:inline' }, imp.only ? '' : blogs
+            ? ` — unchecked: also re-checks all ${imp.blogs.length} registered blogs`
+            : ' — unchecked: also re-checks every Substack author in the catalog + the local blog (can take hours)')),
+        blogs ? h('label', { style: 'display:block' }, h('input', { type: 'checkbox', checked: imp.save, disabled: running, onchange: (e) => { imp.save = e.target.checked; } }),
+          ' Save new blogs to src/data/external-blogs.ts so future runs re-check them') : null,
+      ),
+      h('div', { class: 'toolbar' },
+        h('button', { class: 'btn primary', disabled: running || imp.others.length > 0, onclick: startImport },
+          imp.source === 'substack-fix' ? 'Clean catalog' : imp.source === 'substack' ? 'Import selected' : 'Import'),
+        h('button', { class: 'btn danger', disabled: !running, onclick: () => act(() => api('/api/import/stop', {}), 'Stopping…') }, 'Stop'),
+        h('span', { class: 'meta' }, 'Needs Ollama running (gemma4:e4b). Articles are checkpointed as they are added; Stop keeps what was saved.'),
+      ),
+    ),
+    blogs ? h('details', { style: 'margin-top:10px' }, h('summary', { class: 'meta' }, `${imp.blogs.length} registered blogs`),
+      h('div', { class: 'list' }, imp.blogs.map((b) => h('div', { class: 'row' },
+        h('div', { class: 'body' }, h('span', { class: 'title' }, b.slug), ' ', h('a', { class: 'link', href: b.url, target: '_blank', rel: 'noreferrer' }, b.url)),
+        h('button', { class: 'btn', disabled: running, onclick: () => { imp.text.blogs = (imp.text.blogs.trim() + '\n' + b.url).trim(); renderImport(); } }, 'Add to list'))))) : null,
+    h('h2', { id: 'impjobtitle' }),
+    h('pre', { class: 'log', id: 'implog' }),
+  );
+  updateImportJob(true);
+  updateDiscoverJob(true);
+}
+
+function updateImportJob(force) {
+  const title = document.getElementById('impjobtitle'), log = document.getElementById('implog');
+  if (!title || !log) return;
+  const j = imp.job;
+  if (!j) { title.textContent = 'Log'; log.textContent = 'No import run since the admin server started.'; return; }
+  const status = j.running ? 'running…' : j.stopped ? 'stopped' : j.exitCode === 0 ? 'done' : `failed (exit ${j.exitCode})`;
+  const secs = Math.round(((j.endedAt || Date.now()) - j.startedAt) / 1000);
+  title.replaceChildren(`Import #${j.id} — ${j.mode}${j.scopes.length ? ` (${j.scopes.length})` : ''} — `,
+    h('span', { class: j.running ? '' : j.exitCode === 0 ? 'ok' : 'bad' }, status), h('span', { class: 'meta', style: 'display:inline' }, ` ${secs}s`));
+  const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 30;
+  log.textContent = '$ ' + j.command + '\n' + imp.lines.join('\n');
+  if (atBottom || force) log.scrollTop = log.scrollHeight;
+}
+
+function startImport() {
+  const items = imp.source === 'substack' ? [...cands.sel].join(' ') : imp.text[imp.source] || '';
+  const body = { source: imp.source, items, only: imp.only, save: imp.save };
+  if (imp.source !== 'substack-fix' && !imp.only && !confirm('Re-check every known source too? This can take a long time.')) return;
+  act(async () => { await api('/api/import/run', body); imp.lines = []; imp.next = 0; imp.job = null; await pollImport(); }, 'Started');
+}
+
+// ─── Shared: a polled job log (Publish, Social) ───
+function jobPoller(key, endpoint, tab, onDone) {
+  const st = { job: null, next: 0, lines: [], timer: null, loaded: false, last: null };
+  st.poll = async () => {
+    clearTimeout(st.timer);
+    const r = await api(endpoint + (endpoint.includes('?') ? '&' : '?') + 'from=' + st.next).catch(() => null);
+    if (!r) return;
+    st.loaded = true; st.last = r;
+    if (r.job && st.job && r.job.id !== st.job.id) st.lines = [];
+    const wasRunning = st.job?.running;
+    st.job = r.job;
+    if (r.job) { st.lines.push(...r.job.lines); st.next = r.job.next; if (st.lines.length > 5000) st.lines.splice(0, st.lines.length - 5000); }
+    if (state.tab === tab) st.update();
+    if (r.job?.running) st.timer = setTimeout(st.poll, 1000);
+    else if (wasRunning) {
+      toast(r.job.exitCode === 0 ? `${r.job.mode} finished` : r.job.stopped ? `${r.job.mode} stopped` : `${r.job.mode} exited with code ${r.job.exitCode}`, r.job.exitCode !== 0 && !r.job.stopped);
+      await onDone?.(r);
+    }
+  };
+  st.start = (path, body, ok = 'Started') => act(async () => { await api(path, body); st.lines = []; st.next = 0; st.job = null; await st.poll(); }, ok);
+  st.update = (force) => {
+    const title = document.getElementById(key + 'jobtitle'), log = document.getElementById(key + 'log');
+    if (!title || !log) return;
+    const j = st.job;
+    if (!j) { title.textContent = 'Log'; log.textContent = 'Nothing run since the admin server started.'; return; }
+    const status = j.running ? 'running…' : j.stopped ? 'stopped' : j.exitCode === 0 ? 'done' : `failed (exit ${j.exitCode})`;
+    const secs = Math.round(((j.endedAt || Date.now()) - j.startedAt) / 1000);
+    title.replaceChildren(`#${j.id} — ${j.mode} — `, h('span', { class: j.running ? '' : j.exitCode === 0 ? 'ok' : 'bad' }, status), h('span', { class: 'meta', style: 'display:inline' }, ` ${secs}s`));
+    const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 30;
+    log.textContent = '$ ' + j.command + '\n' + st.lines.join('\n');
+    if (atBottom || force) log.scrollTop = log.scrollHeight;
+  };
+  st.view = () => [h('h2', { id: key + 'jobtitle' }), h('pre', { class: 'log', id: key + 'log' })];
+  return st;
+}
+
+// ─── Health ───
+const health = { kind: 'missing_image', category: '' };
+
+async function renderHealth() {
+  const params = new URLSearchParams({ kind: health.kind, category: health.category, page: state.page });
+  const data = await api('/api/health?' + params);
+  const chips = Object.entries(data.kinds).map(([k, label]) => h('button', {
+    class: 'btn' + (health.kind === k ? ' primary' : ''), disabled: !data.counts[k] && health.kind !== k,
+    onclick: () => { health.kind = k; state.page = 1; state.selected.clear(); state.editing = null; render(); },
+  }, `${label} · ${data.counts[k].toLocaleString()}`));
+  const fixes = [];
+  if (data.counts.wrong_file || data.counts.out_of_order) fixes.push(h('button', { class: 'btn primary', onclick: () => {
+    if (confirm('Rewrite every catalog file through writeArticles()? This re-sorts each file by title and moves articles into their created_at month.'))
+      act(() => api('/api/health/rewrite', {}), (r) => `Rewrote ${r.written} file(s), removed ${r.removed}`);
+  } }, 'Fix order & month files'));
+  if (data.counts.missing_slug) fixes.push(h('button', { class: 'btn', onclick: () => {
+    publish.start('/api/publish/run', { step: 'add-slugs' }, 'add-slugs started — see the Publish tab');
+  } }, 'Generate missing slugs (add-slugs)'));
+
+  paint('health', 
+    h('p', { class: 'meta' }, `${data.totalArticles.toLocaleString()} articles have at least one problem (the same checks as bun run check-data). Edit fixes images, dates and titles; Remove blocklists the article.`),
+    h('div', { class: 'toolbar' }, ...chips),
+    h('div', { class: 'toolbar' },
+      h('select', { onchange: (e) => { health.category = e.target.value; state.page = 1; render(); } }, categoryOptions(health.category, true)),
+      h('span', { class: 'meta' }, `${data.total.toLocaleString()} ${data.kinds[health.kind] ?? ''}`),
+      data.ids?.length ? h('button', { class: 'btn', onclick: () => { data.ids.forEach((id) => state.selected.add(id)); render(); } }, `Select all ${data.ids.length.toLocaleString()}`) : null,
+      state.selected.size ? h('button', { class: 'btn danger', onclick: () => removeSelected() }, `Remove ${state.selected.size} selected`) : null,
+      state.selected.size ? h('button', { class: 'btn', onclick: () => { state.selected.clear(); render(); } }, 'Clear selection') : null,
+      ...fixes,
+    ),
+    data.items.length ? h('div', { class: 'list' }, data.items.map((a) => articleRow(a, h('div', { class: 'meta' },
+      ...a.kinds.map((k) => h('span', { class: 'pill bad' }, data.kinds[k])), h('span', {}, a.file), a.slug ? h('span', {}, 'slug: ' + a.slug) : null))))
+      : h('div', { class: 'list' }, h('div', { class: 'empty' }, 'Nothing here 🎉')),
+    pager(data),
+  );
+}
+
+// ─── Publish ───
+const publish = jobPoller('pub', '/api/publish/job', 'publish', async () => { await loadGit(); await refreshStats(); if (state.tab === 'publish') renderPublish(); });
+const gitInfo = { data: null, message: '', loading: false };
+
+async function loadGit() {
+  gitInfo.loading = true;
+  try { gitInfo.data = await api('/api/publish/git'); } catch (e) { toast(e.message, true); }
+  gitInfo.loading = false;
+}
+
+function defaultMessage(g) {
+  const d = g.delta;
+  const parts = d ? [d.added && `+${d.added} articles`, d.removed && `−${d.removed} removed`].filter(Boolean) : [];
+  return `data: ${parts.length ? parts.join(', ') : 'catalog updates'} (${new Date().toISOString().slice(0, 10)})`;
+}
+
+async function renderPublish() {
+  if (!publish.loaded) await publish.poll();
+  if (!gitInfo.data && !gitInfo.loading) loadGit().then(() => { if (state.tab === 'publish') renderPublish(); });
+  const g = gitInfo.data;
+  const running = !!publish.job?.running;
+  const msg = h('input', { value: gitInfo.message || (g ? defaultMessage(g) : ''), style: 'flex:1;min-width:260px', oninput: (e) => { gitInfo.message = e.target.value; } });
+  const step = (s, label, cls = '', confirmText) => h('button', { class: 'btn ' + cls, disabled: running, onclick: () => {
+    if (confirmText && !confirm(confirmText)) return;
+    publish.start('/api/publish/run', { step: s });
+  } }, label);
+
+  paint('publish', 
+    h('div', { class: 'toolbar' }, h('h2', { style: 'margin:0' }, 'Data changes'),
+      h('button', { class: 'btn', disabled: gitInfo.loading, onclick: async () => { await loadGit(); renderPublish(); } }, 'Refresh')),
+    !g ? h('div', { class: 'card' }, 'Reading git…') : h('div', { class: 'card' },
+      h('div', { class: 'meta', style: 'margin-bottom:8px' },
+        h('span', {}, `branch ${g.branch}`), h('span', {}, `last: ${g.last}`),
+        g.ahead != null ? h('span', {}, `${g.ahead} ahead / ${g.behind} behind upstream`) : null),
+      g.totalFiles ? h('div', {},
+        h('div', { style: 'font-size:15px;margin-bottom:4px' },
+          g.delta ? [h('strong', { class: 'ok' }, `+${g.delta.added.toLocaleString()}`), ' articles · ', h('strong', { class: 'bad' }, `−${g.delta.removed.toLocaleString()}`), ' removed · '] : null,
+          `${g.totalFiles} files changed`, g.shortstat ? h('span', { class: 'meta', style: 'display:inline' }, ` (${g.shortstat})`) : null),
+        h('details', {}, h('summary', { class: 'meta', style: 'cursor:pointer' }, 'Files'),
+          h('table', {}, g.files.map((f) => h('tr', {},
+            h('td', { style: 'font-family:ui-monospace,monospace;width:3em' }, f.status),
+            h('td', { style: 'font-family:ui-monospace,monospace;font-size:12px' }, f.path),
+            h('td', { class: 'num ok' }, f.add != null ? '+' + f.add : ''), h('td', { class: 'num bad' }, f.del != null ? '−' + f.del : '')))),
+          g.totalFiles > g.files.length ? h('div', { class: 'meta' }, `…and ${g.totalFiles - g.files.length} more`) : null),
+        h('div', { class: 'toolbar', style: 'margin-top:10px' }, msg,
+          h('button', { class: 'btn primary', disabled: running, onclick: () => act(async () => {
+            const r = await api('/api/publish/commit', { message: msg.value });
+            gitInfo.message = ''; await loadGit(); return r;
+          }, (r) => r.output.split('\n')[0]) }, 'Commit data changes')),
+        h('div', { class: 'meta' }, `Commits only ${g.dataPaths.join(', ')}. `,
+          g.otherChanges > 0 ? `${g.otherChanges} other changed path(s) (code etc.) are left alone.` : ''),
+      ) : h('div', { class: 'meta' }, 'No uncommitted data changes.'),
+    ),
+    h('h2', {}, 'Release'),
+    h('div', { class: 'card' },
+      h('div', { class: 'toolbar' },
+        step('check', '1. Check data'),
+        step('build', '2. Build', 'primary'),
+        step('deploy', '3. Deploy', '', 'Deploy dist/ to Cloudflare with wrangler deploy? The live site changes right away.'),
+        h('span', { class: 'meta' }, 'or'),
+        step('build+deploy', 'Build & deploy', 'primary', 'Build, then deploy to Cloudflare if the build succeeds?'),
+        h('button', { class: 'btn danger', disabled: !running, onclick: () => act(() => api('/api/publish/stop', {}), 'Stopping…') }, 'Stop'),
+      ),
+      h('div', { class: 'meta' }, 'Build runs prepare-data (add-slugs, split, metadata, llms.txt), astro build and build-worker-data. Catalog edits and imports are blocked while it runs. check-data exits non-zero while any Health issue remains — that does not block the build.'),
+    ),
+    ...publish.view(),
+  );
+  publish.update(true);
+}
+
+// ─── Social ───
+const social = jobPoller('soc', '/api/social/job', 'social', async () => { media.data = null; if (state.tab === 'social') renderSocial(); });
+const SOCIAL_TOOLS = { x: 'X (Twitter)', linkedin: 'LinkedIn', 'tiktok-slides': 'TikTok — articles slideshow', 'tiktok-books': 'TikTok — book summary' };
+const nextMonth = () => { const d = new Date(); d.setMonth(d.getMonth() + 1); return d.toISOString().slice(0, 7); };
+const soc = { tool: 'x', span: 'day', month: nextMonth(), days: '', articles: '', quizzes: '', book: true, category: '', since: '', date: '', random: false, dryRun: true, count: '', time: '', force: false, bookSlug: '' };
+
+async function copySnippet(tool) {
+  try {
+    const r = await api('/api/social/snippet?tool=' + tool);
+    await navigator.clipboard.writeText(r.text);
+    toast('Snippet copied — paste it in the DevTools console');
+  } catch (e) { toast(e.message, true); }
+}
+
+async function renderSocial() {
+  if (!social.loaded) await social.poll();
+  const running = !!social.job?.running;
+  const info = social.last || { snippets: {}, outputs: {} };
+  const t = soc.tool;
+  const field = (label, el) => h('label', { style: 'display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--muted)' }, label, el);
+  const num = (key, ph, max) => h('input', { type: 'number', min: 0, max, placeholder: ph, value: soc[key], disabled: running, style: 'width:110px', oninput: (e) => { soc[key] = e.target.value; } });
+  const check = (key, label, title) => h('label', { title }, h('input', { type: 'checkbox', checked: soc[key], disabled: running, onchange: (e) => { soc[key] = e.target.checked; } }), ' ', label);
+  const spanSel = (opts) => h('select', { disabled: running, onchange: (e) => { soc.span = e.target.value; renderSocial(); } },
+    opts.map(([v, l]) => h('option', { value: v, selected: soc.span === v }, l)));
+  const monthIn = h('input', { type: 'month', value: soc.month, disabled: running, oninput: (e) => { soc.month = e.target.value; } });
+  const dateIn = h('input', { type: 'date', value: soc.date, disabled: running, oninput: (e) => { soc.date = e.target.value; } });
+
+  let form;
+  if (t === 'x' || t === 'linkedin') {
+    if (!['day', 'next', 'month'].includes(soc.span)) soc.span = 'day';
+    form = [
+      h('div', { class: 'toolbar' },
+        field('Schedule', spanSel([['day', 'One day'], ['next', 'Next N days'], ['month', 'A calendar month']])),
+        soc.span === 'month' ? field('Month', monthIn) : field(soc.span === 'day' ? 'Day (default: today/tomorrow)' : 'First day', dateIn),
+        soc.span === 'next' ? field('Days', num('days', '30', 60)) : null,
+        field('Articles / day', num('articles', '4 (0 = none)', 12)),
+        field('Quizzes / day', num('quizzes', '2 (0 = none)', 12)),
+        field('Category', h('select', { disabled: running, onchange: (e) => { soc.category = e.target.value; } }, categoryOptions(soc.category, true))),
+        field('Articles since', h('input', { type: 'date', value: soc.since, disabled: running, oninput: (e) => { soc.since = e.target.value; } })),
+      ),
+      h('div', { class: 'toolbar' },
+        t === 'x' ? check('book', 'Daily book post') : null,
+        check('random', 'Random order'),
+        check('dryRun', 'Dry run', 'Print the plan without marking articles as used'),
+      ),
+    ];
+  } else if (t === 'tiktok-slides') {
+    if (!['day', 'month'].includes(soc.span)) soc.span = 'day';
+    form = [h('div', { class: 'toolbar' },
+      field('Generate', spanSel([['day', 'One slideshow'], ['month', 'One per day of a month']])),
+      soc.span === 'month' ? field('Month', monthIn) : field('Date', dateIn),
+      soc.span === 'month' ? field('Post time', h('input', { type: 'time', value: soc.time || '19:00', disabled: running, oninput: (e) => { soc.time = e.target.value; } })) : null,
+      field('Articles per slideshow', num('count', '5', 12)),
+    ), h('div', { class: 'toolbar' }, soc.span === 'month' ? check('force', 'Rebuild days already generated') : null, check('dryRun', 'Dry run'))];
+  } else {
+    form = [h('div', { class: 'toolbar' },
+      field('Slideshows', num('count', '1', 20)),
+      field('Specific book (slug, optional)', h('input', { value: soc.bookSlug, dir: 'auto', disabled: running, oninput: (e) => { soc.bookSlug = e.target.value; } })),
+      field('Date', dateIn),
+    ), h('div', { class: 'toolbar' }, check('dryRun', 'Dry run'))];
+  }
+
+  const run = () => {
+    const body = { tool: t, span: soc.span, month: soc.month, days: soc.days, articles: soc.articles, quizzes: soc.quizzes, book: soc.book, category: soc.category,
+      since: soc.since, date: soc.date, random: soc.random, dryRun: soc.dryRun, count: soc.count, time: soc.time, force: soc.force };
+    if (t === 'tiktok-books') body.book = soc.bookSlug;
+    social.start('/api/social/run', body);
+  };
+
+  const snip = info.snippets?.[t];
+  const outputs = info.outputs?.[t];
+  paint('social', 
+    h('div', { class: 'card' },
+      h('div', { class: 'toolbar' }, ...Object.entries(SOCIAL_TOOLS).map(([k, label]) => h('label', {},
+        h('input', { type: 'radio', name: 'soctool', checked: t === k, disabled: running, onchange: () => { soc.tool = k; renderSocial(); } }), ' ', label))),
+      ...form,
+      h('div', { class: 'toolbar' },
+        h('button', { class: 'btn primary', disabled: running, onclick: run }, soc.dryRun ? 'Dry run' : 'Run'),
+        h('button', { class: 'btn danger', disabled: !running, onclick: () => act(() => api('/api/social/stop', {}), 'Stopping…') }, 'Stop'),
+        h('span', { class: 'meta' }, t === 'x' || t === 'linkedin'
+          ? 'Writes a console snippet; paste it on the site in Chrome to schedule the posts. Picked items are remembered so they are never posted twice (not on dry runs).'
+          : 'Renders PNGs + caption.txt to upload by hand in TikTok. Picked items are remembered (not on dry runs).'),
+      ),
+    ),
+    t === 'x' || t === 'linkedin' ? h('div', { class: 'card', style: 'margin-top:10px' },
+      snip ? h('div', { class: 'toolbar' },
+        h('strong', {}, 'Latest snippet'), h('span', { class: 'meta' }, `${new Date(snip.mtime).toLocaleString()} · ${(snip.size / 1024).toFixed(0)} KB`),
+        h('button', { class: 'btn primary', onclick: () => copySnippet(t) }, 'Copy snippet'),
+        h('a', { class: 'link', href: snip.post, target: '_blank', rel: 'noreferrer' }, `Open ${SOCIAL_TOOLS[t]} ↗`),
+        h('span', { class: 'meta' }, 'then DevTools console (⌘⌥J) → paste, keep the tab in front until it logs "done".'))
+      : h('div', { class: 'meta' }, 'No snippet yet.')) : '',
+    outputs ? h('div', { style: 'margin-top:10px' }, h('h2', {}, 'Recent output folders'),
+      outputs.length ? h('div', { class: 'list' }, h('table', {}, outputs.map((o) => h('tr', {},
+        h('td', {}, o.name), h('td', { class: 'num' }, `${o.images} images`),
+        h('td', { class: 'num' }, h('button', { class: 'btn', onclick: () => act(() => api('/api/social/open', { tool: t, name: o.name })) }, 'Open in Finder'))))))
+      : h('div', { class: 'meta' }, 'None yet.')) : '',
+    mediaSection(running),
+    ...social.view(),
+  );
+  social.update(true);
+}
+
+// Generated media folders (Social tab): pick posted ones and delete them to free space.
+const media = { data: null, loading: false, sel: {}, open: {} };
+const fmtBytes = (n) => n >= 1e9 ? (n / 1e9).toFixed(1) + ' GB' : n >= 1e6 ? (n / 1e6).toFixed(1) + ' MB' : n ? Math.max(1, Math.round(n / 1e3)) + ' KB' : '0 KB';
+
+async function loadMedia() {
+  media.loading = true;
+  try { media.data = await api('/api/media'); } catch (e) { toast(e.message, true); }
+  media.loading = false;
+  for (const r of media.data?.roots ?? []) {
+    const names = new Set(r.folders.map((f) => f.name));
+    media.sel[r.key] = new Set([...(media.sel[r.key] ?? [])].filter((n) => names.has(n)));
+  }
+}
+
+function deleteMediaFolders(root) {
+  const sel = media.sel[root.key];
+  const picked = root.folders.filter((f) => sel.has(f.name));
+  const bytes = picked.reduce((n, f) => n + f.bytes, 0);
+  const upcoming = picked.filter((f) => !f.past);
+  if (!confirm(`Permanently delete ${picked.length} item(s) from ${root.dir}/ (${fmtBytes(bytes)})?`
+    + (upcoming.length ? `\n\n⚠️ ${upcoming.length} of them are dated today or later (or undated) — posts scheduled from them may still need these files.` : '')
+    + '\n\nhistory.json / used.json are kept, so these items won\'t be picked again.')) return;
+  act(async () => { const r = await api('/api/media/delete', { root: root.key, names: [...sel] }); sel.clear(); await loadMedia(); return r; },
+    (r) => `Deleted ${r.deleted} item(s), freed ${fmtBytes(r.bytes)}`);
+}
+
+function mediaSection(running) {
+  if (!media.data && !media.loading) loadMedia().then(() => { if (state.tab === 'social') renderSocial(); });
+  const d = media.data;
+  const total = d ? d.roots.reduce((n, r) => n + r.bytes, 0) : 0;
+  return h('div', { style: 'margin-top:10px' },
+    h('div', { class: 'toolbar' }, h('h2', { style: 'margin:0' }, 'Generated media'),
+      d ? h('span', { class: 'meta' }, `${fmtBytes(total)} on disk`) : null,
+      h('button', { class: 'btn', disabled: media.loading, onclick: async () => { await loadMedia(); renderSocial(); } }, media.loading ? 'Reading…' : 'Refresh')),
+    !d ? h('div', { class: 'card meta' }, 'Measuring folders…') : h('div', { class: 'list' }, d.roots.map((r) => {
+      const sel = media.sel[r.key] ??= new Set();
+      const selBytes = r.folders.filter((f) => sel.has(f.name)).reduce((n, f) => n + f.bytes, 0);
+      const past = r.folders.filter((f) => f.past).map((f) => f.name);
+      return h('details', { class: 'row', style: 'display:block', open: !!media.open[r.key], ontoggle: (e) => { media.open[r.key] = e.target.open; } },
+        h('summary', { style: 'cursor:pointer' }, h('strong', {}, r.label), ' ',
+          h('span', { class: 'meta', style: 'display:inline' }, `${r.dir}/ · ${r.exists ? `${r.folders.length} items · ${fmtBytes(r.bytes)}` : 'not created yet'}`)),
+        !r.folders.length ? h('div', { class: 'meta', style: 'padding:8px 0' }, 'Empty.') : h('div', {},
+          h('div', { class: 'toolbar', style: 'margin:8px 0' },
+            h('button', { class: 'btn', disabled: !past.length, onclick: () => { media.sel[r.key] = new Set(past); renderSocial(); } }, `Select posted (${past.length} before today)`),
+            h('button', { class: 'btn', onclick: () => { media.sel[r.key] = new Set(r.folders.map((f) => f.name)); renderSocial(); } }, 'All'),
+            h('button', { class: 'btn', onclick: () => { sel.clear(); renderSocial(); } }, 'None'),
+            h('button', { class: 'btn danger', disabled: running || !sel.size, onclick: () => deleteMediaFolders(r) },
+              sel.size ? `Delete ${sel.size} (${fmtBytes(selBytes)})` : 'Delete selected')),
+          h('table', {}, r.folders.map((f) => h('tr', {},
+            h('td', { style: 'width:24px' }, h('input', { type: 'checkbox', checked: sel.has(f.name),
+              onchange: (e) => { e.target.checked ? sel.add(f.name) : sel.delete(f.name); renderSocial(); } })),
+            h('td', { dir: 'auto' }, f.name, f.file ? h('span', { class: 'meta', style: 'display:inline' }, ' (file)') : null),
+            h('td', {}, f.past ? h('span', { class: 'pill' }, `posted · ${f.date}`) : h('span', { class: 'pill ok' }, f.date ? `upcoming · ${f.date}` : 'undated')),
+            h('td', { class: 'meta' }, Object.entries(f.kinds).map(([k, n]) => `${n} ${k}`).join(' · ')),
+            h('td', { class: 'num' }, fmtBytes(f.bytes)))))));
+    })),
+  );
+}
+
+// ─── Stats ───
+let dash = null;
+
+function weeklyChart(weeks) {
+  const W = 760, H = 200, padL = 36, padB = 22, padT = 8;
+  const max = Math.max(1, ...weeks.map((w) => w.total));
+  const step = Math.pow(10, Math.floor(Math.log10(max)));
+  const tick = [1, 2, 5, 10].map((m) => m * step).find((t) => max / t <= 5);
+  const top = Math.ceil(max / tick) * tick;
+  const bw = (W - padL) / weeks.length;
+  const y = (v) => padT + (H - padT - padB) * (1 - v / top);
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const s = (tag, attrs, ...kids) => { const el = document.createElementNS(svgNS, tag); for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v); el.append(...kids); return el; };
+  const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', role: 'img', 'aria-label': 'Articles published per week, last 26 weeks' });
+  for (let v = 0; v <= top; v += tick) {
+    svg.append(s('line', { x1: padL, x2: W, y1: y(v), y2: y(v), stroke: 'var(--line)', 'stroke-width': 1 }));
+    svg.append(s('text', { x: padL - 6, y: y(v) + 4, 'text-anchor': 'end', 'font-size': 11, fill: 'var(--muted)' }, v.toLocaleString()));
+  }
+  weeks.forEach((w, i) => {
+    const x = padL + i * bw + 1, width = Math.max(2, bw - 2), top_ = y(w.total), hgt = y(0) - top_;
+    const g = s('g', {});
+    g.append(s('title', {}, `Week of ${w.week}: ${w.total.toLocaleString()} articles\nSubstack ${w.substack} · blogs ${w.blogs} · other ${w.other}`));
+    g.append(s('rect', { x: padL + i * bw, y: padT, width: bw, height: H - padT - padB, fill: 'transparent' })); // hit area
+    if (hgt > 0) g.append(s('path', { d: `M${x},${y(0)} V${top_ + Math.min(4, hgt)} q0,-${Math.min(4, hgt)} ${Math.min(4, width / 2)},-${Math.min(4, hgt)} H${x + width - Math.min(4, width / 2)} q${Math.min(4, width / 2)},0 ${Math.min(4, width / 2)},${Math.min(4, hgt)} V${y(0)} Z`, fill: 'var(--accent)' }));
+    g.addEventListener('mouseenter', () => g.setAttribute('opacity', '.75'));
+    g.addEventListener('mouseleave', () => g.removeAttribute('opacity'));
+    svg.append(g);
+    if (i % 4 === 0) svg.append(s('text', { x: padL + i * bw + bw / 2, y: H - 6, 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--muted)' }, w.week.slice(5)));
+  });
+  return svg;
+}
+
+const tile = (label, value, sub) => h('div', { class: 'card', style: 'flex:1;min-width:150px' },
+  h('div', { class: 'meta' }, label), h('div', { style: 'font-size:24px;font-weight:600;font-variant-numeric:tabular-nums' }, value), sub ? h('div', { class: 'meta' }, sub) : null);
+const viewAuthor = (name) => h('a', { class: 'link', onclick: () => { state.tab = 'articles'; state.author = name; state.q = ''; state.page = 1; syncTabs(); render(); } }, '@' + name);
+const SOURCE_LABELS = { substack: 'Substack (*.substack.com)', blogs: 'Registered external blogs', other: 'Other domains (custom-domain Substacks, etc.)' };
+
+async function renderStats() {
+  if (!dash) { paint('stats', h('div', { class: 'empty' }, 'Crunching the catalog…')); dash = await api('/api/dashboard'); if (state.tab !== 'stats') return; }
+  const d = dash;
+  const last30 = d.sources.reduce((n, s) => n + s.last30, 0);
+  const thisWeek = d.weeks.at(-1)?.total ?? 0;
+  const mr = d.mostRead;
+  paint('stats', 
+    h('div', { class: 'toolbar' }, h('span', { class: 'meta' }, 'Dates are each post\'s publish date (created_at) — the catalog doesn\'t record import time.'),
+      h('button', { class: 'btn', onclick: async () => { dash = null; renderStats(); } }, 'Refresh')),
+    h('div', { class: 'toolbar', style: 'align-items:stretch' },
+      tile('Articles', d.total.toLocaleString()),
+      tile('Authors', d.totalAuthors.toLocaleString()),
+      tile('Published, last 30 days', last30.toLocaleString()),
+      tile('This week', thisWeek.toLocaleString(), `week of ${d.weeks.at(-1)?.week}`),
+      d.future ? tile('Future-dated', d.future.toLocaleString(), 'created_at after today — check Health') : null,
+    ),
+    h('h2', {}, 'Published per week'),
+    h('div', { class: 'card' }, weeklyChart(d.weeks)),
+    h('details', {}, h('summary', { class: 'meta', style: 'cursor:pointer' }, 'Table view'),
+      h('div', { class: 'list' }, h('table', {}, h('tr', {}, h('th', {}, 'Week of'), h('th', { class: 'num' }, 'Total'), h('th', { class: 'num' }, 'Substack'), h('th', { class: 'num' }, 'Blogs'), h('th', { class: 'num' }, 'Other')),
+        [...d.weeks].reverse().map((w) => h('tr', {}, h('td', {}, w.week), h('td', { class: 'num' }, w.total), h('td', { class: 'num' }, w.substack), h('td', { class: 'num' }, w.blogs), h('td', { class: 'num' }, w.other)))))),
+    h('h2', {}, 'By source'),
+    h('div', { class: 'list' }, h('table', {}, h('tr', {}, h('th', {}, 'Source'), h('th', { class: 'num' }, 'Articles'), h('th', { class: 'num' }, 'Last 30 days'), h('th', { class: 'num' }, 'Authors')),
+      d.sources.map((s) => h('tr', {}, h('td', {}, SOURCE_LABELS[s.source]), h('td', { class: 'num' }, s.total.toLocaleString()), h('td', { class: 'num' }, s.last30.toLocaleString()), h('td', { class: 'num' }, s.authors.toLocaleString()))))),
+    h('h2', {}, 'By category'),
+    h('div', { class: 'list' }, h('table', {}, h('tr', {}, h('th', {}, 'Category'), h('th', { class: 'num' }, 'Articles'), h('th', { class: 'num' }, 'Last 7 days'), h('th', { class: 'num' }, 'Last 30 days')),
+      d.categories.map((c) => h('tr', {}, h('td', {}, h('a', { class: 'link', onclick: () => { state.tab = 'articles'; state.category = c.category; state.author = ''; state.page = 1; syncTabs(); render(); } }, `${c.title} (${c.category})`)),
+        h('td', { class: 'num' }, c.total.toLocaleString()), h('td', { class: 'num' }, c.last7.toLocaleString()), h('td', { class: 'num' }, c.last30.toLocaleString()))))),
+    h('h2', {}, 'Top authors'),
+    h('div', { class: 'list' }, h('table', {}, h('tr', {}, h('th', {}, 'Author'), h('th', {}, 'Source'), h('th', { class: 'num' }, 'Articles'), h('th', { class: 'num' }, 'Last 90 days'), h('th', {}, 'Latest')),
+      d.topAuthors.map((a) => h('tr', {}, h('td', {}, viewAuthor(a.screen_name)), h('td', { class: 'meta' }, a.source), h('td', { class: 'num' }, a.total.toLocaleString()), h('td', { class: 'num' }, a.last90), h('td', {}, a.latest))))),
+    h('h2', {}, `Stopped posting (${d.stale.length})`),
+    h('p', { class: 'meta' }, 'Authors with 5+ articles whose newest post is more than 60 days old.'),
+    h('div', { class: 'list' }, d.stale.length ? h('table', {}, h('tr', {}, h('th', {}, 'Author'), h('th', {}, 'Source'), h('th', { class: 'num' }, 'Articles'), h('th', {}, 'Latest'), h('th', { class: 'num' }, 'Days silent')),
+      d.stale.map((a) => h('tr', {}, h('td', {}, viewAuthor(a.screen_name)), h('td', { class: 'meta' }, a.source), h('td', { class: 'num' }, a.total), h('td', {}, a.latest), h('td', { class: 'num' }, a.daysSilent))))
+      : h('div', { class: 'empty' }, 'Everyone is still posting')),
+    h('h2', {}, 'Most read (views worker)'),
+    mr.error ? h('div', { class: 'card bad' }, mr.error)
+    : !mr.items.length ? h('div', { class: 'card meta' }, 'The views worker\'s leaderboard is empty — view tracking isn\'t recording yet (the known MostRead bug).')
+    : h('div', { class: 'list' }, h('table', {}, h('tr', {}, h('th', {}, 'Article'), h('th', {}, 'Author'), h('th', { class: 'num' }, 'Views')),
+        mr.items.map((e) => h('tr', {}, h('td', { dir: 'auto' }, h('a', { class: 'link', href: `https://elhellal.com/articles/${encodeURIComponent(e.slug)}/`, target: '_blank', rel: 'noreferrer' }, e.title || e.slug)),
+          h('td', {}, e.screen_name ? viewAuthor(e.screen_name) : '—'), h('td', { class: 'num' }, e.count.toLocaleString()))))),
+  );
+}
+
+// ─── Sites (quotes / books / biographies / quiz) ───
+const sites = { site: 'quotes', overview: null, message: {}, args: '', q: '', author: '', book: '', sort: 'likes', cat: '', untranslated: false, editing: null, markdown: null, reports: null, reportsLoading: false };
+const siteJob = jobPoller('site', '/api/sites/job', 'sites', async () => { await loadSites(); if (state.tab === 'sites') renderSites(); });
+
+async function loadSites() {
+  try { sites.overview = await api('/api/sites'); } catch (e) { toast(e.message, true); }
+}
+
+/** Like act(), but re-reads the sites' git status and counts first. */
+function siteAct(fn, ok) { return act(async () => { const r = await fn(); await loadSites(); return r; }, ok); }
+
+async function renderSites() {
+  if (!siteJob.loaded) await siteJob.poll();
+  if (!sites.overview) { paint('sites', h('div', { class: 'empty' }, 'Reading the sibling repos…')); await loadSites(); if (!sites.overview) return; }
+  const s = sites.overview.find((x) => x.name === sites.site) ?? sites.overview[0];
+  const running = !!siteJob.job?.running;
+  const pick = (name) => { sites.site = name; sites.q = ''; sites.author = ''; sites.book = ''; sites.cat = ''; sites.editing = null; sites.markdown = null; state.page = 1; state.selected.clear(); render(); };
+
+  const nav = h('div', { class: 'toolbar' }, sites.overview.map((x) => h('button', { class: 'btn' + (x.name === s.name ? ' primary' : ''), onclick: () => pick(x.name) },
+    x.title, x.git?.totalFiles ? ` · ${x.git.totalFiles} changed` : '')),
+    h('button', { class: 'btn', onclick: async () => { sites.overview = null; render(); } }, 'Refresh'));
+  if (s.missing) return paint('sites', nav, h('div', { class: 'card' }, `${s.dir} not found`));
+
+  let content;
+  try { content = await ({ quotes: quotesSection, books: () => entriesSection('books'), biographies: () => entriesSection('biographies'), quiz: quizSection })[s.name](running); }
+  catch (e) { content = h('div', { class: 'card bad' }, e.message); }
+
+  paint('sites', nav, siteCard(s, running), content, ...(siteJob.job?.scopes?.[0] === s.name ? siteJob.view() : []));
+  siteJob.update(true);
+}
+
+function siteCard(s, running) {
+  const g = s.git;
+  const msg = h('input', { value: sites.message[s.name] ?? `data: ${s.title.toLowerCase()} updates (${new Date().toISOString().slice(0, 10)})`, style: 'flex:1;min-width:260px',
+    oninput: (e) => { sites.message[s.name] = e.target.value; } });
+  const isRunning = (step) => running && siteJob.job?.mode === `${s.name}:${step}`;
+  const step = (key, label, cls = '', confirmText, args) => h('button', { class: 'btn ' + cls, disabled: running, onclick: () => {
+    if (confirmText && !confirm(confirmText)) return;
+    siteJob.start('/api/sites/run', { site: s.name, step: key, args });
+  } }, isRunning(key) ? label + '…' : label);
+  const scriptButtons = s.steps.map((st) => {
+    if (st.key === 'import-quotes') return [h('input', { placeholder: 'Goodreads slugs (optional)', value: sites.args, style: 'min-width:220px', oninput: (e) => { sites.args = e.target.value; } }),
+      step(st.key, st.label, '', 'Import from Goodreads? It re-checks every known author too (slow, needs Ollama running) and writes quotes.json as it goes.', sites.args)];
+    if (st.key === 'd1-migrate') return step(st.key, st.label, '', 'Apply pending migrations to the live quiz D1 database?');
+    return step(st.key, st.label);
+  });
+
+  return h('div', { class: 'card' },
+    h('div', { class: 'toolbar' },
+      h('h2', { style: 'margin:0' }, s.title), h('a', { class: 'link', href: s.url, target: '_blank', rel: 'noreferrer' }, s.url.replace('https://', '') + ' ↗'),
+      h('span', { class: 'meta' }, Object.entries(s.counts).map(([k, v]) => `${v.toLocaleString()} ${k}`).join(' · ')),
+      s.error ? h('span', { class: 'bad' }, s.error) : null),
+    h('div', { class: 'meta', style: 'margin-bottom:8px' },
+      h('span', {}, s.dir), h('span', {}, `branch ${g.branch}`), h('span', {}, `last: ${g.last}`),
+      g.ahead != null ? h('span', {}, `${g.ahead} ahead / ${g.behind} behind`) : null,
+      h('span', {}, s.built ? `built ${new Date(s.built).toLocaleString()}` : 'never built')),
+    g.totalFiles ? h('div', { style: 'margin-bottom:8px' },
+      h('details', {}, h('summary', { style: 'cursor:pointer' }, `${g.totalFiles} changed data file(s)`, g.shortstat ? h('span', { class: 'meta', style: 'display:inline' }, ` (${g.shortstat})`) : null),
+        h('table', {}, g.files.map((f) => h('tr', {}, h('td', { style: 'font-family:ui-monospace,monospace;width:3em' }, f.status), h('td', { style: 'font-family:ui-monospace,monospace;font-size:12px', dir: 'auto' }, f.path))))),
+      h('div', { class: 'toolbar', style: 'margin-top:8px' }, msg,
+        h('button', { class: 'btn primary', disabled: running, onclick: () => siteAct(async () => {
+          const r = await api('/api/sites/commit', { site: s.name, message: msg.value }); delete sites.message[s.name]; return r;
+        }, (r) => r.output.split('\n')[0]) }, 'Commit data changes')),
+      h('div', { class: 'meta' }, `Commits only ${s.data.join(', ')} in ${s.dir.split('/').pop()}.`, g.otherChanges > 0 ? ` ${g.otherChanges} other changed path(s) are left alone.` : ''))
+      : h('div', { class: 'meta', style: 'margin-bottom:8px' }, 'No uncommitted data changes.'),
+    h('div', { class: 'toolbar' }, ...scriptButtons.flat(),
+      scriptButtons.length ? h('span', { class: 'meta' }, '|') : null,
+      step('build', 'Build', 'primary'),
+      step('deploy', 'Deploy', '', `Deploy ${s.title} dist/ to Cloudflare? ${s.url} changes right away.`),
+      step('build+deploy', 'Build & deploy', 'primary', `Build ${s.title}, then deploy it to Cloudflare if the build succeeds?`),
+      h('button', { class: 'btn danger', disabled: !running, onclick: () => act(() => api('/api/sites/stop', {}), 'Stopping…') }, 'Stop'),
+      running && siteJob.job?.scopes?.[0] !== s.name ? h('span', { class: 'meta' }, `${siteJob.job.mode} is running`) : null),
+  );
+}
+
+function siteSearch(placeholder) {
+  const input = h('input', { type: 'search', placeholder, value: sites.q, dir: 'auto',
+    oninput: (e) => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { sites.q = e.target.value; state.page = 1; render(); }, 250); } });
+  queueMicrotask(() => { if (document.activeElement === document.body && sites.q) { input.focus(); input.setSelectionRange(sites.q.length, sites.q.length); } });
+  return input;
+}
+
+// Quotes
+async function quotesSection() {
+  const data = await api('/api/quotes?' + new URLSearchParams({ q: sites.q, author: sites.author, book: sites.book, sort: sites.sort, page: state.page }));
+  const visible = data.items.map((x) => x.id);
+  const author = data.authors.find((a) => a.slug === sites.author);
+  return h('div', {},
+    h('h2', {}, 'Quotes'),
+    h('div', { class: 'toolbar' }, siteSearch('Search quote text or id…'),
+      h('select', { dir: 'auto', onchange: (e) => { sites.author = e.target.value; sites.book = ''; state.page = 1; render(); } },
+        h('option', { value: '' }, 'All authors'), data.authors.map((a) => h('option', { value: a.slug, selected: a.slug === sites.author }, `${a.name} · ${a.count}`))),
+      data.books.length ? h('select', { dir: 'auto', onchange: (e) => { sites.book = e.target.value; state.page = 1; render(); } },
+        h('option', { value: '' }, 'All books'), data.books.map((b) => h('option', { value: b.slug, selected: b.slug === sites.book }, `${b.title} · ${b.count}`))) : null,
+      h('select', { onchange: (e) => { sites.sort = e.target.value; render(); } },
+        [['likes', 'Most liked'], ['shortest', 'Shortest'], ['longest', 'Longest'], ['file', 'File order']].map(([v, l]) => h('option', { value: v, selected: v === sites.sort }, `Sort: ${l}`)))),
+    h('div', { class: 'toolbar' },
+      h('label', {}, h('input', { type: 'checkbox', checked: visible.length > 0 && visible.every((id) => state.selected.has(id)),
+        onchange: (e) => { visible.forEach((id) => e.target.checked ? state.selected.add(id) : state.selected.delete(id)); render(); } }), ' Select page'),
+      h('span', { class: 'meta' }, `${data.total.toLocaleString()} quotes`),
+      state.selected.size ? h('button', { class: 'btn danger', onclick: () => {
+        if (confirm(`Delete ${state.selected.size} quotes from quotes.json?`)) siteAct(async () => { const r = await api('/api/quotes/remove', { ids: [...state.selected] }); state.selected.clear(); return r; }, (r) => `Deleted ${r.removed} quotes`);
+      } }, `Delete ${state.selected.size} selected`) : null,
+      state.selected.size ? h('button', { class: 'btn', onclick: () => { state.selected.clear(); render(); } }, 'Clear selection') : null,
+      author ? h('button', { class: 'btn danger', onclick: () => {
+        const typed = prompt(`Delete ${author.name} and all ${author.count} of their quotes? Type the slug to confirm:\n${author.slug}`);
+        if (typed !== null) siteAct(async () => { const r = await api('/api/quotes/remove-author', { slug: author.slug, confirm: typed.trim() }); sites.author = ''; sites.book = ''; return r; }, (r) => `Deleted the author and ${r.removed} quotes`);
+      } }, 'Delete author') : null),
+    data.items.length ? h('div', { class: 'list' }, data.items.map(quoteRow)) : h('div', { class: 'list' }, h('div', { class: 'empty' }, 'No quotes')),
+    pager(data),
+    h('p', { class: 'meta' }, 'Deleted quotes can come back on the next Goodreads import, which re-fetches every known author.'),
+  );
+}
+
+function quoteRow(x) {
+  const editing = sites.editing === x.id;
+  const text = editing ? h('textarea', { dir: 'auto' }, x.text) : null;
+  return h('div', { class: 'row' },
+    h('input', { type: 'checkbox', checked: state.selected.has(x.id), onchange: (e) => { e.target.checked ? state.selected.add(x.id) : state.selected.delete(x.id); render(); } }),
+    h('div', { class: 'body' },
+      h('div', { dir: 'auto' }, x.text),
+      h('div', { class: 'meta' },
+        h('a', { onclick: () => { sites.author = x.author; sites.book = ''; state.page = 1; render(); } }, x.authorName),
+        x.book ? h('a', { onclick: () => { sites.author = x.author; sites.book = x.book; state.page = 1; render(); } }, x.bookTitle) : h('span', {}, 'no book'),
+        h('span', {}, `♥ ${x.likes.toLocaleString()}`), h('span', {}, `${x.text.length} chars`), h('span', {}, x.id)),
+      editing ? h('div', { class: 'edit' }, text, h('div', { class: 'two' },
+        h('button', { class: 'btn primary', onclick: () => siteAct(async () => { await api('/api/quotes/edit', { id: x.id, text: text.value }); sites.editing = null; }, 'Saved') }, 'Save'))) : null),
+    h('div', { class: 'actions' },
+      h('button', { class: 'btn', onclick: () => { sites.editing = editing ? null : x.id; render(); } }, editing ? 'Close' : 'Edit'),
+      h('button', { class: 'btn danger', onclick: () => siteAct(() => api('/api/quotes/remove', { ids: [x.id] }), 'Deleted') }, 'Delete')),
+  );
+}
+
+// Books / biographies: whole entries edited as JSON
+async function entriesSection(coll) {
+  const data = await api('/api/entries?coll=' + coll);
+  const q = sites.q.trim().toLowerCase();
+  const items = data.items.filter((x) => !q || JSON.stringify(x.entry).toLowerCase().includes(q));
+  const isBooks = coll === 'books';
+  const blank = isBooks
+    ? { slug: '', title: '', author: '', authorSlug: '', cover: '', year: null, genre: '', summary: '', keyIdeas: [], whoShouldRead: '', quotesSlug: '' }
+    : { slug: '', name: '', image: '', tagline: '', born: { year: null, place: '' }, died: null, nationality: '', roles: [], summary: '', sections: [], works: [] };
+  return h('div', {},
+    h('h2', {}, isBooks ? 'Books' : 'Biographies'),
+    h('div', { class: 'toolbar' }, siteSearch('Search…'),
+      h('span', { class: 'meta' }, `${items.length} of ${data.items.length}`),
+      h('button', { class: 'btn', onclick: () => { sites.editing = sites.editing === '+new' ? null : '+new'; render(); } }, sites.editing === '+new' ? 'Cancel' : isBooks ? 'New book' : 'New biography')),
+    sites.editing === '+new' ? h('div', { class: 'card' }, entryEditor(coll, '', blank)) : null,
+    h('div', { class: 'list' }, items.length ? items.map((x) => entryRow(coll, x)) : h('div', { class: 'empty' }, 'Nothing here')),
+    isBooks ? h('p', { class: 'meta' }, 'After adding, renaming or removing books, run "Sync book links" on Quotes and Biographies so their cross-links match.')
+      : h('p', { class: 'meta' }, 'After adding or removing biographies, run "Sync biography links" on Quotes.'),
+  );
+}
+
+function entryRow(coll, x) {
+  const e = x.entry, slug = e.slug;
+  const editing = sites.editing === slug, mdOpen = sites.markdown?.slug === slug;
+  const site = sites.overview.find((s) => s.name === sites.site);
+  const sub = coll === 'books'
+    ? [e.author, e.year, e.genre, e.award ? '🏆' : null, x.markdown != null ? `long summary ${Math.round(x.markdown / 1024)} KB` : 'no long summary']
+    : [e.tagline, e.born?.year ? `b. ${e.born.year}` : null, e.died?.year ? `d. ${e.died.year}` : null, `${e.sections?.length ?? 0} sections`];
+  return h('div', { class: 'row' },
+    (e.cover || e.image) ? h('img', { src: e.cover || e.image, loading: 'lazy', alt: '', referrerpolicy: 'no-referrer', style: 'width:44px;height:64px' }) : null,
+    h('div', { class: 'body' },
+      h('div', { class: 'title', dir: 'auto' }, e.title || e.name),
+      h('div', { class: 'preview', dir: 'auto' }, e.summary),
+      h('div', { class: 'meta' }, ...sub.filter(Boolean).map((t) => h('span', { dir: 'auto' }, t)),
+        h('a', { href: `${site.url}/${encodeURIComponent(slug)}/`, target: '_blank', rel: 'noreferrer' }, 'on site ↗'), h('span', { dir: 'auto' }, slug)),
+      editing ? entryEditor(coll, slug, e) : null,
+      mdOpen ? markdownEditor(coll, slug) : null),
+    h('div', { class: 'actions' },
+      h('button', { class: 'btn', onclick: () => { sites.editing = editing ? null : slug; render(); } }, editing ? 'Close' : 'Edit'),
+      coll === 'books' ? h('button', { class: 'btn', onclick: () => openMarkdown(coll, slug, mdOpen) }, mdOpen ? 'Close summary' : 'Long summary') : null,
+      h('button', { class: 'btn danger', onclick: () => {
+        const typed = prompt(`Delete "${e.title || e.name}"${coll === 'books' ? ' and its long summary' : ''}? Type the slug to confirm:\n${slug}`);
+        if (typed !== null) siteAct(() => api('/api/entries/remove', { coll, slug, confirm: typed.trim() }), 'Deleted');
+      } }, 'Delete')),
+  );
+}
+
+function entryEditor(coll, slug, entry) {
+  const area = h('textarea', { dir: 'auto', spellcheck: 'false', style: 'min-height:360px;font:12px/1.5 ui-monospace,Menlo,monospace' }, JSON.stringify(entry, null, 2));
+  return h('div', { class: 'edit' }, area, h('div', { class: 'two' },
+    h('button', { class: 'btn primary', onclick: () => {
+      let parsed;
+      try { parsed = JSON.parse(area.value); } catch (e) { return toast('Invalid JSON: ' + e.message, true); }
+      siteAct(async () => { const r = await api('/api/entries/save', { coll, slug, entry: parsed }); sites.editing = null; return r; }, (r) => r.created ? 'Added' : 'Saved');
+    } }, slug ? 'Save' : 'Add'),
+    h('span', { class: 'meta' }, slug ? 'Changing "slug" changes the page URL' + (coll === 'books' ? ' (the long summary file is renamed with it).' : '.') : 'Fill in the fields; empty optional ones can be removed.')));
+}
+
+async function openMarkdown(coll, slug, open) {
+  if (open) { sites.markdown = null; return render(); }
+  try { const r = await api('/api/entries/markdown?' + new URLSearchParams({ coll, slug })); sites.markdown = { slug, text: r.text ?? '' }; render(); }
+  catch (e) { toast(e.message, true); }
+}
+
+function markdownEditor(coll, slug) {
+  const area = h('textarea', { dir: 'auto', style: 'min-height:420px' }, sites.markdown.text);
+  return h('div', { class: 'edit' }, h('div', { class: 'meta' }, `src/content/summaries/${slug}.md — saving it empty deletes the file`), area, h('div', { class: 'two' },
+    h('button', { class: 'btn primary', onclick: () => siteAct(async () => { const r = await api('/api/entries/markdown', { coll, slug, text: area.value }); sites.markdown = null; return r; }, (r) => r.deleted ? 'Long summary deleted' : 'Saved') }, 'Save summary')));
+}
+
+// Quiz
+const QUIZ_CATS = { geo: 'Geography', sci: 'Science', hist: 'History', gen: 'General', lit: 'Literature', lang: 'Language' };
+
+async function quizSection() {
+  const data = await api('/api/quiz/bank?' + new URLSearchParams({ q: sites.q, cat: sites.cat, untranslated: sites.untranslated ? '1' : '', page: state.page }));
+  return h('div', {},
+    reportsSection(),
+    h('h2', {}, 'Question bank'),
+    h('div', { class: 'toolbar' }, siteSearch('Search questions, answers, or an id like b12…'),
+      h('select', { onchange: (e) => { sites.cat = e.target.value; state.page = 1; render(); } },
+        h('option', { value: '' }, 'All categories'), data.cats.map((c) => h('option', { value: c, selected: c === sites.cat }, `${QUIZ_CATS[c] ?? c} · ${data.counts[c] ?? 0}`))),
+      h('label', {}, h('input', { type: 'checkbox', checked: sites.untranslated, onchange: (e) => { sites.untranslated = e.target.checked; state.page = 1; render(); } }), ` Missing a translation (${data.langs.join(', ')})`),
+      h('span', { class: 'meta' }, `${data.total.toLocaleString()} questions`)),
+    data.items.length ? h('div', { class: 'list' }, data.items.map((x) => bankRow(x, data.langs))) : h('div', { class: 'list' }, h('div', { class: 'empty' }, 'No questions')),
+    pager(data),
+    h('p', { class: 'meta' }, 'Questions are identified by their position (b<n>), so they can be fixed here but not deleted. Edits go live on the next build & deploy.'),
+  );
+}
+
+function answers(row) {
+  return h('div', { class: 'meta' }, h('span', { class: 'ok', dir: 'auto' }, '✓ ' + row[1]), ...row[2].map((w) => h('span', { dir: 'auto' }, '✗ ' + w)));
+}
+
+function bankRow(x, langs) {
+  const [cat, q, a, w] = x.row;
+  const editing = sites.editing === 'b' + x.i;
+  return h('div', { class: 'row' },
+    h('div', { class: 'body' },
+      h('div', { class: 'title', dir: 'auto' }, q),
+      answers([q, a, w]),
+      ...langs.map((l) => x.translations[l]
+        ? h('div', { class: 'meta' }, h('span', { class: 'pill' }, l), h('span', {}, x.translations[l][0]), h('span', { class: 'ok' }, '✓ ' + x.translations[l][1]))
+        : h('div', { class: 'meta' }, h('span', { class: 'pill' }, l), h('span', {}, 'not translated'))),
+      h('div', { class: 'meta' }, h('span', {}, QUIZ_CATS[cat] ?? cat), h('span', {}, 'b' + x.i)),
+      editing ? bankEditor(x, langs) : null),
+    h('div', { class: 'actions' }, h('button', { class: 'btn', onclick: () => { sites.editing = editing ? null : 'b' + x.i; render(); } }, editing ? 'Close' : 'Edit')),
+  );
+}
+
+function bankEditor(x, langs) {
+  const fields = (label, row, dir) => {
+    const q = h('input', { value: row?.[0] ?? '', placeholder: 'Question', dir, style: 'flex:1;min-width:260px' });
+    const a = h('input', { value: row?.[1] ?? '', placeholder: '✓ Answer', dir });
+    const w = [0, 1, 2].map((k) => h('input', { value: row?.[2]?.[k] ?? '', placeholder: '✗ Wrong ' + (k + 1), dir }));
+    return { el: h('div', { class: 'edit' }, h('div', { class: 'meta' }, label), h('div', { class: 'two' }, q), h('div', { class: 'two' }, a, ...w)), get: () => ({ q: q.value, a: a.value, w: w.map((i) => i.value) }) };
+  };
+  const [cat, q, a, w] = x.row;
+  const catSel = h('select', {}, Object.entries(QUIZ_CATS).map(([k, l]) => h('option', { value: k, selected: k === cat }, l)));
+  const ar = fields('Arabic', [q, a, w], 'rtl');
+  const tr = langs.map((l) => [l, fields(`${l} (leave the question and answer empty to remove the translation)`, x.translations[l], 'ltr')]);
+  return h('div', { class: 'edit' }, h('div', { class: 'two' }, catSel), ar.el, ...tr.map(([, f]) => f.el),
+    h('div', { class: 'two' }, h('button', { class: 'btn primary', onclick: () => siteAct(async () => {
+      await api('/api/quiz/bank/edit', { i: x.i, ar: { cat: catSel.value, ...ar.get() }, translations: Object.fromEntries(tr.map(([l, f]) => [l, f.get()])) });
+      sites.editing = null;
+    }, 'Saved') }, 'Save')));
+}
+
+function reportsSection() {
+  const r = sites.reports;
+  const load = async (fresh) => {
+    sites.reportsLoading = true; render();
+    try { sites.reports = await api('/api/quiz/reports' + (fresh ? '?fresh=1' : '')); } catch (e) { sites.reports = { error: e.message }; }
+    sites.reportsLoading = false; if (state.tab === 'sites') render();
+  };
+  const describe = (x) => x.row ? [h('div', { dir: 'auto' }, x.translation ? x.translation[0] : x.row[1]), answers(x.translation ? x.translation : x.row.slice(1))]
+    : [h('div', { class: 'meta' }, `${x.kind} question (generated from quotes, books, pictures or numbers)`)];
+  return h('div', {},
+    h('div', { class: 'toolbar', style: 'margin-top:18px' }, h('h2', { style: 'margin:0' }, 'Player reports'),
+      h('button', { class: 'btn', disabled: sites.reportsLoading, onclick: () => load(!!r) }, sites.reportsLoading ? 'Loading…' : r ? 'Refresh' : 'Load from D1'),
+      h('span', { class: 'meta' }, 'Questions players flagged as wrong or unclear (live D1, via wrangler).')),
+    !r ? null
+      : r.error ? h('div', { class: 'card bad' }, r.error)
+      : r.missingTable ? h('div', { class: 'banner' }, 'The live D1 database has no reports table yet — migration 0002_reports.sql was never applied, so the site\'s report button is failing. Use "Apply D1 migrations" above.')
+      : !r.reports.length ? h('div', { class: 'card meta' }, 'No reports yet.')
+      : h('div', { class: 'list' }, h('table', {}, h('tr', {}, h('th', {}, 'Question'), h('th', {}, 'Lang'), h('th', { class: 'num' }, 'Reports'), h('th', { class: 'num' }, 'Answered'), h('th', { class: 'num' }, 'Correct'), h('th', {})),
+        r.reports.map((x) => h('tr', {},
+          h('td', {}, ...describe(x)), h('td', {}, x.lang), h('td', { class: 'num bad' }, x.n), h('td', { class: 'num' }, x.answered ?? '—'),
+          h('td', { class: 'num' }, x.answered ? Math.round((x.ok / x.answered) * 100) + '%' : '—'),
+          h('td', {}, x.i != null ? h('button', { class: 'btn', onclick: () => { sites.q = 'b' + x.i; sites.cat = ''; sites.untranslated = false; sites.editing = 'b' + x.i; state.page = 1; render(); } }, 'Fix') : x.id))))),
   );
 }
 

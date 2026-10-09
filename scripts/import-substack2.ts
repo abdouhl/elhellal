@@ -16,12 +16,14 @@
  * Usage:
  *   bun run scripts/import-substack.ts [username] [username2] ...
  *   bun run scripts/import-substack.ts --fix
+ *   bun run scripts/import-substack.ts --only <username> ...
  *
  * Example:
  *   bun run scripts/import-substack.ts                     # re-check all known authors
  *   bun run scripts/import-substack.ts 99iov                # + a brand-new author
  *   bun run scripts/import-substack.ts 99iov sabahlal        # + several new authors
  *   bun run scripts/import-substack.ts --fix                 # clean the catalog only
+ *   bun run scripts/import-substack.ts --only 99iov          # just this author, skip the re-check
  *
  * --fix: scans the catalog and removes any article with no title, or a
  * title containing no Arabic characters (junk entries like the empty-slug
@@ -31,6 +33,9 @@
  * Independently of --fix, every normal run also refuses to add any new
  * article with no title or a non-Arabic title, so this junk can't creep
  * back in on future imports.
+ *
+ * --only: fetches just the usernames passed on the CLI — no re-check of known
+ * authors and no local-blog pass (the admin panel's Import tab uses this).
  *
  * Requires Ollama running locally with gemma4:e4b pulled (not required for --fix).
  */
@@ -136,7 +141,8 @@ function getExistingSubstackAuthors(): string[] {
 }
 
 const FIX_MODE = process.argv.includes('--fix');
-const cliUsers = process.argv.slice(2).filter(arg => arg !== '--fix');
+const ONLY_MODE = process.argv.includes('--only');
+const cliUsers = process.argv.slice(2).filter(arg => arg !== '--fix' && arg !== '--only');
 
 // ─── Arabic title validation (shared by --fix and the normal add path) ───────
 
@@ -182,7 +188,7 @@ if (FIX_MODE) {
     process.exit(0);
 }
 
-const existingAuthors = getExistingSubstackAuthors();
+const existingAuthors = ONLY_MODE ? [] : getExistingSubstackAuthors();
 // Authors blocklisted by scripts/moderate-articles.ts are never fetched.
 const moderationBlockedAuthors = blockedAuthors();
 const substackUsers: string[] = [...new Set([...cliUsers, ...existingAuthors])]
@@ -668,7 +674,7 @@ async function main() {
     }
 
     // ─── Personal blog (abderahmane.com) — Arabic posts ────────────────────
-    const localPosts = readLocalBlogPosts();
+    const localPosts = ONLY_MODE ? [] : readLocalBlogPosts();
     console.log(
         localPosts.length > 0
             ? `\n📁 ${localPosts.length} Arabic post(s) found in local blog\n`

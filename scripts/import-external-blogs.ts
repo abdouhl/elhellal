@@ -41,6 +41,11 @@
  *   bun run scripts/import-external-blogs.ts                                     # re-check all known blogs
  *   bun run scripts/import-external-blogs.ts https://alfarhan.ws                 # + a brand-new blog
  *   bun run scripts/import-external-blogs.ts https://alfarhan.ws https://fatthatmablog.wordpress.com
+ *   bun run scripts/import-external-blogs.ts --only https://alfarhan.ws          # just this blog, skip the re-check
+ *   bun run scripts/import-external-blogs.ts --save https://newblog.com          # + register it in external-blogs.ts
+ *
+ * --only: processes just the URLs passed on the CLI (known or new).
+ * --save: appends the new CLI blogs to src/data/external-blogs.ts so future runs re-check them.
  *
  * Requires Ollama running locally with gemma4:e4b pulled.
  */
@@ -174,12 +179,19 @@ const cliJobs: BlogJob[] = [];
 const seenCliUrls = new Set<string>();
 const unparseableArgs: string[] = [];
 
+const ONLY_MODE = process.argv.includes('--only');
+const SAVE_MODE = process.argv.includes('--save');
+/** Known blogs named on the CLI — with --only, these are the only known ones checked. */
+const requestedKnown = new Set<string>();
+
 for (const raw of process.argv.slice(2)) {
+    if (raw === '--only' || raw === '--save') continue;
     const url = normalizeUrlArg(raw);
     if (!url) { unparseableArgs.push(raw); continue; }
 
     const key = url.replace(/\/$/, '');
-    if (knownUrlSet.has(key) || seenCliUrls.has(key)) continue; // already known, or duplicate in this run
+    if (knownUrlSet.has(key)) { requestedKnown.add(key); continue; }
+    if (seenCliUrls.has(key)) continue; // duplicate in this run
     seenCliUrls.add(key);
 
     const slug = deriveSlugFromUrl(url);
@@ -192,7 +204,8 @@ if (unparseableArgs.length > 0) {
     console.log('');
 }
 
-const jobs: BlogJob[] = [...knownJobs, ...cliJobs];
+const checkedKnownJobs = ONLY_MODE ? knownJobs.filter(j => requestedKnown.has(j.url.replace(/\/$/, ''))) : knownJobs;
+const jobs: BlogJob[] = [...checkedKnownJobs, ...cliJobs];
 
 if (jobs.length === 0) {
     console.error('Usage: bun run scripts/import-external-blogs.ts [url] [url2] ...');
@@ -203,17 +216,32 @@ if (jobs.length === 0) {
 
 console.log(
     `📚 Checking ${jobs.length} blog(s) total ` +
-    `(${knownJobs.length} already known from external-blogs.ts` +
+    `(${checkedKnownJobs.length} already known from external-blogs.ts` +
     (cliJobs.length > 0 ? `, ${cliJobs.length} new from CLI)` : ')') +
     '\n'
 );
 
-if (cliJobs.length > 0) {
+if (cliJobs.length > 0 && SAVE_MODE) {
+    saveToRegistry(cliJobs);
+    console.log(`💾 Added ${cliJobs.length} blog(s) to src/data/external-blogs.ts — future runs re-check them.\n`);
+} else if (cliJobs.length > 0) {
     console.log('💡 New blog(s) — add these to src/data/external-blogs.ts to have them re-checked on future runs:');
     for (const j of cliJobs) {
         console.log(`   ${j.slug}: { slug: '${j.slug}', name: '${j.name}', url: '${j.url}' },`);
     }
     console.log('');
+}
+
+/** Appends entries before the closing `};` of the externalBlogs object. */
+function saveToRegistry(newJobs: BlogJob[]) {
+    const file = path.join(__dirname, '../src/data/external-blogs.ts');
+    const src = fs.readFileSync(file, 'utf-8');
+    const end = src.lastIndexOf('};');
+    if (end === -1) throw new Error('Could not find the end of externalBlogs in external-blogs.ts');
+    const entries = newJobs.map(j =>
+        `    ${JSON.stringify(j.slug)}: {\n        slug: ${JSON.stringify(j.slug)},\n        name: ${JSON.stringify(j.name)},\n        url: ${JSON.stringify(j.url)},\n    },\n`
+    ).join('');
+    fs.writeFileSync(file, src.slice(0, end) + entries + src.slice(end));
 }
 
 // Verify Ollama is reachable before starting

@@ -39,7 +39,7 @@ bun run prepare-data      # Full data pipeline (slugs → split → slug-map →
 bun run add-slugs         # Generate slugs and sort articles alphabetically
 bun run check-data        # Validate data integrity before commits
 bun run update-metadata   # Update article metadata
-bun run admin             # Local admin panel (localhost:4322): remove/edit/move articles, block authors
+bun run admin             # Local admin panel (localhost:4322): remove/edit/move articles, block authors, generate/remove Pinterest pins on R2, run discover-substack into an import list and the Substack/external-blog importers; Health (check-data issues per article, fixable in place), Publish (check-data → build → wrangler deploy with a live log, git summary + commit of data paths only), Social (x/linkedin schedulers, TikTok generators) and Stats (weekly volume, sources, top/stale authors, most-read); Sites manages the sibling repos ../elhellal-quotes, -books, -biographies, -quiz (edit quotes / book & biography entries / quiz bank rows, run their scripts, build + deploy, commit their data, read quiz player reports from D1)
 ```
 
 ### Testing
