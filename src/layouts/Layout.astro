@@ -101,12 +101,13 @@ const {
         <link rel="apple-touch-icon" href="/icon-192.png" />
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#000000" />
-        <!-- Body and heading fonts are preloaded: once one loads it sets the line
-             height of its text (Arabic included), so a late swap would shift the
-             page. ROM-Mono only styles small labels and isn't worth the bandwidth
-             competing with the LCP image. -->
+        <!-- All three (Latin-only, 68 KB together) are preloaded: once a font loads
+             it sets the line height of its text, Arabic included, so a late swap
+             shifts the page (ROM-Mono styles the breadcrumb and meta lines above
+             article text). -->
         <link rel="preload" href="/fonts/rom-regular-latin.woff2" as="font" type="font/woff2" crossorigin />
         <link rel="preload" href="/fonts/rom-bold-latin.woff2" as="font" type="font/woff2" crossorigin />
+        <link rel="preload" href="/fonts/rom-mono-latin.woff2" as="font" type="font/woff2" crossorigin />
         <meta name="generator" content={Astro.generator} />
         <title>
             {
