@@ -1,0 +1,36 @@
+# Response headers for files served from dist/ by Workers Static Assets.
+# Pages the site Worker renders (articles, tags, authors) set their own
+# Cache-Control in workers/site/src/index.ts.
+#
+# HTML keeps the platform default (public, max-age=0, must-revalidate): it is
+# revalidated with an ETag on every view, so a deploy is picked up at once and
+# a page never points at /_astro/ files the deploy removed.
+
+# Content-hashed by Astro: a changed file gets a new name.
+/_astro/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Rename the file (e.g. rom-regular-latin-2.woff2) if a font ever changes.
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/woffs/*
+  Cache-Control: public, max-age=2592000
+
+# Feed pages and Worker data shards keep their names across builds but change
+# with every data update.
+/feed/*
+  Cache-Control: public, max-age=300
+/_data/*
+  Cache-Control: public, max-age=300
+
+/thumbs/*
+  Cache-Control: public, max-age=604800
+/pins/*
+  Cache-Control: public, max-age=604800
+/*.png
+  Cache-Control: public, max-age=604800
+/*.svg
+  Cache-Control: public, max-age=604800
+/og-image.jpg
+  Cache-Control: public, max-age=604800
