@@ -159,6 +159,62 @@
   max-height: none;
 }
 
+/* Covers of tiles past the first row are clipped while collapsed, but lazy
+   loading ignores overflow clipping, so they would all download (~1 MB).
+   An image that isn't rendered isn't fetched: hide every cover after the
+   first row, which holds n tiles once the grid is 150n - 10px wide
+   (140px min column + 10px gap). Expanding shows (and loads) them all. */
+.tag-tiles {
+  container: tag-tiles / inline-size;
+}
+
+.tag-explorer[data-expanded="false"] .tag-tile:nth-child(n + 3) img {
+  display: none;
+}
+
+@container tag-tiles (min-width: 440px) {
+  .tag-explorer[data-expanded="false"] .tag-tile:nth-child(3) img { display: block; }
+}
+@container tag-tiles (min-width: 590px) {
+  .tag-explorer[data-expanded="false"] .tag-tile:nth-child(4) img { display: block; }
+}
+@container tag-tiles (min-width: 740px) {
+  .tag-explorer[data-expanded="false"] .tag-tile:nth-child(5) img { display: block; }
+}
+@container tag-tiles (min-width: 890px) {
+  .tag-explorer[data-expanded="false"] .tag-tile:nth-child(6) img { display: block; }
+}
+@container tag-tiles (min-width: 1040px) {
+  .tag-explorer[data-expanded="false"] .tag-tile:nth-child(7) img { display: block; }
+}
+@container tag-tiles (min-width: 1190px) {
+  .tag-explorer[data-expanded="false"] .tag-tile:nth-child(8) img { display: block; }
+}
+@container tag-tiles (min-width: 1340px) {
+  .tag-explorer[data-expanded="false"] .tag-tile:nth-child(9) img { display: block; }
+}
+@container tag-tiles (min-width: 1490px) {
+  .tag-explorer[data-expanded="false"] .tag-tile:nth-child(10) img { display: block; }
+}
+@container tag-tiles (min-width: 1640px) {
+  .tag-explorer[data-expanded="false"] .tag-tile:nth-child(11) img { display: block; }
+}
+@container tag-tiles (min-width: 1790px) {
+  .tag-explorer[data-expanded="false"] .tag-tile:nth-child(12) img { display: block; }
+}
+@container tag-tiles (min-width: 1940px) {
+  .tag-explorer[data-expanded="false"] .tag-tile:nth-child(13) img { display: block; }
+}
+@container tag-tiles (min-width: 2090px) {
+  .tag-explorer[data-expanded="false"] .tag-tile:nth-child(14) img { display: block; }
+}
+@container tag-tiles (min-width: 2240px) {
+  .tag-explorer[data-expanded="false"] .tag-tile:nth-child(15) img { display: block; }
+}
+@container tag-tiles (min-width: 2390px) {
+  .tag-explorer[data-expanded="false"] .tag-tile:nth-child(16) img { display: block; }
+}
+
 .tag-tile {
   min-width: 0;
 }
