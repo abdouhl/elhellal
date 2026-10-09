@@ -3,6 +3,7 @@ import BookmarkButton from './BookmarkButton';
 import { isRecentlyAdded } from '../utils/dates';
 import { getPlaceholderImage } from '../utils/placeholderImage';
 import authorNames from '../data/author-names.json';
+import { CARD_SIZES, CARD_WIDTHS, isImageUrl, responsiveImage } from '../lib/images';
 
 interface CardProps {
     href: string;
@@ -24,21 +25,6 @@ interface CardProps {
     internalHref?: string | undefined;
 }
 
-const CF_IMAGE_BASE = 'https://img.xarticl.es/cdn-cgi/image';
-const CF_R2_BASE = 'https://img.xarticl.es';
-
-function cfImage(src: string, opts: Record<string, string | number>): string {
-    const params = Object.entries(opts)
-        .map(([k, v]) => `${k}=${v}`)
-        .join(',');
-    // src is a full R2 URL like https://img.xarticl.es/original_img_url/foo.jpg
-    // strip the origin so we get just the path: /original_img_url/foo.jpg
-    const path = src.startsWith(CF_R2_BASE)
-        ? src.slice(CF_R2_BASE.length)
-        : src;
-    return `${CF_IMAGE_BASE}/${params}${path}`;
-}
-
 export default function Card({
     href,
     title,
@@ -57,27 +43,19 @@ export default function Card({
     //const linkUrl = internalHref || (slug ? `/articles/${slug}` : href);
     const linkUrl = internalHref || (slug ? `/articles/${encodeURIComponent(slug)}/` : href);
     const isNew = isRecentlyAdded(dateAdded, 30);
-    const rawImage = image || getPlaceholderImage();
-    const isR2Image = rawImage.startsWith(CF_R2_BASE);
-
-    const coverImage = isR2Image
-        ? cfImage(rawImage, { width: 640, height: 360, fit: 'cover', format: 'auto', quality: 80 })
-        : rawImage;
-
-    const coverImage2x = isR2Image
-        ? cfImage(rawImage, { width: 1280, height: 720, fit: 'cover', format: 'auto', quality: 75 })
-        : rawImage;
+    const cover = responsiveImage(isImageUrl(image) ? image : getPlaceholderImage(), CARD_WIDTHS);
 
     return (
         <li className="link-card">
             {typeof rank === 'number' && <span className="card-rank">{rank}</span>}
             <div className="card-cover">
                 <img
-                    src={coverImage}
-                    srcSet={`${coverImage} 1x, ${coverImage2x} 2x`}
+                    src={cover.src}
+                    srcSet={cover.srcset}
+                    sizes={cover.srcset ? CARD_SIZES : undefined}
                     alt={title}
                     loading={priority ? 'eager' : 'lazy'}
-                    decoding={priority ? 'sync' : 'async'}
+                    decoding="async"
                     fetchPriority={priority ? 'high' : 'low'}
                     width={640}
                     height={360}

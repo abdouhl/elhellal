@@ -14,6 +14,7 @@
 
 import type { TemplateData } from './shell-template';
 import type { FeedCard } from './feed';
+import { tileLoading } from '../utils/tileLoading';
 import { fnv1a } from './hash';
 import { jsonForScript } from './article-page';
 
@@ -139,7 +140,7 @@ function itemListLd(r: ListingRecord, listName: string) {
 export function listingTemplateData(r: ListingRecord): TemplateData {
     const common = {
         total: r.total,
-        tiles: r.tiles,
+        tiles: r.tiles.map((tile, i) => ({ ...tile, ...tileLoading(i) })),
         manyTiles: r.tiles.length > 2,
     };
 

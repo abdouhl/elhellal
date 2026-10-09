@@ -9,6 +9,7 @@ import { personalBlogs, PERSONAL_COLLECTIONS, type PersonalBlogPerson } from "..
 import { getPlaceholderImage } from "../../utils/placeholderImage";
 import { ARTICLE_SHELL_SLUG } from "../../lib/article-page";
 import { shellMarkers } from "../../lib/shell-template";
+import { HERO_SIZES, HERO_WIDTHS, RELATED_WIDTH, resizeImage, responsiveImage } from "../../lib/images";
 
 // This page renders in two modes:
 // - Personal-blog posts (src/content/*) prerender as ordinary static pages.
@@ -50,6 +51,9 @@ interface ArticleView {
   title: string;
   preview_text: string;
   original_img_url?: string | undefined;
+  /** Resized cover (src = smallest width) and its srcset; srcset is empty when the host can't resize */
+  coverSrc?: string | undefined;
+  coverSrcset?: string | undefined;
   screen_name?: string | undefined;
   created_at: string;
   dateAr: string;
@@ -94,6 +98,8 @@ if (isShell) {
     title: T("title"),
     preview_text: T("preview_text"),
     original_img_url: T("original_img_url"),
+    coverSrc: T("coverSrc"),
+    coverSrcset: T("coverSrcset"),
     screen_name: T("screen_name"),
     created_at: T("created_at"),
     dateAr: T("dateAr"),
@@ -138,6 +144,8 @@ if (isShell) {
         `اكتشف "${found.data.title}" — مقالة رائعة وجدتها على الهلال! ${canonicalUrl}`
       );
       const encodedCanonicalUrl = encodeURIComponent(canonicalUrl);
+      const coverUrl = found.data.large || found.data.thumb;
+      const cover = coverUrl ? responsiveImage(coverUrl, HERO_WIDTHS) : undefined;
       v = {
         seoTitle: found.data.title,
         seoDescription: found.data.description,
@@ -149,7 +157,9 @@ if (isShell) {
         slug: found.slug,
         title: found.data.title,
         preview_text: found.data.description,
-        original_img_url: found.data.large || found.data.thumb,
+        original_img_url: coverUrl,
+        coverSrc: cover?.src,
+        coverSrcset: cover?.srcset,
         screen_name: person.slug,
         created_at: found.data.pubDate.toISOString().slice(0, 10),
         dateAr: found.data.pubDate.toLocaleDateString("ar", { year: "numeric", month: "long", day: "numeric" }),
@@ -169,7 +179,7 @@ if (isShell) {
         redditShareUrl: `https://www.reddit.com/submit?url=${encodedCanonicalUrl}&title=${encodedShareText}`,
         related: otherPosts.map((p) => ({
           href: `/articles/${encodeURIComponent(p.slug)}/`,
-          image: p.data.large || p.data.thumb || getPlaceholderImage(),
+          image: resizeImage(p.data.large || p.data.thumb || getPlaceholderImage(), RELATED_WIDTH),
           title: p.data.title,
           author: person!.nameAr,
         })),
@@ -210,6 +220,12 @@ const breadcrumbs = [
   twitterCreator={v.twitterCreator}
   keywords={v.keywordsString}
 >
+  {(isShell || v.coverSrc) && (
+    <Fragment
+      slot="head"
+      set:html={`${open("original_img_url")}<link rel="preload" as="image" href="${v.coverSrc}" imagesrcset="${v.coverSrcset ?? ""}" imagesizes="${HERO_SIZES}" fetchpriority="high">${close("original_img_url")}`}
+    />
+  )}
   {isShell && (
     <Fragment
       slot="head"
@@ -258,11 +274,17 @@ const breadcrumbs = [
             <Fragment set:html={open("original_img_url")} />
             <div class="article-cover">
               <img
-                src={v.original_img_url}
+                src={v.coverSrc}
+                srcset={v.coverSrcset}
+                sizes={HERO_SIZES}
                 alt={v.title}
                 class="article-cover-img"
                 itemprop="image"
+                width="1600"
+                height="700"
                 loading="eager"
+                fetchpriority="high"
+                decoding="async"
                 onerror="this.closest('.article-cover').style.display='none'"
               />
               <div class="article-cover-tags">
@@ -571,7 +593,10 @@ const breadcrumbs = [
                     src={t.image}
                     alt={t.title}
                     class="related-img"
+                    width="400"
+                    height="225"
                     loading="lazy"
+                    decoding="async"
                     onerror="this.src='/favicons/default.png'"
                   />
                   <span class="related-tag">{v.categoryTitle}</span>

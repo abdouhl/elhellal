@@ -10,6 +10,7 @@
 
 import type { TemplateData } from './shell-template';
 import { fnv1a } from './hash';
+import { HERO_WIDTHS, isImageUrl, RELATED_WIDTH, resizeImage, responsiveImage } from './images';
 
 export const ARTICLE_SHELL_SLUG = '__shell__';
 
@@ -113,6 +114,9 @@ export function articleTemplateData(r: ArticleRecord): TemplateData {
         ],
     };
 
+    const coverUrl = isImageUrl(r.original_img_url) ? r.original_img_url : undefined;
+    const cover = coverUrl ? responsiveImage(coverUrl, HERO_WIDTHS) : undefined;
+
     return {
         seoTitle: r.title,
         seoDescription: r.preview_text || r.metaDescription || '',
@@ -127,7 +131,9 @@ export function articleTemplateData(r: ArticleRecord): TemplateData {
         slug: r.slug,
         title: r.title,
         preview_text: r.preview_text,
-        original_img_url: r.original_img_url,
+        original_img_url: coverUrl,
+        coverSrc: cover?.src,
+        coverSrcset: cover?.srcset,
         screen_name: r.screen_name,
         created_at: r.created_at,
         dateAr: r.dateAr,
@@ -155,7 +161,7 @@ export function articleTemplateData(r: ArticleRecord): TemplateData {
         redditShareUrl: `https://www.reddit.com/submit?url=${encodedCanonicalUrl}&title=${encodedShareText}`,
         related: r.related.map(([slug, title, image, screenName]) => ({
             href: `/articles/${encodeURIComponent(slug)}/`,
-            image: image || `/favicons/${slug}.png`,
+            image: isImageUrl(image) ? resizeImage(image, RELATED_WIDTH) : `/favicons/${slug}.png`,
             title,
             author: screenName ? `@${screenName}` : '',
         })),

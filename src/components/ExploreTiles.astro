@@ -4,6 +4,7 @@
 // src/utils/exploreTiles.ts (categories or tags, depending on the page).
 import type { ExploreTile } from "../utils/exploreTiles";
 import { shellMarkers } from "../lib/shell-template";
+import { tileLoading } from "../utils/tileLoading";
 
 interface Props {
   tiles: ExploreTile[];
@@ -25,9 +26,9 @@ const {
 } = Astro.props;
 
 const { open, close, eachOpen, eachClose } = shellMarkers(shell);
-const items: Array<{ href: string; label: string; count: number | string; image?: string | undefined }> = shell
-  ? [{ href: "{{.href}}", label: "{{.label}}", count: "{{.count}}", image: "{{.image}}" }]
-  : tiles;
+const items: Array<{ href: string; label: string; count: number | string; image?: string | undefined; loading: string; priority: string }> = shell
+  ? [{ href: "{{.href}}", label: "{{.label}}", count: "{{.count}}", image: "{{.image}}", loading: "{{.loading}}", priority: "{{.priority}}" }]
+  : tiles.map((tile, i) => ({ ...tile, ...tileLoading(i) }));
 ---
 
 {(shell || tiles.length > 0) && (
@@ -56,7 +57,7 @@ const items: Array<{ href: string; label: string; count: number | string; image?
             {tile.image && (
               <Fragment>
                 <Fragment set:html={open(".image")} />
-                <img src={tile.image} alt="" loading="lazy" decoding="async" />
+                <img src={tile.image} alt="" width="400" height="92" loading={tile.loading} fetchpriority={tile.priority} decoding="async" />
                 <Fragment set:html={close(".image")} />
               </Fragment>
             )}

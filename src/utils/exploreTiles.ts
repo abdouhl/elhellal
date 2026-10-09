@@ -1,4 +1,5 @@
 import { loadArticles } from '../lib/articles-data';
+import { isImageUrl, resizeImage, TILE_WIDTH } from '../lib/images';
 import type { Category } from '../types';
 import { buildTagIndex, MIN_TAG_ARTICLES, normalizeTag, slugifyTag, type TaggedArticle } from './tags';
 
@@ -17,13 +18,15 @@ const categories = data.articles as Category[];
 /** Tags that just repeat a category name ("علم النفس" on the psychology page) add nothing. */
 const categoryTitles = new Set(categories.map((c) => normalizeTag(c.title)));
 
-/** Picks a cover per tile, avoiding images already used by earlier tiles. */
+/** Picks a (resized) cover per tile, avoiding images already used by earlier tiles. */
 function coverPicker() {
     const used = new Set<string>();
     return (urls: Array<string | undefined>): string | undefined => {
-        const image = urls.find((url) => url && !used.has(url)) ?? urls.find(Boolean);
-        if (image) used.add(image);
-        return image;
+        const images = urls.filter(isImageUrl);
+        const image = images.find((url) => !used.has(url)) ?? images[0];
+        if (!image) return undefined;
+        used.add(image);
+        return resizeImage(image, TILE_WIDTH);
     };
 }
 
