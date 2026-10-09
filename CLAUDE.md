@@ -177,5 +177,5 @@ Individual category and article metadata files are also accessible via package e
 - Use Bun commands (`bun run`) not npm/pnpm
 - Always run `prepare-data` before building or development to ensure generated files are current
 - The `prepare-data` script is automatically run by `dev` and `build` commands
-- Article images are hosted on `img.xarticl.es`
+- Cover images (mostly substackcdn.com) are always rendered through `src/lib/images.ts`, which resizes them (`resizeImage`/`responsiveImage`); never put a raw `original_img_url` in an `<img>`
 - This site curates the best Arabic articles from Substack
