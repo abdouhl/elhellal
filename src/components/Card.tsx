@@ -14,7 +14,10 @@ interface CardProps {
     slug?: string | undefined;
     category?: string | undefined;
     image?: string | undefined;
+    /** The page's likely LCP image: loads first, at high priority */
     priority?: boolean;
+    /** Above the fold on wide screens: skips lazy-loading, at normal priority */
+    eager?: boolean;
     /** Shows a numbered rank badge (used by the "الأكثر قراءة" section) */
     rank?: number;
     /** Overrides the default /authors/{screen_name} link (used by personal-blog cards) */
@@ -35,6 +38,7 @@ export default function Card({
     category,
     image,
     priority = false,
+    eager = false,
     rank,
     authorHref,
     authorLabel,
@@ -54,9 +58,9 @@ export default function Card({
                     srcSet={cover.srcset}
                     sizes={cover.srcset ? CARD_SIZES : undefined}
                     alt={title}
-                    loading={priority ? 'eager' : 'lazy'}
+                    loading={priority || eager ? 'eager' : 'lazy'}
                     decoding="async"
-                    fetchPriority={priority ? 'high' : 'low'}
+                    fetchPriority={priority ? 'high' : eager ? 'auto' : 'low'}
                     width={640}
                     height={360}
                 />

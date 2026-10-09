@@ -10,9 +10,11 @@ const SUBSTACK_FETCH = 'https://substackcdn.com/image/fetch/';
 const SUBSTACK_YOUTUBE = 'https://substackcdn.com/image/youtube/';
 const R2_BASE = 'https://img.xarticl.es';
 
-/** Card covers: one feed column is at most ~400px wide. */
-export const CARD_WIDTHS = [400, 800];
-export const CARD_SIZES = '(min-width: 1400px) 25vw, (min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw';
+/** Card covers: a feed column is (100vw - 32px) / columns (MasonryFeed's breakpoints). */
+export const CARD_WIDTHS = [400, 480, 640, 800];
+export const CARD_SIZES =
+    '(min-width: 1400px) calc((100vw - 32px) / 4), (min-width: 1024px) calc((100vw - 32px) / 3), ' +
+    '(min-width: 640px) calc((100vw - 32px) / 2), calc(100vw - 32px)';
 /** Article page cover (the hero). */
 export const HERO_WIDTHS = [400, 800, 1600];
 export const HERO_SIZES = '(min-width: 769px) 760px, 100vw';

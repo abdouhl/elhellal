@@ -325,7 +325,8 @@ export default function MasonryFeed({ scope, total = 0, initialCards = [], cards
                                             image={item.card.img}
                                             authorHref={item.card.authorHref}
                                             authorLabel={item.card.authorName}
-                                            priority={item.order < 4}
+                                            priority={item.order === 0}
+                                            eager={item.order < 4}
                                         />
                                     )}
                                 </ul>
