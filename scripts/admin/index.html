@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>elhellal admin</title>
+<style>
+  :root {
+    --bg: #f6f6f4; --panel: #fff; --text: #1d1d1b; --muted: #6b6b66; --line: #e3e3de;
+    --accent: #2459d6; --danger: #c62f2f; --ok: #1f8a4c; --warn-bg: #fff4d6; --warn: #7a5800;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141414; --panel: #1d1d1d; --text: #ececea; --muted: #9a9a94; --line: #2f2f2d;
+      --accent: #7aa2ff; --danger: #ff6b6b; --ok: #4cc283; --warn-bg: #3a3014; --warn: #f3d47a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif; background: var(--bg); color: var(--text); }
+  header { position: sticky; top: 0; z-index: 5; background: var(--panel); border-bottom: 1px solid var(--line); padding: 10px 16px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0; }
+  nav { display: flex; gap: 4px; }
+  nav button { background: none; border: 0; padding: 6px 10px; border-radius: 6px; color: var(--muted); cursor: pointer; font: inherit; }
+  nav button.active { background: var(--bg); color: var(--text); font-weight: 600; }
+  .stats { color: var(--muted); margin-inline-start: auto; font-size: 13px; }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  .banner { background: var(--warn-bg); color: var(--warn); padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
+  input, select, textarea { font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+  input[type=search] { flex: 1; min-width: 200px; }
+  button.btn { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 6px; padding: 5px 10px; cursor: pointer; white-space: nowrap; }
+  button.btn:hover { border-color: var(--muted); }
+  button.danger { color: var(--danger); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  .list { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+  .row { display: flex; gap: 12px; padding: 10px 12px; border-top: 1px solid var(--line); align-items: flex-start; }
+  .row:first-child { border-top: 0; }
+  .row img { width: 64px; height: 44px; object-fit: cover; border-radius: 4px; background: var(--bg); flex: none; }
+  .row .body { flex: 1; min-width: 0; }
+  .row .title { font-weight: 600; }
+  .row .preview { color: var(--muted); font-size: 13px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .meta { color: var(--muted); font-size: 12px; display: flex; gap: 10px; flex-wrap: wrap; margin-top: 2px; }
+  .meta a, .link { color: var(--accent); text-decoration: none; cursor: pointer; }
+  .actions { display: flex; gap: 6px; flex: none; flex-wrap: wrap; justify-content: flex-end; }
+  .pill { font-size: 11px; padding: 1px 6px; border-radius: 99px; background: var(--bg); border: 1px solid var(--line); }
+  .pill.bad { color: var(--danger); border-color: currentColor; }
+  .empty { padding: 30px; text-align: center; color: var(--muted); }
+  .pager { display: flex; gap: 8px; justify-content: center; align-items: center; margin: 12px 0; color: var(--muted); }
+  .edit { display: grid; gap: 6px; margin-top: 8px; }
+  .edit textarea { min-height: 70px; }
+  .edit .two { display: flex; gap: 6px; flex-wrap: wrap; }
+  h2 { font-size: 15px; margin: 18px 0 8px; }
+  #toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 8px 14px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+  #toast.err { background: var(--danger); color: #fff; }
+  @media (max-width: 640px) { .row { flex-wrap: wrap; } .row img { display: none; } .actions { width: 100%; justify-content: flex-start; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>elhellal admin</h1>
+  <nav id="tabs">
+    <button data-tab="articles" class="active">Articles</button>
+    <button data-tab="authors">Authors</button>
+    <button data-tab="review">Review</button>
+    <button data-tab="blocked">Blocked</button>
+  </nav>
+  <span class="stats" id="stats"></span>
+  <button class="btn" id="reload" title="Re-read the catalog from disk">Reload</button>
+</header>
+<main>
+  <div id="banner"></div>
+  <div id="view"></div>
+</main>
+<div id="toast"></div>
+
+<script>
+// Article data is scraped from the web: only ever put it in the DOM via textContent / attributes.
+function h(tag, props = {}, ...children) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (v == null || v === false) continue;
+    if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else if (k === 'class') el.className = v;
+    else el.setAttribute(k, v === true ? '' : v);
+  }
+  for (const c of children.flat()) if (c != null && c !== false) el.append(c instanceof Node ? c : String(c));
+  return el;
+}
+
+async function api(path, body) {
+  const res = await fetch(path, body === undefined ? {} : {
+    method: 'POST', headers: { 'content-type': 'application/json', 'x-admin': '1' }, body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({ error: res.statusText }));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+let toastTimer;
+function toast(msg, err) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'show' + (err ? ' err' : '');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.className = '', 2500);
+}
+
+async function act(fn, ok) {
+  try { const r = await fn(); if (ok) toast(typeof ok === 'function' ? ok(r) : ok); await refreshStats(); render(); }
+  catch (e) { toast(e.message, true); }
+}
+
+// ─── State ───
+const state = { tab: 'articles', q: '', category: '', author: '', sort: 'newest', page: 1, selected: new Set(), editing: null };
+let stats = { categories: [] };
+
+async function refreshStats() {
+  stats = await api('/api/stats');
+  document.getElementById('stats').textContent =
+    `${stats.articles.toLocaleString()} articles · ${stats.blockedArticles} blocked · ${stats.blockedAuthors} blocked authors`;
+  document.getElementById('banner').replaceChildren(stats.legacyFile ? h('div', { class: 'banner' },
+    'src/data/articles.json still exists (P6 cutover pending). migrate-to-catalog skips blocklisted articles, ',
+    'but title/category edits made here would be overwritten by it. Prefer removals until the cutover is done.') : '');
+}
+
+document.getElementById('tabs').addEventListener('click', (e) => {
+  const tab = e.target.dataset?.tab; if (!tab) return;
+  state.tab = tab; state.page = 1; state.selected.clear(); state.editing = null;
+  for (const b of document.querySelectorAll('#tabs button')) b.classList.toggle('active', b.dataset.tab === tab);
+  render();
+});
+document.getElementById('reload').onclick = () => act(() => api('/api/reload', {}), 'Reloaded from disk');
+
+function render() { ({ articles: renderArticles, authors: renderAuthors, review: renderReview, blocked: renderBlocked })[state.tab](); }
+const view = () => document.getElementById('view');
+
+// ─── Articles ───
+function categoryOptions(selected, withAll) {
+  return [
+    withAll ? h('option', { value: '' }, 'All categories') : null,
+    ...stats.categories.map((c) => h('option', { value: c.category, selected: c.category === selected }, `${c.title} (${c.category}) · ${c.count}`)),
+  ];
+}
+
+let searchTimer;
+async function renderArticles() {
+  const params = new URLSearchParams({ q: state.q, category: state.category, author: state.author, sort: state.sort, page: state.page });
+  const data = await api('/api/articles?' + params);
+  const search = h('input', { type: 'search', placeholder: 'Search title, author, id or URL…', value: state.q, dir: 'auto',
+    oninput: (e) => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { state.q = e.target.value; state.page = 1; render(); }, 250); } });
+
+  const visibleIds = data.items.map((a) => a.id_str);
+  const allChecked = visibleIds.length > 0 && visibleIds.every((id) => state.selected.has(id));
+
+  view().replaceChildren(
+    h('div', { class: 'toolbar' },
+      search,
+      h('select', { onchange: (e) => { state.category = e.target.value; state.page = 1; render(); } }, categoryOptions(state.category, true)),
+      h('select', { onchange: (e) => { state.sort = e.target.value; render(); } },
+        ['newest', 'oldest', 'title'].map((s) => h('option', { value: s, selected: s === state.sort }, `Sort: ${s}`))),
+      state.author ? h('button', { class: 'btn', onclick: () => { state.author = ''; state.page = 1; render(); } }, `@${state.author} ✕`) : null,
+    ),
+    h('div', { class: 'toolbar' },
+      h('label', {}, h('input', { type: 'checkbox', checked: allChecked,
+        onchange: (e) => { visibleIds.forEach((id) => e.target.checked ? state.selected.add(id) : state.selected.delete(id)); render(); } }), ' Select page'),
+      h('span', { class: 'meta' }, `${data.total.toLocaleString()} results`),
+      state.selected.size ? h('button', { class: 'btn danger', onclick: () => removeSelected() }, `Remove ${state.selected.size} selected`) : null,
+      state.selected.size ? h('button', { class: 'btn', onclick: () => { state.selected.clear(); render(); } }, 'Clear selection') : null,
+    ),
+    data.items.length ? h('div', { class: 'list' }, data.items.map(articleRow)) : h('div', { class: 'list' }, h('div', { class: 'empty' }, 'No articles')),
+    pager(data),
+  );
+  if (document.activeElement === document.body && state.q) { search.focus(); search.setSelectionRange(state.q.length, state.q.length); }
+}
+
+function pager(data) {
+  if (data.pages <= 1) return '';
+  return h('div', { class: 'pager' },
+    h('button', { class: 'btn', disabled: data.page <= 1, onclick: () => { state.page--; render(); scrollTo(0, 0); } }, '← Prev'),
+    `Page ${data.page} / ${data.pages}`,
+    h('button', { class: 'btn', disabled: data.page >= data.pages, onclick: () => { state.page++; render(); scrollTo(0, 0); } }, 'Next →'),
+  );
+}
+
+function articleMeta(a) {
+  return h('div', { class: 'meta' },
+    h('a', { onclick: () => { state.tab = 'articles'; state.author = a.screen_name; state.page = 1; syncTabs(); render(); } }, '@' + a.screen_name),
+    h('span', {}, a.category), h('span', {}, a.created_at),
+    a.url ? h('a', { href: a.url, target: '_blank', rel: 'noreferrer' }, 'source ↗') : null,
+    a.live ? h('a', { href: a.live, target: '_blank', rel: 'noreferrer' }, 'on site ↗') : null,
+    h('span', {}, a.id_str),
+  );
+}
+
+function syncTabs() { for (const b of document.querySelectorAll('#tabs button')) b.classList.toggle('active', b.dataset.tab === state.tab); }
+
+function articleRow(a) {
+  const editing = state.editing === a.id_str;
+  return h('div', { class: 'row' },
+    h('input', { type: 'checkbox', checked: state.selected.has(a.id_str),
+      onchange: (e) => { e.target.checked ? state.selected.add(a.id_str) : state.selected.delete(a.id_str); render(); } }),
+    a.original_img_url ? h('img', { src: a.original_img_url, loading: 'lazy', alt: '' }) : null,
+    h('div', { class: 'body' },
+      h('div', { class: 'title', dir: 'auto' }, a.title),
+      h('div', { class: 'preview', dir: 'auto' }, a.preview_text),
+      articleMeta(a),
+      editing ? editForm(a) : null,
+    ),
+    h('div', { class: 'actions' },
+      h('button', { class: 'btn', onclick: () => { state.editing = editing ? null : a.id_str; render(); } }, editing ? 'Close' : 'Edit'),
+      h('button', { class: 'btn danger', onclick: () => removeOne(a) }, 'Remove'),
+    ),
+  );
+}
+
+function editForm(a) {
+  const title = h('input', { value: a.title, dir: 'auto' });
+  const preview = h('textarea', { dir: 'auto' }, a.preview_text);
+  const img = h('input', { value: a.original_img_url || '', placeholder: 'Image URL', style: 'flex:1;min-width:200px' });
+  const date = h('input', { value: a.created_at, placeholder: 'YYYY-MM-DD', size: 10 });
+  const cat = h('select', {}, categoryOptions(a.category, false));
+  return h('div', { class: 'edit' }, title, preview, h('div', { class: 'two' }, cat, date, img),
+    h('div', { class: 'two' },
+      h('button', { class: 'btn primary', onclick: () => act(async () => {
+        await api('/api/edit', { id_str: a.id_str, changes: { title: title.value, preview_text: preview.value, original_img_url: img.value, created_at: date.value, category: cat.value } });
+        state.editing = null;
+      }, 'Saved') }, 'Save'),
+      h('span', { class: 'meta' }, 'The slug (URL) stays the same when the title changes.'),
+    ));
+}
+
+function removeOne(a) {
+  const note = prompt(`Remove "${a.title}"?\n\nOptional reason (saved in blocklist.json):`, '');
+  if (note === null) return;
+  act(() => api('/api/remove', { ids: [a.id_str], note }), 'Removed and blocklisted');
+}
+
+function removeSelected() {
+  const note = prompt(`Remove ${state.selected.size} articles?\n\nOptional reason:`, '');
+  if (note === null) return;
+  act(async () => { const r = await api('/api/remove', { ids: [...state.selected], note }); state.selected.clear(); return r; },
+    (r) => `Removed ${r.removed} articles`);
+}
+
+// ─── Authors ───
+let authorQuery = '';
+async function renderAuthors() {
+  const data = await api('/api/authors?' + new URLSearchParams({ q: authorQuery }));
+  const search = h('input', { type: 'search', placeholder: 'Search authors…', value: authorQuery,
+    oninput: (e) => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { authorQuery = e.target.value; render(); }, 250); } });
+  view().replaceChildren(
+    h('div', { class: 'toolbar' }, search, h('span', { class: 'meta' }, `${data.total.toLocaleString()} authors (top 200 by article count shown)`)),
+    h('div', { class: 'list' }, data.items.length ? data.items.map((au) => h('div', { class: 'row' },
+      au.image ? h('img', { src: au.image, loading: 'lazy', alt: '', style: 'width:40px;height:40px;border-radius:50%' }) : null,
+      h('div', { class: 'body' },
+        h('div', { class: 'title' }, '@' + au.screen_name, ' ', au.blocked ? h('span', { class: 'pill bad' }, 'blocked') : null),
+        h('div', { class: 'meta' }, `${au.count} articles`, `latest ${au.latest}`, au.categories.slice(0, 6).join(', ')),
+      ),
+      h('div', { class: 'actions' },
+        h('button', { class: 'btn', onclick: () => { state.tab = 'articles'; state.author = au.screen_name; state.q = ''; state.page = 1; syncTabs(); render(); } }, 'View articles'),
+        h('button', { class: 'btn danger', onclick: () => blockAuthor(au.screen_name, au.count) }, 'Remove all & block'),
+      ),
+    )) : h('div', { class: 'empty' }, 'No authors')),
+  );
+  if (authorQuery) { search.focus(); search.setSelectionRange(authorQuery.length, authorQuery.length); }
+}
+
+function blockAuthor(name, count) {
+  if (!confirm(`Remove all ${count} articles by @${name} and block the author from future imports?`)) return;
+  act(() => api('/api/authors/block', { screen_name: name }), (r) => `Blocked @${name}, removed ${r.removed} articles`);
+}
+
+// ─── Review ───
+async function renderReview() {
+  const data = await api('/api/review');
+  view().replaceChildren(
+    h('p', { class: 'meta' }, `${data.total} articles flagged "review" by bun run moderate. Keep or remove writes to overrides.json.`),
+    h('div', { class: 'list' }, data.items.length ? data.items.map((a) => h('div', { class: 'row' },
+      h('div', { class: 'body' },
+        h('div', { class: 'title', dir: 'auto' }, a.title),
+        h('div', { class: 'preview', dir: 'auto' }, a.preview_text),
+        articleMeta(a),
+        h('div', { class: 'meta' }, ...a.verdict.reasons.map((r) => h('span', { class: 'pill bad' }, r)), h('span', {}, a.verdict.note)),
+      ),
+      h('div', { class: 'actions' },
+        h('button', { class: 'btn', onclick: () => act(() => api('/api/decide', { id_str: a.id_str, decision: 'keep' }), 'Kept') }, 'Keep'),
+        h('button', { class: 'btn danger', onclick: () => act(() => api('/api/decide', { id_str: a.id_str, decision: 'remove' }), 'Removed') }, 'Remove'),
+      ),
+    )) : h('div', { class: 'empty' }, 'Nothing to review')),
+  );
+}
+
+// ─── Blocked ───
+async function renderBlocked() {
+  const data = await api('/api/blocked');
+  view().replaceChildren(
+    h('h2', {}, `Blocked authors (${data.authors.length})`),
+    h('div', { class: 'list' }, data.authors.length ? data.authors.map((name) => h('div', { class: 'row' },
+      h('div', { class: 'body title' }, '@' + name),
+      h('button', { class: 'btn', onclick: () => {
+        if (confirm(`Unblock @${name}? Importers will fetch their articles again (removed articles stay blocklisted).`))
+          act(() => api('/api/authors/unblock', { screen_name: name }), 'Unblocked');
+      } }, 'Unblock'),
+    )) : h('div', { class: 'empty' }, 'None')),
+    h('h2', {}, `Blocked articles (${data.totalArticles}, newest first)`),
+    h('p', { class: 'meta' }, 'Restore puts back articles removed since the admin server started. For older ones, Unblock only lets importers re-add them; use git to bring the content back.'),
+    h('div', { class: 'list' }, data.articles.length ? data.articles.map((a) => h('div', { class: 'row' },
+      h('div', { class: 'body' },
+        h('div', { class: 'title', dir: 'auto' }, a.title),
+        h('div', { class: 'meta' }, '@' + a.screen_name, a.removed_at, a.note || a.reasons.join(', '),
+          a.url ? h('a', { href: a.url, target: '_blank', rel: 'noreferrer' }, 'source ↗') : null),
+      ),
+      h('button', { class: 'btn', onclick: () => act(() => api('/api/restore', { id_str: a.id_str }),
+        (r) => r.restored ? 'Restored' : 'Unblocked (content not in this session — importer may re-add it)') },
+        a.restorable ? 'Restore' : 'Unblock'),
+    )) : h('div', { class: 'empty' }, 'None')),
+  );
+}
+
+refreshStats().then(render).catch((e) => toast(e.message, true));
+</script>
+</body>
+</html>

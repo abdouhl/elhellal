@@ -11,10 +11,18 @@ import fs from 'fs';
 import path from 'path';
 import type { ArticlesConfig } from '../src/types/index.ts';
 import { readArticles, writeArticles } from '../src/lib/articles-store.ts';
+import { blockedAuthors, blockedIds } from './lib/moderation.ts';
 
 const SOURCE = path.join(process.cwd(), 'src/data/articles.json');
 
 const source: ArticlesConfig = JSON.parse(fs.readFileSync(SOURCE, 'utf-8'));
+
+// Don't bring back what the admin panel or the moderation script removed.
+const ids = blockedIds();
+const authors = blockedAuthors();
+for (const cat of source.articles) {
+    cat.content = cat.content.filter((a) => !ids.has(a.id_str) && !authors.has(a.screen_name));
+}
 const { written, removed } = writeArticles(source);
 
 // Same categories and articles, in title order (equal titles may swap).

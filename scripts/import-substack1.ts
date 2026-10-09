@@ -30,6 +30,7 @@ import { fileURLToPath } from 'url';
 import type { ArticlesConfig, Article } from '../src/types/index.ts';
 import { personalBlogs } from '../src/data/personal-blogs.ts';
 import { readArticles, writeArticles } from '../src/lib/articles-store.ts';
+import { blockedAuthors, blockedIds } from './lib/moderation.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -124,7 +125,10 @@ function getExistingSubstackAuthors(): string[] {
 
 const cliUsers = process.argv.slice(2);
 const existingAuthors = getExistingSubstackAuthors();
-const substackUsers: string[] = [...new Set([...cliUsers, ...existingAuthors])];
+// Authors blocklisted by scripts/moderate-articles.ts are never fetched.
+const moderationBlockedAuthors = blockedAuthors();
+const substackUsers: string[] = [...new Set([...cliUsers, ...existingAuthors])]
+    .filter(u => !moderationBlockedAuthors.has(u));
 
 if (substackUsers.length === 0) {
     console.error('Usage: bun run scripts/import-substack.ts [username] [username2] ...');
@@ -519,9 +523,11 @@ async function main() {
     const data: ArticlesConfig = readArticles();
 
     // Duplicate check across ALL categories
-    const allExistingIds = new Set(
-        data.articles.flatMap(c => c.content.map(a => a.id_str))
-    );
+    // Moderated-out articles count as seen, so they are never re-imported.
+    const allExistingIds = new Set([
+        ...data.articles.flatMap(c => c.content.map(a => a.id_str)),
+        ...blockedIds(),
+    ]);
 
     let added = 0;
     let skipped = 0;

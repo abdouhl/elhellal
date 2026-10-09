@@ -36,6 +36,8 @@
     "test": "vitest",
     "test:run": "vitest run",
     "check-data": "bun run scripts/check-data.ts",
+    "moderate": "bun run scripts/moderate-articles.ts",
+    "admin": "bun run scripts/admin.ts",
     "x-schedule": "bun run scripts/x-schedule.ts",
     "linkedin-schedule": "bun run scripts/linkedin-schedule.ts",
     "update-metadata": "bun run scripts/update-metadata.ts",
@@ -47,6 +49,7 @@
     "deploy:views": "wrangler deploy --config workers/views/wrangler.jsonc"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.132.1",
     "@astrojs/cloudflare": "^12.6.12",
     "@astrojs/partytown": "^2.1.4",
     "@astrojs/react": "^4.4.2",

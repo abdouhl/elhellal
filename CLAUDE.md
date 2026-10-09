@@ -39,6 +39,7 @@ bun run prepare-data      # Full data pipeline (slugs → split → slug-map →
 bun run add-slugs         # Generate slugs and sort articles alphabetically
 bun run check-data        # Validate data integrity before commits
 bun run update-metadata   # Update article metadata
+bun run admin             # Local admin panel (localhost:4322): remove/edit/move articles, block authors
 ```
 
 ### Testing
