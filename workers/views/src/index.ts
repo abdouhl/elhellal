@@ -12,7 +12,8 @@ const ALLOWED_ORIGINS = [
 	"https://www.elhellal.com",
 ];
 
-const SLUG_RE = /^[a-z0-9-]{1,120}$/;
+// Article slugs are mostly Arabic (sent decoded, as the site stores them).
+const SLUG_RE = /^[\p{L}\p{M}\p{N}_-]{1,200}$/u;
 const LEADERBOARD_KEY = "leaderboard";
 const LEADERBOARD_SIZE = 50;
 const DEFAULT_LIMIT = 8;

@@ -9,6 +9,7 @@ import { personalBlogs, PERSONAL_COLLECTIONS, type PersonalBlogPerson } from "..
 import { getPlaceholderImage } from "../../utils/placeholderImage";
 import { ARTICLE_SHELL_SLUG } from "../../lib/article-page";
 import { shellMarkers } from "../../lib/shell-template";
+import { VIEWS_API_BASE } from "../../config/views";
 import { HERO_SIZES, HERO_WIDTHS, RELATED_WIDTH, resizeImage, responsiveImage } from "../../lib/images";
 
 // This page renders in two modes:
@@ -640,13 +641,17 @@ const breadcrumbs = [
   </script>
 
   <!-- View-tracking beacon — feeds the "الأكثر قراءة" leaderboard. Silently
-       no-ops if the elhellal-views worker isn't deployed/routed yet. -->
-  <script type="module" data-astro-rerun>
-    import { VIEWS_API_BASE } from "../../config/views";
-
+       no-ops if the elhellal-views worker isn't deployed/routed yet.
+       data-astro-rerun makes this an unbundled inline script, so it can't
+       `import` (the browser requested /config/views and the module never
+       ran); the API base comes in through define:vars instead. -->
+  <script type="module" data-astro-rerun define:vars={{ VIEWS_API_BASE }}>
     const match = window.location.pathname.match(/^\/articles\/([^/]+)\/?$/);
     if (match) {
-      const slug = match[1];
+      let slug = match[1];
+      try {
+        slug = decodeURIComponent(slug);
+      } catch {}
       let alreadyTracked = false;
       try {
         alreadyTracked = !!sessionStorage.getItem(`viewed:${slug}`);
