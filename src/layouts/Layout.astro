@@ -96,9 +96,33 @@ const {
         </script>
 
         <meta charset="UTF-8" />
+        <!-- The installed app gets its own shell (tab bar, compact header; see
+             the "Installed app" styles). Flag it before first paint; pwa.ts
+             carries the flag across view-transition swaps. -->
+        <script is:inline>
+            if (matchMedia("(display-mode: standalone)").matches || navigator.standalone === true)
+                document.documentElement.setAttribute("data-standalone", "");
+        </script>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <link rel="icon" type="image/svg+xml" href="/xarticles.svg" />
-        <link rel="apple-touch-icon" href="/icon-192.png" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <!-- iOS launch screens (scripts/pwa-assets/), one per device size. -->
+        <link rel="apple-touch-startup-image" href="/splash/splash-1320x2868.jpg" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+        <link rel="apple-touch-startup-image" href="/splash/splash-1206x2622.jpg" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+        <link rel="apple-touch-startup-image" href="/splash/splash-1290x2796.jpg" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+        <link rel="apple-touch-startup-image" href="/splash/splash-1179x2556.jpg" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+        <link rel="apple-touch-startup-image" href="/splash/splash-1284x2778.jpg" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+        <link rel="apple-touch-startup-image" href="/splash/splash-1170x2532.jpg" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+        <link rel="apple-touch-startup-image" href="/splash/splash-1125x2436.jpg" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+        <link rel="apple-touch-startup-image" href="/splash/splash-1242x2688.jpg" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+        <link rel="apple-touch-startup-image" href="/splash/splash-828x1792.jpg" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
+        <link rel="apple-touch-startup-image" href="/splash/splash-1242x2208.jpg" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+        <link rel="apple-touch-startup-image" href="/splash/splash-750x1334.jpg" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
+        <link rel="apple-touch-startup-image" href="/splash/splash-640x1136.jpg" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
+        <link rel="apple-touch-startup-image" href="/splash/splash-1536x2048.jpg" media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
+        <link rel="apple-touch-startup-image" href="/splash/splash-1640x2360.jpg" media="(device-width: 820px) and (device-height: 1180px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
+        <link rel="apple-touch-startup-image" href="/splash/splash-1668x2388.jpg" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
+        <link rel="apple-touch-startup-image" href="/splash/splash-2048x2732.jpg" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#000000" />
         <meta name="mobile-web-app-capable" content="yes" />
@@ -231,6 +255,11 @@ const {
         <header class="site-header" aria-label="رأس الصفحة">
             <div class="site-header-inner">
                 <div class="site-header-top">
+                    <button type="button" class="app-back" id="app-back" aria-label="رجوع" hidden>
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M9 6l6 6-6 6" />
+                        </svg>
+                    </button>
                     <time class="header-date" datetime={headerDateISO}>{headerDate}</time>
 
                     <div class="header-brand">
@@ -324,7 +353,7 @@ const {
 
         <slot />
 
-        <footer class="footer" aria-label="Site footer">
+        <footer class="footer" id="site-footer" aria-label="Site footer">
             <nav class="footer-nav" aria-label="تذييل الصفحة">
                 <a href="/about/" class="nu-u-link--subtle">حول الموقع</a>
                 <span class="footer-separator" aria-hidden="true">·</span>
@@ -364,6 +393,28 @@ const {
                 >
             </p>
         </footer>
+        <nav class="app-tabbar" aria-label="التطبيق">
+            <a href="/" data-tab="/">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z" /></svg>
+                <span>الرئيسية</span>
+            </a>
+            <a href="/tags/" data-tab="/tags/">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z" /><circle cx="7.5" cy="7.5" r="1.5" /></svg>
+                <span>الوسوم</span>
+            </a>
+            <a href="/saved/" data-tab="/saved/">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z" /></svg>
+                <span>المحفوظة</span>
+            </a>
+            <a href="/notifications/" data-tab="/notifications/">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>
+                <span>الإشعارات</span>
+            </a>
+            <button type="button" id="app-more" aria-expanded="false" aria-controls="site-footer">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+                <span>المزيد</span>
+            </button>
+        </nav>
         <script>
             import "../scripts/pwa";
         </script>
@@ -1317,13 +1368,204 @@ const {
         padding-left: env(safe-area-inset-left, 0px);
         padding-right: env(safe-area-inset-right, 0px);
     }
-    @media (display-mode: standalone) {
-        .site-header {
-            padding-top: env(safe-area-inset-top, 0px);
-        }
+    .app-back,
+    .app-tabbar {
+        display: none;
+    }
+
+    /* The installed app (html[data-standalone]) looks like an app, not the
+       website: a sticky compact header with a back button (there is no browser
+       chrome), a bottom tab bar, and the footer as a "more" sheet. */
+    html[data-standalone] {
+        --tabbar-height: 56px;
+        overscroll-behavior-y: none;
+        -webkit-tap-highlight-color: transparent;
+    }
+    html[data-standalone] body {
+        padding-bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom, 0px));
     }
     html[data-standalone] .site-header {
+        position: sticky;
+        top: 0;
+        z-index: 800;
         padding-top: env(safe-area-inset-top, 0px);
+        background: color-mix(in srgb, var(--background) 82%, transparent);
+        -webkit-backdrop-filter: saturate(1.6) blur(18px);
+        backdrop-filter: saturate(1.6) blur(18px);
+        -webkit-user-select: none;
+        user-select: none;
+    }
+    html[data-standalone] .site-header-inner {
+        padding: 0 16px;
+    }
+    html[data-standalone] .site-header-top {
+        position: relative;
+        flex-wrap: nowrap;
+        justify-content: center;
+        min-height: 52px;
+        padding: 0;
+    }
+    html[data-standalone] .header-date,
+    html[data-standalone] .brand-tagline,
+    html[data-standalone] .social-links,
+    html[data-standalone] .header-install,
+    html[data-standalone] .favorites-link,
+    html[data-standalone] .sister-sites,
+    html[data-standalone] .news-ticker {
+        display: none !important;
+    }
+    html[data-standalone] .header-brand {
+        flex: 0 1 auto;
+    }
+    html[data-standalone] .brand-link img {
+        width: 30px;
+        height: 30px;
+    }
+    html[data-standalone] .brand-name {
+        font-size: 1.2rem;
+    }
+    html[data-standalone] .header-actions {
+        position: absolute;
+        inset-inline-end: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        flex: none;
+        order: 0;
+    }
+    html[data-standalone] .app-back:not([hidden]) {
+        position: absolute;
+        inset-inline-start: -8px;
+        top: 50%;
+        transform: translateY(-50%);
+        display: grid;
+        place-items: center;
+        width: 44px;
+        height: 44px;
+        padding: 0;
+        border: 0;
+        border-radius: 50%;
+        background: transparent;
+        color: var(--content-primary);
+        cursor: pointer;
+    }
+    html[data-standalone] .header-search-row {
+        padding: 0 0 var(--spacing-04);
+    }
+
+    html[data-standalone] .app-tabbar {
+        position: fixed;
+        z-index: 950;
+        inset-inline: 0;
+        bottom: 0;
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        height: calc(var(--tabbar-height) + env(safe-area-inset-bottom, 0px));
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+        border-top: 0.5px solid var(--border-muted);
+        background: color-mix(in srgb, var(--background) 82%, transparent);
+        -webkit-backdrop-filter: saturate(1.6) blur(18px);
+        backdrop-filter: saturate(1.6) blur(18px);
+        -webkit-user-select: none;
+        user-select: none;
+    }
+    .app-tabbar a,
+    .app-tabbar button {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        padding: 0;
+        border: 0;
+        background: none;
+        font: inherit;
+        font-size: 11px;
+        line-height: 1;
+        color: var(--content-secondary);
+        text-decoration: none;
+        cursor: pointer;
+        -webkit-touch-callout: none;
+        transition: color 0.15s;
+    }
+    .app-tabbar svg {
+        transition: transform 0.15s;
+    }
+    .app-tabbar a:active svg,
+    .app-tabbar button:active svg {
+        transform: scale(0.88);
+    }
+    .app-tabbar [aria-current="page"],
+    .app-tabbar [aria-expanded="true"] {
+        color: var(--content-primary);
+    }
+    .app-tabbar [aria-current="page"] svg {
+        fill: color-mix(in srgb, currentColor 18%, transparent);
+    }
+
+    /* Cards press in like native list rows. */
+    html[data-standalone] .link-card {
+        transition: transform 0.12s ease-out;
+    }
+    html[data-standalone] .link-card:active {
+        transform: scale(0.985);
+    }
+
+    /* "More": the footer slides up as a sheet above the tab bar. */
+    html[data-standalone] .footer {
+        position: fixed;
+        z-index: 940;
+        inset-inline: 0;
+        bottom: 0;
+        max-height: 75vh;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding: 20px 16px calc(var(--tabbar-height) + env(safe-area-inset-bottom, 0px) + 16px);
+        border-radius: 20px 20px 0 0;
+        border-top: 0.5px solid var(--border-muted);
+        background: var(--background);
+        box-shadow: 0 -12px 40px rgb(0 0 0 / 0.5);
+        transform: translateY(100%);
+        visibility: hidden;
+        transition:
+            transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
+            visibility 0s 0.28s;
+    }
+    html[data-standalone] .footer::before {
+        content: "";
+        display: block;
+        width: 36px;
+        height: 4px;
+        margin: -8px auto 16px;
+        border-radius: 2px;
+        background: var(--border-muted);
+    }
+    html[data-more-open] .footer {
+        transform: none;
+        visibility: visible;
+        transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    html[data-more-open] body::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: 930;
+        background: rgb(0 0 0 / 0.5);
+    }
+    @media (prefers-reduced-motion: reduce) {
+        html[data-standalone] .footer,
+        html[data-more-open] .footer {
+            transition: none;
+        }
+    }
+    /* Listing pages' fixed link bar (FeedChrome): its links live in "more". */
+    html[data-standalone] .feed-footer {
+        display: none;
+    }
+    html[data-standalone] .to-top {
+        bottom: calc(var(--tabbar-height) + 16px + env(safe-area-inset-bottom, 0px));
+    }
+    html[data-standalone] .pwa-banner {
+        bottom: calc(var(--tabbar-height) + 12px + env(safe-area-inset-bottom, 0px));
     }
 
     .footer-nav [hidden] {
@@ -1362,6 +1604,14 @@ const {
     .pwa-banner-icon {
         flex: none;
         border-radius: 10px;
+    }
+    .pwa-banner-bell {
+        display: grid;
+        place-items: center;
+        width: 44px;
+        height: 44px;
+        background: var(--content-primary);
+        color: var(--background);
     }
     .pwa-banner-text {
         display: grid;

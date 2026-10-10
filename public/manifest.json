@@ -6,13 +6,20 @@
     "start_url": "/?source=pwa",
     "scope": "/",
     "display": "standalone",
-    "display_override": ["standalone", "minimal-ui"],
+    "display_override": [
+        "standalone"
+    ],
     "orientation": "any",
-    "background_color": "#000000",
+    "background_color": "#18123a",
     "theme_color": "#000000",
     "lang": "ar",
     "dir": "rtl",
-    "categories": ["news", "books", "education", "magazines"],
+    "categories": [
+        "news",
+        "books",
+        "education",
+        "magazines"
+    ],
     "prefer_related_applications": false,
     "icons": [
         {
@@ -28,6 +35,12 @@
             "purpose": "any"
         },
         {
+            "src": "/icon-192-maskable.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
             "src": "/icon-512-maskable.png",
             "sizes": "512x512",
             "type": "image/png",
@@ -39,23 +52,53 @@
             "name": "المقالات المحفوظة",
             "short_name": "المحفوظة",
             "url": "/saved/?source=shortcut",
-            "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+            "icons": [
+                {
+                    "src": "/icon-192.png",
+                    "sizes": "192x192",
+                    "type": "image/png"
+                }
+            ]
         },
         {
             "name": "علم النفس",
             "url": "/psychology/?source=shortcut",
-            "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+            "icons": [
+                {
+                    "src": "/icon-192.png",
+                    "sizes": "192x192",
+                    "type": "image/png"
+                }
+            ]
         },
         {
             "name": "السياسة والشأن العام",
             "short_name": "السياسة",
             "url": "/politics/?source=shortcut",
-            "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+            "icons": [
+                {
+                    "src": "/icon-192.png",
+                    "sizes": "192x192",
+                    "type": "image/png"
+                }
+            ]
         },
         {
             "name": "الإشعارات",
             "url": "/notifications/?source=shortcut",
-            "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+            "icons": [
+                {
+                    "src": "/icon-192.png",
+                    "sizes": "192x192",
+                    "type": "image/png"
+                }
+            ]
         }
-    ]
+    ],
+    "launch_handler": {
+        "client_mode": [
+            "navigate-existing",
+            "auto"
+        ]
+    }
 }

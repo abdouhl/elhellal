@@ -19,6 +19,8 @@ export interface InstallState {
     /** When the reader last dismissed the install banner (ms). */
     dismissedAt?: number;
     installed?: boolean;
+    /** When the reader last dismissed the installed app's notifications banner (ms). */
+    notifyDismissedAt?: number;
 }
 
 function read<T>(key: string, fallback: T): T {

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<style>
+  html,body{margin:0;height:100%;overflow:hidden}
+  body{
+    background:
+      radial-gradient(120vw 60vh at 50% 100%, rgba(255,170,100,.55), transparent 70%),
+      linear-gradient(180deg,#18123a 0%,#2a1850 38%,#5a2763 62%,#a8435f 82%,#e07a55 100%);
+    font-family:"Geeza Pro","SF Arabic","Noto Sans Arabic",system-ui,sans-serif;
+    color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  }
+  .stars{position:absolute;inset:0 0 50% 0;background-image:
+    radial-gradient(1.5px 1.5px at 12% 18%,#fff9,transparent),radial-gradient(1px 1px at 28% 8%,#fff8,transparent),
+    radial-gradient(1.5px 1.5px at 44% 26%,#fffa,transparent),radial-gradient(1px 1px at 62% 12%,#fff9,transparent),
+    radial-gradient(2px 2px at 78% 22%,#fffb,transparent),radial-gradient(1px 1px at 88% 6%,#fff8,transparent),
+    radial-gradient(1.5px 1.5px at 8% 40%,#fff7,transparent),radial-gradient(1px 1px at 92% 38%,#fff8,transparent),
+    radial-gradient(1px 1px at 36% 44%,#fff6,transparent),radial-gradient(1.5px 1.5px at 70% 46%,#fff7,transparent)}
+  .icon{width:min(34vw,34vh,200px);aspect-ratio:1;border-radius:22.5%;
+    box-shadow:0 0 0 1px rgba(255,255,255,.08),0 18px 50px rgba(10,0,30,.55),0 0 90px rgba(255,170,120,.35);position:relative}
+  h1{margin:28px 0 6px;font-size:min(11vw,64px);font-weight:700;letter-spacing:0;position:relative}
+  p{margin:0;font-size:min(4.2vw,22px);opacity:.82;position:relative}
+  .dunes{position:absolute;inset:auto 0 0 0;height:16vh}
+</style></head>
+<body>
+  <div class="stars"></div>
+  <img class="icon" src="icon-512.png" alt="">
+  <h1>الهلال</h1>
+  <p>أفضل المقالات العربية</p>
+  <svg class="dunes" viewBox="0 0 100 20" preserveAspectRatio="none">
+    <path d="M0 8 C20 2 40 12 60 6 S90 4 100 7 V20 H0Z" fill="#c8704a"/>
+    <path d="M0 14 C25 8 45 18 70 12 S95 11 100 13 V20 H0Z" fill="#9c4c3a"/>
+  </svg>
+</body></html>

@@ -8,10 +8,15 @@
  *  - shows an install banner (or, on iOS, how to add to the home screen) to
  *    returning readers, and the header's install button (touch devices) and
  *    the footer's install link wherever installing is possible
+ *  - drives the installed app's shell: tab bar, back button, "more" sheet
+ *  - subscribes the installed app to the daily digest: silently when
+ *    notifications are already allowed, otherwise through a one-tap banner
+ *    (iOS only asks for permission from a tap)
  */
 
 import { shardOf } from '../lib/article-page';
 import { getBookmarks } from '../utils/bookmarks';
+import { currentSubscription, pushSupport, subscribe } from '../lib/push-client';
 import { readInstallState, rememberRecent, updateInstallState } from './pwa-store';
 
 interface BeforeInstallPromptEvent extends Event {
@@ -188,12 +193,129 @@ function setupInstall() {
     });
 }
 
+// ─── Notifications in the installed app ──────────────────────────────────────
+
+const NOTIFY_DISMISS_DAYS = 7;
+const NOTIFY_SESSION_KEY = 'elhellal_notify_banner_shown';
+const BELL_ICON = `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>`;
+
+let subscribing = false;
+
+async function enableNotifications() {
+    if (subscribing) return;
+    subscribing = true;
+    try {
+        await subscribe({ categories: '*', frequency: 'daily' });
+        trackPwaEvent('subscribed');
+    } catch {
+        // denied, dismissed or offline: the banner's dismissal covers it
+        updateInstallState({ notifyDismissedAt: Date.now() });
+    } finally {
+        subscribing = false;
+    }
+}
+
+function showNotifyBanner() {
+    if (document.getElementById('pwa-banner')) return;
+    const banner = document.createElement('div');
+    banner.id = 'pwa-banner';
+    banner.className = 'pwa-banner';
+    banner.setAttribute('role', 'dialog');
+    banner.setAttribute('aria-label', 'تفعيل الإشعارات');
+    banner.innerHTML = `
+        <span class="pwa-banner-icon pwa-banner-bell">${BELL_ICON}</span>
+        <div class="pwa-banner-text">
+            <strong>فعّل الإشعارات</strong>
+            <span>أفضل المقالات الجديدة مرة في اليوم، ويمكنك تغيير ذلك متى شئت.</span>
+        </div>
+        <div class="pwa-banner-actions">
+            <button type="button" class="pwa-banner-install">تفعيل</button>
+            <button type="button" class="pwa-banner-close" aria-label="إغلاق">لاحقاً</button>
+        </div>`;
+    banner.querySelector('.pwa-banner-install')?.addEventListener('click', () => {
+        hideBanner();
+        enableNotifications();
+    });
+    banner.querySelector('.pwa-banner-close')?.addEventListener('click', () => {
+        updateInstallState({ notifyDismissedAt: Date.now() });
+        trackPwaEvent('notify-dismissed');
+        hideBanner();
+    });
+    document.body.append(banner);
+    try {
+        sessionStorage.setItem(NOTIFY_SESSION_KEY, '1');
+    } catch {}
+}
+
+async function setupAppNotifications() {
+    if (!isStandalone() || !import.meta.env.PROD || pushSupport() !== 'ok') return;
+    if (Notification.permission === 'denied' || location.pathname.startsWith('/notifications')) return;
+    if (await currentSubscription()) return;
+    if (Notification.permission === 'granted') return enableNotifications();
+    const { notifyDismissedAt } = readInstallState();
+    if (notifyDismissedAt && Date.now() - notifyDismissedAt < NOTIFY_DISMISS_DAYS * 86_400_000) return;
+    try {
+        if (sessionStorage.getItem(NOTIFY_SESSION_KEY)) return;
+    } catch {}
+    showNotifyBanner();
+}
+
+// ─── App shell (installed app) ───────────────────────────────────────────────
+
+function setMoreOpen(open: boolean) {
+    document.documentElement.toggleAttribute('data-more-open', open);
+    document.getElementById('app-more')?.setAttribute('aria-expanded', String(open));
+}
+
+function updateAppShell() {
+    const path = location.pathname;
+    for (const tab of document.querySelectorAll<HTMLAnchorElement>('.app-tabbar a[data-tab]')) {
+        const target = tab.dataset.tab!;
+        const current = target === '/' ? path === '/' : path.startsWith(target);
+        if (current) tab.setAttribute('aria-current', 'page');
+        else tab.removeAttribute('aria-current');
+    }
+    const back = document.getElementById('app-back');
+    if (back) back.hidden = path === '/';
+    setMoreOpen(false);
+}
+
+function setupAppShell() {
+    // Astro's view transitions copy the new page's <html> attributes over ours.
+    document.addEventListener('astro:before-swap', (e) => {
+        const next = (e as Event & { newDocument: Document }).newDocument.documentElement;
+        next.toggleAttribute('data-standalone', document.documentElement.hasAttribute('data-standalone'));
+    });
+    document.addEventListener('click', (e) => {
+        const target = e.target as Element;
+        if (target.closest?.('#app-back')) {
+            // Opened straight onto a page (a notification, a shared link): back goes home.
+            // Astro numbers its view-transition history entries in history.state.index.
+            const inApp = (history.state?.index ?? 0) > 0 || document.referrer.startsWith(location.origin);
+            if (inApp) history.back();
+            else location.assign('/');
+            return;
+        }
+        if (target.closest?.('#app-more')) {
+            setMoreOpen(!document.documentElement.hasAttribute('data-more-open'));
+            return;
+        }
+        if (document.documentElement.hasAttribute('data-more-open') && !target.closest?.('#site-footer')) {
+            setMoreOpen(false);
+        }
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') setMoreOpen(false);
+    });
+}
+
 // ─── Every page ──────────────────────────────────────────────────────────────
 
 function onPageLoad() {
     const standalone = isStandalone();
     document.documentElement.toggleAttribute('data-standalone', standalone);
     if (standalone) (navigator as Navigator & { clearAppBadge?: () => Promise<void> }).clearAppBadge?.().catch(() => {});
+    updateAppShell();
 
     if (/^\/articles\/[^/]+\/$/.test(location.pathname)) {
         const title = document.querySelector('h1')?.textContent?.trim() || document.title.replace(/ \| الهلال$/, '');
@@ -203,8 +325,10 @@ function onPageLoad() {
 
     updateInstallLink();
     maybeShowBanner();
+    setupAppNotifications().catch(() => {});
 }
 
 registerServiceWorker();
 setupInstall();
+setupAppShell();
 document.addEventListener('astro:page-load', onPageLoad);
