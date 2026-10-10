@@ -15,7 +15,7 @@ export default defineConfig({
   ), sitemap({
     // /articles/__shell__/ is the Worker's template, not a page; real article
     // URLs go in sitemap-articles-*.xml (scripts/build-worker-data.ts).
-    filter: (page) => !page.includes('/saved') && !page.includes('/404') && !page.includes('/__shell__'),
+    filter: (page) => !page.includes('/saved') && !page.includes('/offline') && !page.includes('/notifications') && !page.includes('/404') && !page.includes('/__shell__'),
   })],
   redirects: {
     '/layla': '/authors/layla/',
