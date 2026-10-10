@@ -10,7 +10,8 @@
  * build and wrangler deploy and commits the data changes; Social runs the X /
  * LinkedIn schedulers and TikTok generators and deletes the media they wrote; Stats charts the catalog.
  * Sites does the same for the sibling repos (../elhellal-quotes, -books,
- * -biographies, -quiz): edit their data, run their scripts, build, deploy, commit.
+ * -biographies, -quiz): edit their data, run their scripts, build, deploy, commit;
+ * and for ../abderahmane, whose deploy is a push to main (Cloudflare builds from GitHub).
  * Leads manages the abderahmane blog's /functional-food-leads queue: pick leads to
  * write (opens an interactive Claude Code session), edit / remove / deploy the
  * articles, copy them for X and record X links.
@@ -1283,6 +1284,10 @@ interface Site {
     /** What the Sites tab edits and commits, relative to the repo. */
     data: string[];
     steps: Record<string, SiteStep>;
+    /** Build/ship buttons; defaults to RELEASE_STEPS (wrangler deploy). */
+    release?: Record<string, SiteStep>;
+    /** File whose presence/mtime means "built" (default dist/_worker.js). */
+    builtFile?: string;
 }
 
 const siteDir = (name: string) => path.join(DEV_DIR, name);
@@ -1344,7 +1349,22 @@ const SITES: Record<string, Site> = {
             },
         },
     },
+    // Deployed by Cloudflare from GitHub: pushing main is the deploy.
+    abderahmane: {
+        title: 'Abderahmane',
+        dir: siteDir('abderahmane'),
+        url: 'https://abderahmane.elhellal.com',
+        data: ['src/content'],
+        steps: {},
+        release: {
+            build: runScript('Build', 'build'),
+            push: { label: 'Push (deploys)', cmd: ['git', 'push', 'origin', 'main'], display: 'git push origin main' },
+        },
+        builtFile: 'dist/index.html',
+    },
 };
+
+const releaseSteps = (s: Site) => s.release ?? RELEASE_STEPS;
 
 function site(name: unknown): Site & { name: string } {
     const s = SITES[str(name)];
@@ -1366,9 +1386,10 @@ function runSite(body: Body) {
     if (sitesSlot.proc) throw new HttpError(409, `${sitesSlot.job?.mode} is already running`);
     const s = site(body.site);
     const stepName = str(body.step);
-    const step = s.steps[stepName] ?? RELEASE_STEPS[stepName];
+    const step = s.steps[stepName] ?? releaseSteps(s)[stepName];
     if (!step) throw new HttpError(400, `Unknown step ${stepName}`);
-    if (stepName === 'deploy' && !fs.existsSync(path.join(s.dir, 'dist/_worker.js'))) throw new HttpError(400, 'No build in dist/ — build first');
+    if (stepName === 'deploy' && !fs.existsSync(path.join(s.dir, s.builtFile ?? 'dist/_worker.js'))) throw new HttpError(400, 'No build in dist/ — build first');
+    if (stepName === 'push' && gitIn(s.dir, 'branch', '--show-current').out.trim() !== 'main') throw new HttpError(409, `${s.title} is not on main`);
     const args = splitList(body.args);
     if (args.length && !step.args) throw new HttpError(400, `${stepName} takes no arguments`);
     const bad = args.find((a) => !step.args!.test(a));
@@ -1455,6 +1476,13 @@ function siteCounts(name: string): Record<string, number> {
         }
         case 'biographies':
             return has(BIOS_JSON) ? { authors: readJson<unknown[]>(BIOS_JSON).length } : {};
+        case 'abderahmane': {
+            const count = (dir: string) => {
+                const d = path.join(BLOG_DIR, 'src/content', dir);
+                return has(d) ? fs.readdirSync(d).filter((f) => /\.mdx?$/.test(f)).length : 0;
+            };
+            return { articles: count('article'), books: count('books'), taammulat: count('taammulat') };
+        }
         case 'quiz': {
             const bank = readJson<unknown[]>(path.join(QUIZ_DATA, 'bank.json'));
             const counts: Record<string, number> = { 'bank questions': bank.filter(Boolean).length };
@@ -1486,6 +1514,7 @@ function sitesOverview() {
             dir: s.dir,
             data: s.data,
             steps: Object.entries(s.steps).map(([key, st]) => ({ key, label: st.label, args: !!st.args })),
+            release: Object.entries(releaseSteps(s)).map(([key, st]) => ({ key, label: st.label, display: st.display })),
             counts,
             error,
             git: {
@@ -1498,7 +1527,10 @@ function sitesOverview() {
                 shortstat: gitIn(s.dir, 'diff', 'HEAD', '--shortstat', '--', ...s.data).out.trim(),
                 otherChanges: gitIn(s.dir, 'status', '--porcelain').out.split('\n').filter(Boolean).length - files.length,
             },
-            built: fs.existsSync(path.join(s.dir, 'dist/_worker.js')) ? fs.statSync(path.join(s.dir, 'dist/_worker.js')).mtimeMs : null,
+            built: (() => {
+                const f = path.join(s.dir, s.builtFile ?? 'dist/_worker.js');
+                return fs.existsSync(f) ? fs.statSync(f).mtimeMs : null;
+            })(),
         };
     });
 }
@@ -1778,9 +1810,10 @@ function editBank(body: Body) {
 // Player flags ("this question is wrong") live in the quiz's remote D1 database.
 let reportsCache: { at: number; value: unknown } | null = null;
 
-async function d1(sql: string) {
-    const proc = Bun.spawn([BUN, 'x', 'wrangler', 'd1', 'execute', 'elhellal-quiz', '--remote', '--json', '--command', sql], {
-        cwd: SITES.quiz!.dir,
+/** Runs SQL (one or more statements) on a remote D1 database; one result set per statement. */
+async function d1Results(sql: string, db = 'elhellal-quiz', cwd = SITES.quiz!.dir) {
+    const proc = Bun.spawn([BUN, 'x', 'wrangler', 'd1', 'execute', db, '--remote', '--json', '--command', sql], {
+        cwd,
         stdout: 'pipe',
         stderr: 'pipe',
         env: { ...process.env, FORCE_COLOR: '0' },
@@ -1793,7 +1826,11 @@ async function d1(sql: string) {
         throw new HttpError(502, `wrangler: ${out.trim().slice(0, 300) || 'no output'}`);
     }
     if (parsed.error) throw new HttpError(502, [parsed.error.text, ...(parsed.error.notes ?? []).map((n: { text: string }) => n.text)].join(' — '));
-    return parsed[0]?.results as Record<string, any>[];
+    return (parsed as { results: Record<string, any>[] }[]).map((r) => r.results);
+}
+
+async function d1(sql: string) {
+    return (await d1Results(sql))[0]!;
 }
 
 /** What a stat id points at: Arabic ids are bare, other languages are `<lang>:<id>`. */
@@ -1930,6 +1967,33 @@ function listLeads(params: URLSearchParams) {
         pages: Math.max(1, Math.ceil(matches.length / PAGE_SIZE)),
         items,
         savedPages: fs.existsSync(path.join(LEADS_DIR, 'pages')) ? fs.readdirSync(path.join(LEADS_DIR, 'pages')).filter((f) => f.endsWith('.html')).length : 0,
+        blogUrl: BLOG_URL,
+    };
+}
+
+/** Every blog article for the Sites tab, newest first, with its git state. */
+function listBlogArticles(params: URLSearchParams) {
+    const dir = path.join(BLOG_DIR, BLOG_ARTICLES);
+    const q = (params.get('q') ?? '').trim().toLowerCase();
+    const git = blogGitState();
+    const leadSlugs = new Set(fs.existsSync(LEADS_JSON) ? readLeads().map((l) => l.slug).filter(Boolean) : []);
+    const slugs = new Set(fs.readdirSync(dir).filter((f) => f.endsWith('.md')).map((f) => f.slice(0, -3)));
+    // Deleted but not yet committed articles still show, so they can be deployed.
+    for (const rel of git.changed.keys()) if (rel.endsWith('.md') && !fs.existsSync(path.join(BLOG_DIR, rel))) slugs.add(path.basename(rel, '.md'));
+    const all = [...slugs].map((slug) => {
+        const rel = `${BLOG_ARTICLES}/${slug}.md`;
+        return { slug, article: articleInfo(slug), onMain: git.onMain.has(rel), change: git.changed.get(rel) ?? null, lead: leadSlugs.has(slug) };
+    });
+    const matches = all
+        .filter((x) => !q || `${x.slug} ${x.article?.title ?? ''} ${x.article?.description ?? ''}`.toLowerCase().includes(q))
+        .sort((a, b) => Number(!!b.change) - Number(!!a.change) || (b.article?.pubDate ?? '').localeCompare(a.article?.pubDate ?? ''));
+    const page = Math.max(1, Number(params.get('page')) || 1);
+    return {
+        total: matches.length,
+        changed: all.filter((x) => x.change).length,
+        page,
+        pages: Math.max(1, Math.ceil(matches.length / PAGE_SIZE)),
+        items: matches.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
         blogUrl: BLOG_URL,
     };
 }
@@ -2230,6 +2294,72 @@ class HttpError extends Error {
 
 const json = (value: unknown, status = 200) => Response.json(value, { status });
 
+// ─── Push notifications ──────────────────────────────────────────────────────
+// Subscribers live in the push Worker's remote D1 database (workers/push/).
+// A send here only queues rows in its outbox; the Worker's cron trigger
+// delivers them, PUSH_BATCH every 5 minutes.
+
+const PUSH_DIR = path.join(ROOT, 'workers', 'push');
+const PUSH_BATCH = 40;
+const pushD1 = (sql: string) => d1Results(sql, 'elhellal-push', PUSH_DIR);
+const sqlText = (value: string) => `'${value.replace(/'/g, "''")}'`;
+
+function pushTarget(category: string) {
+    return category ? `categories = '*' OR categories LIKE ${sqlText(`%,${category},%`)}` : '1';
+}
+
+async function pushStats() {
+    const [totals, categoryRows, events, outbox, broadcasts] = await pushD1(
+        [
+            "SELECT COUNT(*) AS total, COALESCE(SUM(frequency = 'daily'), 0) AS daily, COALESCE(SUM(frequency = 'weekly'), 0) AS weekly, COALESCE(SUM(categories = '*'), 0) AS everything FROM subscriptions",
+            "SELECT categories FROM subscriptions WHERE categories != '*'",
+            "SELECT day, name, n FROM events WHERE day >= date('now', '-14 day') ORDER BY day DESC",
+            'SELECT COUNT(*) AS pending FROM outbox',
+            'SELECT * FROM broadcasts ORDER BY id DESC LIMIT 15',
+        ].join('; ')
+    );
+    const byCategory = new Map<string, number>();
+    for (const row of categoryRows ?? []) {
+        for (const c of String(row.categories).split(',').filter(Boolean)) byCategory.set(c, (byCategory.get(c) ?? 0) + 1);
+    }
+    return {
+        totals: totals?.[0],
+        categories: [...byCategory].sort((a, b) => b[1] - a[1]).map(([category, n]) => ({ category, n })),
+        events,
+        pending: outbox?.[0]?.pending ?? 0,
+        batch: PUSH_BATCH,
+        broadcasts,
+    };
+}
+
+async function pushSend(body: Body) {
+    const title = String(body.title ?? '').trim();
+    const text = String(body.body ?? '').trim();
+    const url = String(body.url ?? '/').trim() || '/';
+    const category = String(body.category ?? '').trim();
+    if (!title || title.length > 80) throw new HttpError(400, 'Title is required (80 characters max)');
+    if (!text || text.length > 240) throw new HttpError(400, 'Body is required (240 characters max)');
+    if (!url.startsWith('/') && !url.startsWith('https://elhellal.com/')) throw new HttpError(400, 'URL must be a path on elhellal.com');
+    if (category && !/^[a-z0-9-]{1,40}$/.test(category)) throw new HttpError(400, 'Invalid category');
+
+    const now = Date.now();
+    const payload = JSON.stringify({ title, body: text, url, tag: `broadcast-${now}` });
+    const where = pushTarget(category);
+    const [count] = await pushD1(
+        [
+            `SELECT COUNT(*) AS n FROM subscriptions WHERE ${where}`,
+            `INSERT INTO broadcasts (title, body, url, target, queued, created_at) SELECT ${sqlText(title)}, ${sqlText(text)}, ${sqlText(url)}, ${sqlText(category || '*')}, COUNT(*), ${now} FROM subscriptions WHERE ${where}`,
+            `INSERT INTO outbox (endpoint, payload, created_at) SELECT endpoint, ${sqlText(payload)}, ${now} FROM subscriptions WHERE ${where}`,
+        ].join('; ')
+    );
+    return { queued: count?.[0]?.n ?? 0 };
+}
+
+async function pushClearOutbox() {
+    await pushD1('DELETE FROM outbox');
+    return { ok: true };
+}
+
 const POST: Record<string, (body: Body) => unknown | Promise<unknown>> = {
     '/api/remove': removeAction,
     '/api/authors/block': blockAuthor,
@@ -2278,6 +2408,8 @@ const POST: Record<string, (body: Body) => unknown | Promise<unknown>> = {
     '/api/leads/copy-x': copyForX,
     '/api/leads/write': writeLeads,
     '/api/leads/publish': publishLead,
+    '/api/push/send': pushSend,
+    '/api/push/clear': pushClearOutbox,
 };
 
 const GET: Record<string, (params: URLSearchParams) => unknown | Promise<unknown>> = {
@@ -2306,9 +2438,11 @@ const GET: Record<string, (params: URLSearchParams) => unknown | Promise<unknown
     '/api/quiz/bank': listBank,
     '/api/quiz/reports': quizReports,
     '/api/leads': listLeads,
+    '/api/blog/articles': listBlogArticles,
     '/api/leads/job': leadJob,
     '/api/leads/live': checkLive,
     '/api/leads/article': readBlogArticle,
+    '/api/push/stats': pushStats,
 };
 
 Bun.serve({

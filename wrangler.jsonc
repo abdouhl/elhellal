@@ -17,12 +17,34 @@
 		// from the asset layer, without ever reaching the Worker — so these
 		// URLs must go to the Worker first. It hands the few static pages there
 		// (personal-blog posts and writers) back to the asset layer.
-		"run_worker_first": ["/articles/*", "/tags/*", "/authors/*", "!/tags/", "!/authors/"]
+		"run_worker_first": [
+			"/articles/*",
+			"/tags/*",
+			"/authors/*",
+			"!/tags/",
+			"!/authors/"
+		]
 	},
 	// The page shells are bundled into the Worker as strings. The CSS rule
 	// only lets the React components it server-renders import their styles.
-	"rules": [{ "type": "Text", "globs": ["**/*.html", "**/*.css"], "fallthrough": true }],
+	"rules": [
+		{
+			"type": "Text",
+			"globs": [
+				"**/*.html",
+				"**/*.css"
+			],
+			"fallthrough": true
+		}
+	],
 	"observability": {
 		"enabled": true
-	}
+	},
+	"d1_databases": [
+		{
+			"binding": "elhellal_push",
+			"database_name": "elhellal-push",
+			"database_id": "3d42d9a4-774b-447a-b646-4fc1d6428e7d"
+		}
+	]
 }

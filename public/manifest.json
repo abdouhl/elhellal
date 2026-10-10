@@ -1,14 +1,19 @@
 {
+    "id": "/",
     "name": "الهلال — دليل منتقى لأفضل المقالات العربية",
     "short_name": "الهلال",
     "description": "دليل منتقى لأفضل المقالات العربية على الإنترنت",
-    "start_url": "/",
+    "start_url": "/?source=pwa",
     "scope": "/",
     "display": "standalone",
+    "display_override": ["standalone", "minimal-ui"],
+    "orientation": "any",
     "background_color": "#000000",
     "theme_color": "#000000",
     "lang": "ar",
     "dir": "rtl",
+    "categories": ["news", "books", "education", "magazines"],
+    "prefer_related_applications": false,
     "icons": [
         {
             "src": "/icon-192.png",
@@ -27,6 +32,30 @@
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "maskable"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "المقالات المحفوظة",
+            "short_name": "المحفوظة",
+            "url": "/saved/?source=shortcut",
+            "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+        },
+        {
+            "name": "علم النفس",
+            "url": "/psychology/?source=shortcut",
+            "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+        },
+        {
+            "name": "السياسة والشأن العام",
+            "short_name": "السياسة",
+            "url": "/politics/?source=shortcut",
+            "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+        },
+        {
+            "name": "الإشعارات",
+            "url": "/notifications/?source=shortcut",
+            "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
         }
     ]
 }

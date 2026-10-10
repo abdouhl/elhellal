@@ -34,3 +34,10 @@
   Cache-Control: public, max-age=604800
 /og-image.jpg
   Cache-Control: public, max-age=604800
+
+# The service worker must never be served stale from the HTTP cache, or a
+# deploy wouldn't reach installed apps (browsers cap it at 24h anyway).
+/sw.js
+  Cache-Control: no-cache
+/manifest.json
+  Cache-Control: public, max-age=3600
