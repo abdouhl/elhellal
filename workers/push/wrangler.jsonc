@@ -1,0 +1,39 @@
+{
+	// Push notifications: subscriptions in D1, digests sent by the cron trigger.
+	// See src/index.ts. Setup (once):
+	//   bunx wrangler d1 create elhellal-push        → paste database_id below
+	//   bun run scripts/generate-vapid.ts            → public key below, .dev.vars
+	//   bunx wrangler secret put VAPID_PRIVATE_JWK   ← the JWK it printed
+	//   bunx wrangler d1 migrations apply elhellal-push --remote
+	//   bunx wrangler deploy
+	"name": "elhellal-push",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-02-21",
+	// More specific than the views Worker's elhellal.com/api/*, so it wins.
+	"routes": [
+		{ "pattern": "elhellal.com/api/push/*", "zone_name": "elhellal.com" }
+	],
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "elhellal-push",
+			"database_id": "3d42d9a4-774b-447a-b646-4fc1d6428e7d",
+			"migrations_dir": "migrations"
+		}
+	],
+	// The site Worker, to read dist/_data/push-digest.json.
+	"services": [{ "binding": "SITE", "service": "elhellal" }],
+	"triggers": { "crons": ["*/5 * * * *"] },
+	"vars": {
+		"SITE_URL": "https://elhellal.com",
+		"VAPID_PUBLIC_KEY": "BFL_KRCmjOZQb509STZTNMvCTqd91AmkUkUHjTRXXoLEwcAqVQlQAxpAA0AtZHSNyGpS3sk-w5uHsvHb3B6si4o",
+		"VAPID_SUBJECT": "https://elhellal.com/about/",
+		// Messages per cron run (free plan: 50 subrequests per invocation).
+		"PUSH_BATCH": "40",
+		// Digests go out at 17:00 UTC (18:00 Algeria, 20:00 Riyadh).
+		"SEND_HOUR_UTC": "17"
+	},
+	"observability": {
+		"enabled": true
+	}
+}

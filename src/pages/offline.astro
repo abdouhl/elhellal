@@ -1,0 +1,104 @@
+---
+// Served by the service worker (public/sw.js) for any page that isn't cached
+// while the reader is offline. Lists what still works: saved articles and the
+// recently read pages that are in the cache (see src/scripts/pwa.ts).
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout
+    site="الهلال"
+    title="غير متصل"
+    tagline="دليل منتقى لأفضل المقالات العربية على الإنترنت"
+    pageTitle="غير متصل بالإنترنت"
+    pageDescription="أنت غير متصل بالإنترنت"
+    noindex
+>
+    <main id="main-content" class="container">
+        <div class="legal-content-wrapper offline-page">
+            <header class="legal-header">
+                <h1 class="nu-c-h5 nu-u-text--primary">أنت غير متصل بالإنترنت</h1>
+                <p class="last-updated">هذه الصفحة غير محفوظة على جهازك، لكن ما يزال بإمكانك قراءة ما يلي.</p>
+            </header>
+
+            <div class="offline-actions">
+                <a href="/saved/" class="offline-button">مقالاتك المحفوظة</a>
+                <button type="button" class="offline-button offline-button--ghost" id="offline-retry">إعادة المحاولة</button>
+            </div>
+
+            <section id="offline-recent" hidden>
+                <h2 class="nu-c-h6 nu-u-text--primary">قرأتها مؤخراً</h2>
+                <ul class="offline-list" id="offline-recent-list"></ul>
+            </section>
+        </div>
+    </main>
+</Layout>
+
+<script>
+    import { readRecent } from "../scripts/pwa-store";
+
+    async function render() {
+        document.getElementById("offline-retry")?.addEventListener("click", () => location.reload());
+        const list = document.getElementById("offline-recent-list");
+        const section = document.getElementById("offline-recent");
+        if (!list || !section || !("caches" in window)) return;
+
+        const available = [];
+        for (const item of readRecent()) {
+            if (await caches.match(item.url, { ignoreSearch: true })) available.push(item);
+        }
+        list.replaceChildren(
+            ...available.map((item) => {
+                const li = document.createElement("li");
+                const a = document.createElement("a");
+                a.href = item.url;
+                a.textContent = item.title;
+                li.append(a);
+                return li;
+            }),
+        );
+        section.hidden = available.length === 0;
+    }
+
+    document.addEventListener("astro:page-load", render);
+</script>
+
+<style>
+    .offline-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--spacing-04);
+        margin-block: var(--spacing-06);
+    }
+
+    .offline-button {
+        display: inline-flex;
+        align-items: center;
+        padding: 10px 18px;
+        border-radius: 999px;
+        border: 1px solid var(--content-primary);
+        background: var(--content-primary);
+        color: var(--background);
+        font: inherit;
+        text-decoration: none;
+        cursor: pointer;
+    }
+
+    .offline-button--ghost {
+        background: transparent;
+        color: var(--content-primary);
+    }
+
+    .offline-list {
+        list-style: none;
+        padding: 0;
+        margin: var(--spacing-04) 0 0;
+        display: grid;
+        gap: 10px;
+    }
+
+    .offline-list a {
+        color: inherit;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+    }
+</style>

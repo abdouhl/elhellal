@@ -30,6 +30,7 @@
   aside nav button .ic { width: 18px; text-align: center; opacity: .75; }
   aside nav button:hover { background: var(--hover); }
   aside nav button.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  aside nav button .badge { margin-inline-start: auto; font-size: 11px; min-width: 18px; padding: 0 6px; border-radius: 99px; background: var(--warn-bg); color: var(--warn); text-align: center; font-weight: 600; }
   aside .foot .stats { white-space: pre-line; }
   aside .foot { margin-top: auto; padding: 14px 10px 0; color: var(--muted); font-size: 12px; display: grid; gap: 8px; }
   .content { min-width: 0; }
@@ -175,38 +176,67 @@ const TABS = [
   ]],
   ['Add content', [
     ['import', '⇣', 'Import', 'Find Substack authors and import their articles, or import external blogs.'],
-    ['leads', '✎', 'Leads', 'Functional-food leads for the abderahmane blog — write, deploy and post.'],
   ]],
   ['Share', [
     ['publish', '⇡', 'Publish', 'Commit & push to GitHub, then build and deploy the site.'],
     ['social', '✦', 'Social', 'Schedule X / LinkedIn posts and generate TikTok slideshows.'],
     ['pins', '📌', 'Pins', 'Generate or remove Pinterest pin images on R2.'],
+    ['push', '🔔', 'Push', 'Notification subscribers and install stats; send a one-off notification.'],
   ]],
   ['More', [
     ['stats', '▥', 'Stats', 'Weekly volume, sources, top authors and most-read articles.'],
-    ['sites', '❖', 'Other sites', 'Quotes, books, biographies and quiz — edit, build and deploy.'],
+  ]],
+  // Sibling repos: one entry each, so switching site is one click ([ and ] cycle through them).
+  ['Sites', [
+    ['sites/quotes', '❝', 'Quotes', 'quotes.elhellal.com — edit quotes, import from Goodreads, build and deploy.'],
+    ['sites/books', '▣', 'Books', 'books.elhellal.com — edit book entries and long summaries, build and deploy.'],
+    ['sites/biographies', '◐', 'Biographies', 'biographies.elhellal.com — edit biographies, build and deploy.'],
+    ['sites/quiz', '?', 'Quiz', 'quiz.elhellal.com — edit the question bank, read player reports, build and deploy.'],
+    ['sites/abderahmane', '✚', 'Abderahmane', 'abderahmane.elhellal.com — edit and deploy blog articles; pushing main deploys.'],
+    ['leads', '✎', 'Leads', 'Functional-food leads for the abderahmane blog — write, deploy and post.'],
   ]],
 ];
 const TAB_INFO = Object.fromEntries(TABS.flatMap(([, tabs]) => tabs.map(([id, icon, label, desc]) => [id, { icon, label, desc }])));
 
+const SITE_TABS = Object.keys(TAB_INFO).filter((id) => id.startsWith('sites/'));
+/** The sidebar entry for the current view: 'sites/<name>' on a site, else the tab. */
+const tabKey = () => state.tab === 'sites' ? `sites/${sites.site}` : state.tab;
+
 function renderNav() {
+  const changed = (id) => sites.overview?.find((x) => `sites/${x.name}` === id)?.git?.totalFiles;
   document.getElementById('tabs').replaceChildren(...TABS.map(([group, tabs]) => [
     h('div', { class: 'group' }, group),
-    h('nav', {}, tabs.map(([id, icon, label]) => h('button', { 'data-tab': id, class: state.tab === id ? 'active' : '',
-      onclick: () => { state.tab = id; state.page = 1; state.selected.clear(); state.editing = null; syncTabs(); render(); scrollTo(0, 0); } },
-      h('span', { class: 'ic' }, icon), label))),
+    h('nav', {}, tabs.map(([id, icon, label]) => h('button', { 'data-tab': id, class: tabKey() === id ? 'active' : '', onclick: () => go(id) },
+      h('span', { class: 'ic' }, icon), label,
+      changed(id) ? h('span', { class: 'badge', title: `${changed(id)} uncommitted data file(s)` }, changed(id)) : null))),
   ]).flat());
 }
-renderNav();
+
+/** Switches to a sidebar entry (e.g. 'articles' or 'sites/quiz') and records it in the URL hash. */
+function go(id, { fromHash = false } = {}) {
+  if (!TAB_INFO[id]) id = 'articles';
+  const [tab, site] = id.split('/');
+  if (tab === 'sites' && site !== sites.site) { sites.site = site; sites.q = ''; sites.author = ''; sites.book = ''; sites.cat = ''; sites.editing = null; sites.markdown = null; }
+  state.tab = tab; state.page = 1; state.selected.clear(); state.editing = null;
+  if (!fromHash && location.hash.slice(1) !== id) history.pushState(null, '', '#' + id);
+  syncTabs(); render(); scrollTo(0, 0);
+}
+addEventListener('popstate', () => go(location.hash.slice(1), { fromHash: true }));
+addEventListener('keydown', (e) => {
+  if (state.tab !== 'sites' || e.metaKey || e.ctrlKey || e.altKey || (e.key !== '[' && e.key !== ']')) return;
+  if (e.target.closest('input, textarea, select, [contenteditable]')) return;
+  const i = SITE_TABS.indexOf(tabKey());
+  go(SITE_TABS[(i + (e.key === ']' ? 1 : SITE_TABS.length - 1)) % SITE_TABS.length]);
+});
 
 document.getElementById('reload').onclick = () => act(() => api('/api/reload', {}), 'Reloaded from disk');
 
 function render() {
-  const info = TAB_INFO[state.tab];
+  const info = TAB_INFO[tabKey()];
   document.getElementById('pagetitle').textContent = info.label;
   document.getElementById('pagedesc').textContent = info.desc;
   document.title = `${info.label} · elhellal admin`;
-  ({ articles: renderArticles, authors: renderAuthors, review: renderReview, blocked: renderBlocked, pins: renderPins, import: renderImport, health: renderHealth, publish: renderPublish, social: renderSocial, stats: renderStats, sites: renderSites, leads: renderLeads })[state.tab]();
+  ({ articles: renderArticles, authors: renderAuthors, review: renderReview, blocked: renderBlocked, pins: renderPins, import: renderImport, health: renderHealth, publish: renderPublish, social: renderSocial, stats: renderStats, sites: renderSites, leads: renderLeads, push: renderPush })[state.tab]();
 }
 const view = () => document.getElementById('view');
 /** Fills the page for `tab` — unless the user has switched tabs while it was loading. */
@@ -270,7 +300,10 @@ function articleMeta(a) {
   );
 }
 
-function syncTabs() { for (const b of document.querySelectorAll('#tabs button')) b.classList.toggle('active', b.dataset.tab === state.tab); }
+function syncTabs() {
+  for (const b of document.querySelectorAll('#tabs button')) b.classList.toggle('active', b.dataset.tab === tabKey());
+  if (state.tab !== 'sites' && location.hash.slice(1) !== state.tab) history.replaceState(null, '', '#' + state.tab);
+}
 
 function articleRow(a, extra) {
   const editing = state.editing === a.id_str;
@@ -723,7 +756,7 @@ function jobPoller(key, endpoint, tab, onDone) {
     const wasRunning = st.job?.running;
     st.job = r.job;
     if (r.job) { st.lines.push(...r.job.lines); st.next = r.job.next; if (st.lines.length > 5000) st.lines.splice(0, st.lines.length - 5000); }
-    if (state.tab === tab) st.update();
+    st.update();
     if (r.job?.running) st.timer = setTimeout(st.poll, 1000);
     else if (wasRunning) {
       toast(r.job.exitCode === 0 ? `${r.job.mode} finished` : r.job.stopped ? `${r.job.mode} stopped` : `${r.job.mode} exited with code ${r.job.exitCode}`, r.job.exitCode !== 0 && !r.job.stopped);
@@ -1123,12 +1156,79 @@ async function renderStats() {
   );
 }
 
+// ─── Push notifications (workers/push) ───
+const push = { stats: null, error: null, loading: false, form: { title: '', body: '', url: '/', category: '' } };
+const EVENT_LABELS = { sent: 'Sent', failed: 'Failed', gone: 'Expired', subscribed: 'Subscribed', unsubscribed: 'Unsubscribed', click: 'Clicks', installed: 'Installed', 'install-accepted': 'Install accepted', 'install-dismissed': 'Install dismissed', 'banner-dismissed': 'Banner dismissed' };
+
+async function loadPush() {
+  push.loading = true;
+  try { push.stats = await api('/api/push/stats'); push.error = null; }
+  catch (e) { push.error = e.message; }
+  push.loading = false;
+}
+
+async function renderPush() {
+  if (!push.stats && !push.error) { paint('push', h('div', { class: 'empty' }, 'Reading the push database…')); await loadPush(); if (state.tab !== 'push') return; }
+  const refresh = h('button', { class: 'btn', onclick: async () => { push.stats = null; push.error = null; renderPush(); } }, 'Refresh');
+  if (push.error) {
+    return paint('push', h('div', { class: 'toolbar' }, refresh),
+      h('div', { class: 'card bad' }, push.error),
+      h('div', { class: 'card' }, h('p', {}, 'First-time setup (from workers/push):'),
+        h('pre', {}, 'bunx wrangler d1 create elhellal-push        # paste database_id into wrangler.jsonc\nbunx wrangler secret put VAPID_PRIVATE_JWK   # the JWK in .dev.vars\nbunx wrangler d1 migrations apply elhellal-push --remote\nbunx wrangler deploy')));
+  }
+  const d = push.stats, t = d.totals ?? {};
+  const days = [...new Set(d.events.map((e) => e.day))];
+  const names = Object.keys(EVENT_LABELS).filter((n) => d.events.some((e) => e.name === n));
+  const count = (day, name) => d.events.find((e) => e.day === day && e.name === name)?.n ?? '';
+  const sum = (name) => d.events.filter((e) => e.name === name).reduce((n, e) => n + e.n, 0);
+  const f = push.form;
+  const field = (key, props) => h(props.rows ? 'textarea' : 'input', { ...props, value: f[key], oninput: (e) => { f[key] = e.target.value; } });
+  const minutes = Math.ceil(d.pending / d.batch) * 5;
+
+  paint('push',
+    h('div', { class: 'toolbar' }, h('span', { class: 'meta' }, 'Digests go out at 17:00 UTC (daily) and Fridays (weekly), only when there are new articles in a subscriber\'s categories.'), refresh),
+    h('div', { class: 'toolbar', style: 'align-items:stretch' },
+      tile('Subscribers', (t.total ?? 0).toLocaleString(), `${t.daily ?? 0} daily · ${t.weekly ?? 0} weekly`),
+      tile('All categories', (t.everything ?? 0).toLocaleString(), `${(t.total ?? 0) - (t.everything ?? 0)} picked categories`),
+      tile('Sent, 14 days', sum('sent').toLocaleString(), `${sum('click')} clicks`),
+      tile('Installs, 14 days', sum('installed').toLocaleString(), `${sum('install-dismissed')} declined the prompt`),
+      tile('Queued', d.pending.toLocaleString(), d.pending ? `≈ ${minutes} min to deliver` : 'outbox empty'),
+    ),
+    h('h2', {}, 'Send a notification'),
+    h('div', { class: 'card', style: 'display:grid;gap:8px;max-width:640px' },
+      field('title', { placeholder: 'Title (Arabic), e.g. الهلال — مختارات خاصة', maxlength: 80, dir: 'auto' }),
+      field('body', { placeholder: 'Body', maxlength: 240, rows: 3, dir: 'auto' }),
+      field('url', { placeholder: '/ or /articles/<slug>/', dir: 'ltr' }),
+      h('select', { onchange: (e) => { f.category = e.target.value; } },
+        h('option', { value: '' }, 'Everyone'),
+        ...stats.categories.map((c) => h('option', { value: c.category, selected: c.category === f.category }, `Subscribed to ${c.title} (${c.category}) or everything`))),
+      h('div', { class: 'toolbar' },
+        h('button', { class: 'btn primary', onclick: () => {
+          if (!confirm(`Queue "${f.title}" for ${f.category ? 'subscribers of ' + f.category : 'every subscriber'}?`)) return;
+          act(async () => { const r = await api('/api/push/send', { ...f }); push.form = { title: '', body: '', url: '/', category: '' }; push.stats = null; return r; }, (r) => `Queued for ${r.queued} subscriber(s)`);
+        } }, 'Queue notification'),
+        d.pending ? h('button', { class: 'btn', onclick: () => { if (confirm(`Drop ${d.pending} queued message(s)?`)) act(async () => { await api('/api/push/clear', {}); push.stats = null; }, 'Outbox cleared'); } }, 'Clear queue') : null)),
+    h('h2', {}, 'Last 14 days'),
+    days.length ? h('div', { class: 'list' }, h('table', {}, h('tr', {}, h('th', {}, 'Day'), names.map((n) => h('th', { class: 'num' }, EVENT_LABELS[n]))),
+      days.map((day) => h('tr', {}, h('td', {}, day), names.map((n) => h('td', { class: 'num' }, count(day, n)))))))
+      : h('div', { class: 'empty' }, 'No activity yet'),
+    h('h2', {}, 'Categories picked'),
+    d.categories.length ? h('div', { class: 'list' }, h('table', {}, h('tr', {}, h('th', {}, 'Category'), h('th', { class: 'num' }, 'Subscribers')),
+      d.categories.map((c) => h('tr', {}, h('td', {}, stats.categories.find((x) => x.category === c.category)?.title ?? c.category), h('td', { class: 'num' }, c.n)))))
+      : h('div', { class: 'empty' }, 'Everyone follows all categories'),
+    h('h2', {}, 'Sent from here'),
+    d.broadcasts.length ? h('div', { class: 'list' }, h('table', {}, h('tr', {}, h('th', {}, 'When'), h('th', {}, 'Title'), h('th', {}, 'Target'), h('th', { class: 'num' }, 'Queued')),
+      d.broadcasts.map((b) => h('tr', {}, h('td', {}, new Date(b.created_at).toLocaleString()), h('td', { dir: 'auto', title: b.body }, b.title), h('td', {}, b.target), h('td', { class: 'num' }, b.queued)))))
+      : h('div', { class: 'empty' }, 'Nothing sent yet'),
+  );
+}
+
 // ─── Sites (quotes / books / biographies / quiz) ───
 const sites = { site: 'quotes', overview: null, message: {}, args: '', q: '', author: '', book: '', sort: 'likes', cat: '', untranslated: false, editing: null, markdown: null, reports: null, reportsLoading: false };
 const siteJob = jobPoller('site', '/api/sites/job', 'sites', async () => { await loadSites(); if (state.tab === 'sites') renderSites(); });
 
 async function loadSites() {
-  try { sites.overview = await api('/api/sites'); } catch (e) { toast(e.message, true); }
+  try { sites.overview = await api('/api/sites'); renderNav(); } catch (e) { toast(e.message, true); }
 }
 
 /** Like act(), but re-reads the sites' git status and counts first. */
@@ -1139,18 +1239,14 @@ async function renderSites() {
   if (!sites.overview) { paint('sites', h('div', { class: 'empty' }, 'Reading the sibling repos…')); await loadSites(); if (!sites.overview) return; }
   const s = sites.overview.find((x) => x.name === sites.site) ?? sites.overview[0];
   const running = !!siteJob.job?.running;
-  const pick = (name) => { sites.site = name; sites.q = ''; sites.author = ''; sites.book = ''; sites.cat = ''; sites.editing = null; sites.markdown = null; state.page = 1; state.selected.clear(); render(); };
-
-  const nav = h('div', { class: 'toolbar' }, sites.overview.map((x) => h('button', { class: 'btn' + (x.name === s.name ? ' primary' : ''), onclick: () => pick(x.name) },
-    x.title, x.git?.totalFiles ? ` · ${x.git.totalFiles} changed` : '')),
-    h('button', { class: 'btn', onclick: async () => { sites.overview = null; render(); } }, 'Refresh'));
-  if (s.missing) return paint('sites', nav, h('div', { class: 'card' }, `${s.dir} not found`));
+  if (s.missing) return paint('sites', h('div', { class: 'card' }, `${s.dir} not found`));
 
   let content;
-  try { content = await ({ quotes: quotesSection, books: () => entriesSection('books'), biographies: () => entriesSection('biographies'), quiz: quizSection })[s.name](running); }
+  try { content = await ({ quotes: quotesSection, books: () => entriesSection('books'), biographies: () => entriesSection('biographies'), quiz: quizSection, abderahmane: blogSection })[s.name](running); }
   catch (e) { content = h('div', { class: 'card bad' }, e.message); }
 
-  paint('sites', nav, siteCard(s, running), content, ...(siteJob.job?.scopes?.[0] === s.name ? siteJob.view() : []));
+  if (state.tab !== 'sites' || sites.site !== s.name) return;
+  paint('sites', siteCard(s, running), content, ...(siteJob.job?.scopes?.[0] === s.name ? siteJob.view() : []));
   siteJob.update(true);
 }
 
@@ -1174,7 +1270,8 @@ function siteCard(s, running) {
     h('div', { class: 'toolbar' },
       h('h2', { style: 'margin:0' }, s.title), h('a', { class: 'link', href: s.url, target: '_blank', rel: 'noreferrer' }, s.url.replace('https://', '') + ' ↗'),
       h('span', { class: 'meta' }, Object.entries(s.counts).map(([k, v]) => `${v.toLocaleString()} ${k}`).join(' · ')),
-      s.error ? h('span', { class: 'bad' }, s.error) : null),
+      s.error ? h('span', { class: 'bad' }, s.error) : null,
+      h('button', { class: 'btn', style: 'margin-inline-start:auto', title: 'Re-read git status and counts of every site', onclick: () => siteAct(async () => {}, 'Refreshed') }, 'Refresh')),
     h('div', { class: 'meta', style: 'margin-bottom:8px' },
       h('span', {}, s.dir), h('span', {}, `branch ${g.branch}`), h('span', {}, `last: ${g.last}`),
       g.ahead != null ? h('span', {}, `${g.ahead} ahead / ${g.behind} behind`) : null,
@@ -1190,9 +1287,11 @@ function siteCard(s, running) {
       : h('div', { class: 'meta', style: 'margin-bottom:8px' }, 'No uncommitted data changes.'),
     h('div', { class: 'toolbar' }, ...scriptButtons.flat(),
       scriptButtons.length ? h('span', { class: 'meta' }, '|') : null,
-      step('build', 'Build', 'primary'),
-      step('deploy', 'Deploy', '', `Deploy ${s.title} dist/ to Cloudflare? ${s.url} changes right away.`),
-      step('build+deploy', 'Build & deploy', 'primary', `Build ${s.title}, then deploy it to Cloudflare if the build succeeds?`),
+      ...s.release.map((r) => step(r.key, r.label, r.key.startsWith('build') ? 'primary' : '', {
+        deploy: `Deploy ${s.title} dist/ to Cloudflare? ${s.url} changes right away.`,
+        'build+deploy': `Build ${s.title}, then deploy it to Cloudflare if the build succeeds?`,
+        push: `Push ${s.title}'s main to GitHub? Cloudflare rebuilds and ${s.url} changes in a few minutes.`,
+      }[r.key])),
       h('button', { class: 'btn danger', disabled: !running, onclick: () => act(() => api('/api/sites/stop', {}), 'Stopping…') }, 'Stop'),
       running && siteJob.job?.scopes?.[0] !== s.name ? h('span', { class: 'meta' }, `${siteJob.job.mode} is running`) : null),
   );
@@ -1408,9 +1507,52 @@ function reportsSection() {
   );
 }
 
+// ─── Abderahmane blog articles (Sites → Abderahmane) ───
+async function blogSection() {
+  if (!leadJob.loaded) await leadJob.poll();
+  const data = await api('/api/blog/articles?' + new URLSearchParams({ q: sites.q, page: state.page }));
+  return h('div', {},
+    h('div', { class: 'toolbar', style: 'margin-top:12px' },
+      siteSearch('Search title, slug or description…'),
+      h('span', { class: 'meta' }, `${data.total} article(s)${data.changed ? ` · ${data.changed} not deployed` : ''}`),
+      h('button', { class: 'btn', onclick: () => go('leads') }, 'Leads →')),
+    h('div', { class: 'list' }, data.items.length ? data.items.map(blogRow) : h('div', { class: 'empty' }, 'No articles')),
+    pager(data),
+    h('p', { class: 'meta' }, 'Deploy on a row commits only that article file and pushes main. Commit data changes + Push (above) ships every changed file under src/content at once.'),
+    ...(leadJob.job?.mode?.startsWith('deploy') ? leadJob.view() : []));
+}
+
+function blogRow(x) {
+  const a = x.article, running = !!leadJob.job?.running;
+  const editing = leads.editing === x.slug && a;
+  const changeLabel = { '??': 'new, not deployed', M: 'edited, not deployed', D: 'deleted, not deployed', A: 'new, not deployed' };
+  return h('div', { class: 'row' },
+    a?.thumb ? h('img', { src: a.thumb, loading: 'lazy', alt: '', referrerpolicy: 'no-referrer' }) : null,
+    h('div', { class: 'body' },
+      h('div', { class: 'title', dir: 'auto' }, a?.title || x.slug),
+      a?.description ? h('div', { class: 'preview', dir: 'rtl' }, a.description) : null,
+      h('div', { class: 'meta' },
+        a?.pubDate ? h('span', {}, a.pubDate.slice(0, 10)) : null,
+        h('span', {}, x.slug),
+        a ? h('span', {}, `${a.words.toLocaleString()} words`) : null,
+        a?.draft ? h('span', { class: 'pill' }, 'draft') : null,
+        x.lead ? h('span', { class: 'pill' }, 'from a lead') : null,
+        x.change ? h('span', { class: 'pill bad' }, changeLabel[x.change] ?? x.change) : x.onMain ? h('span', { class: 'pill ok' }, 'on main') : h('span', { class: 'pill bad' }, 'not deployed'),
+        x.onMain && a ? h('a', { href: `https://abderahmane.elhellal.com/article/${x.slug}/`, target: '_blank', rel: 'noreferrer' }, 'blog ↗') : null),
+      editing ? articleEditor(x) : null),
+    h('div', { class: 'actions' },
+      a ? h('button', { class: 'btn', onclick: () => openArticle(x.slug, !!editing) }, editing ? 'Close' : 'Edit') : null,
+      h('button', { class: 'btn primary', disabled: running || !x.change, title: x.change ? 'Commit this file and push main' : 'Nothing to deploy', onclick: () => {
+        if (confirm(`Commit ${x.slug}.md and push main? The blog redeploys.`)) leadJob.start('/api/leads/deploy', { slug: x.slug });
+      } }, 'Deploy')));
+}
+
 // ─── Leads (abderahmane blog: /functional-food-leads) ───
 const leads = { status: 'pending', q: '', sel: new Set(), editing: null, text: '', xEdit: null, addUrl: '', live: {} };
-const leadJob = jobPoller('lead', '/api/leads/job', 'leads', async () => { if (state.tab === 'leads') renderLeads(); });
+const leadJob = jobPoller('lead', '/api/leads/job', 'leads', async () => {
+  if (state.tab === 'leads') renderLeads();
+  else if (tabKey() === 'sites/abderahmane') { await loadSites(); renderSites(); }
+});
 const LEAD_STATUSES = { pending: 'Pending', written: 'Written', published: 'Published', skipped: 'Skipped' };
 
 const openedClaude = () => 'Opened Claude Code in Terminal — Reload here when it is done';
@@ -1549,7 +1691,9 @@ function removeArticle(x) {
   }, (r) => r.live ? 'Article deleted' : 'Article deleted (it was never deployed)');
 }
 
-refreshStats().then(render).catch((e) => toast(e.message, true));
+renderNav();
+refreshStats().then(() => go(location.hash.slice(1) || 'articles', { fromHash: true })).catch((e) => toast(e.message, true));
+loadSites();
 </script>
 </body>
 </html>

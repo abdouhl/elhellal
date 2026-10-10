@@ -14,6 +14,10 @@
  *  4. Writes .worker-build/meta.json with a build id the Worker uses to key
  *     its edge cache, so a deploy never serves pages cached from the last one.
  *  5. Lists the Worker-rendered pages in sitemaps, since Astro doesn't know them.
+ *  6. Writes dist/_data/push-digest.json, the recent articles the push Worker
+ *     (workers/push/) builds notifications from (see src/lib/push-digest.ts).
+ *  7. Stamps the build id into dist/sw.js, so each deploy installs a new
+ *     service worker with a fresh precache.
  */
 
 import fs from 'fs';
@@ -56,6 +60,7 @@ import { getQualifyingTags, getQualifyingTagSlugSet } from '../src/utils/tags.ts
 import { categoryTiles, tagTiles } from '../src/utils/exploreTiles.ts';
 import { buildAuthorIndex } from '../src/utils/author-index.ts';
 import { personalBlogs } from '../src/data/personal-blogs.ts';
+import { buildPushDigest } from '../src/lib/push-digest.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
@@ -332,10 +337,12 @@ function main() {
     const largestFeeds = writeShards(path.join(DATA_DIR, 'feeds'), listings.feeds);
 
     moveShells();
-    fs.writeFileSync(
-        path.join(WORKER_BUILD, 'meta.json'),
-        JSON.stringify({ buildId: Date.now().toString(36), categoryTitles })
-    );
+    const buildId = Date.now().toString(36);
+    fs.writeFileSync(path.join(WORKER_BUILD, 'meta.json'), JSON.stringify({ buildId, categoryTitles }));
+
+    const digest = buildPushDigest(articles.shards.flatMap((shard) => Object.values(shard)), categoryTitles);
+    fs.writeFileSync(path.join(DATA_DIR, 'push-digest.json'), JSON.stringify(digest));
+    stampServiceWorker(buildId);
 
     const articlePaths = articles.shards
         .flatMap((shard) => Object.values(shard))
@@ -358,6 +365,14 @@ function main() {
         `(largest ${kb(largestListings)}); ${listings.pagedCount} paged feeds in ${LISTING_FEED_SHARDS} shards ` +
         `(largest ${kb(largestFeeds)}); ${sitemapCount} sitemaps`
     );
+    console.log(`✅ Push digest: ${digest.articles.length} articles; sw.js stamped ${buildId}`);
+}
+
+function stampServiceWorker(buildId: string) {
+    const file = path.join(DIST, 'sw.js');
+    const sw = fs.readFileSync(file, 'utf-8');
+    if (!sw.includes('__BUILD_ID__')) throw new Error('dist/sw.js has no __BUILD_ID__ placeholder');
+    fs.writeFileSync(file, sw.replace('__BUILD_ID__', buildId));
 }
 
 const SITE = 'https://elhellal.com';

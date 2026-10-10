@@ -22,6 +22,12 @@ interface FavoritesViewProps {
 export default function FavoritesView({ extraArticles = [] }: FavoritesViewProps) {
     const [bookmarkedArticles, setBookmarkedArticles] = useState<FeedCard[] | null>(null);
     const [sortBy, setSortBy] = useState<FavoritesSortKey>('nameAsc');
+    // The service worker (public/sw.js) keeps a copy of every saved article.
+    const [offlineReady, setOfflineReady] = useState(false);
+
+    useEffect(() => {
+        setOfflineReady(Boolean(navigator.serviceWorker?.controller));
+    }, []);
 
     useEffect(() => {
         let latest = 0;
@@ -70,6 +76,7 @@ export default function FavoritesView({ extraArticles = [] }: FavoritesViewProps
                 <div className="favorites-info">
                     <p className="nu-c-fs-small nu-u-text--secondary">
                         {bookmarkedArticles.length} {bookmarkedArticles.length === 1 ? 'مقالة محفوظة' : 'مقالات محفوظة'}
+                        {offlineReady && ' · متاحة دون اتصال بالإنترنت'}
                     </p>
                 </div>
                 <div className="favorites-controls">

@@ -1,0 +1,111 @@
+.notif-card {
+    display: grid;
+    gap: var(--spacing-06);
+    min-height: 120px;
+    margin-top: var(--spacing-06);
+}
+
+.notif-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-04);
+}
+
+.notif-lead {
+    flex: 1 1 260px;
+    margin: 0;
+    color: var(--content-primary);
+    line-height: 1.7;
+}
+
+.notif-steps {
+    margin: 0;
+    padding-inline-start: 1.4em;
+    line-height: 2;
+}
+
+.notif-button {
+    padding: 10px 20px;
+    border: 1px solid var(--content-primary);
+    border-radius: 999px;
+    background: var(--content-primary);
+    color: var(--background);
+    font: inherit;
+    cursor: pointer;
+}
+
+.notif-button--ghost {
+    background: transparent;
+    color: var(--content-primary);
+}
+
+.notif-button:disabled,
+.notif-link:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.notif-message {
+    margin: 0;
+    color: var(--content-secondary);
+}
+
+.notif-group {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-03) var(--spacing-06);
+}
+
+.notif-group legend {
+    width: 100%;
+    margin-bottom: var(--spacing-03);
+    color: var(--content-primary);
+    font-weight: bold;
+}
+
+.notif-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.notif-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.notif-chip {
+    padding: 6px 14px;
+    border: 0.5px solid var(--border-muted);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--content-secondary);
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.notif-chip.is-on {
+    border-color: var(--content-primary);
+    background: var(--content-primary);
+    color: var(--background);
+}
+
+.notif-link {
+    justify-self: start;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--content-secondary);
+    font: inherit;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}

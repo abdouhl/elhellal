@@ -1,0 +1,31 @@
+---
+// Push notification preferences (src/components/NotificationSettings.tsx,
+// delivered by workers/push/).
+import Layout from "../layouts/Layout.astro";
+import NotificationSettings from "../components/NotificationSettings";
+import { loadArticles } from "../lib/articles-data";
+
+const categories: Array<[string, string]> = loadArticles()
+    .articles.filter((c) => c.content.length > 0)
+    .sort((a, b) => b.content.length - a.content.length)
+    .map((c) => [c.category, c.title || c.category]);
+---
+
+<Layout
+    site="الهلال"
+    title="الإشعارات"
+    tagline="أفضل المقالات الجديدة، في المواضيع التي تهمك"
+    pageTitle="الإشعارات"
+    pageDescription="اختر المواضيع التي تهمك ليصلك جديدها من الهلال"
+    noindex
+>
+    <main id="main-content" class="container">
+        <div class="legal-content-wrapper">
+            <header class="legal-header">
+                <h1 class="nu-c-h5 nu-u-text--primary">الإشعارات</h1>
+                <p class="last-updated">إشعار واحد في اليوم أو في الأسبوع بأفضل ما أُضيف في المواضيع التي تختارها.</p>
+            </header>
+            <NotificationSettings client:load categories={categories} />
+        </div>
+    </main>
+</Layout>
