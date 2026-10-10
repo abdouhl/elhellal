@@ -72,6 +72,8 @@ const EVENTS = new Set([
     'install-accepted',
     'install-dismissed',
     'banner-dismissed',
+    'cta-clicked',
+    'link-clicked',
     'click',
     'subscribed',
     'unsubscribed',

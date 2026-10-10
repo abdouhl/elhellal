@@ -281,6 +281,17 @@ const {
                         >
                             <span class="fire-emoji">🔥</span>
                         </button>
+                        <button
+                            type="button"
+                            class="header-install"
+                            id="pwa-install-cta"
+                            hidden
+                        >
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
+                            </svg>
+                            <span>ثبّت التطبيق</span>
+                        </button>
                         <a
                             href="/saved/"
                             class="favorites-link"
@@ -797,6 +808,42 @@ const {
 
     .favorites-count {
         display: none;
+    }
+
+    /* Install CTA (src/scripts/pwa.ts unhides it when installing is possible).
+       Phones and tablets only: desktop keeps the footer link and the banner. */
+    .header-install {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--spacing-02);
+        padding: var(--spacing-02) var(--spacing-04);
+        border: 0;
+        border-radius: 999px;
+        background: var(--content-primary);
+        color: var(--background);
+        font: inherit;
+        font-size: var(--desktop-body-sm);
+        line-height: var(--lh-desktop-body-sm);
+        white-space: nowrap;
+        cursor: var(--c-pointer);
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+        transition: transform 0.1s ease;
+    }
+    .header-install:active {
+        transform: scale(0.97);
+    }
+    .header-install:focus-visible {
+        outline: 1px solid var(--button-primary);
+        outline-offset: 2px;
+    }
+    .header-install[hidden] {
+        display: none;
+    }
+    @media (hover: hover) and (pointer: fine) {
+        .header-install {
+            display: none;
+        }
     }
 
     @media (max-width: 48rem) {

@@ -6,8 +6,8 @@
  *  - mirrors bookmarks into the worker's offline "saved" cache
  *  - remembers recently read articles for /offline/
  *  - shows an install banner (or, on iOS, how to add to the home screen) to
- *    returning readers, and the footer's install link wherever installing is
- *    possible
+ *    returning readers, and the header's install button (touch devices) and
+ *    the footer's install link wherever installing is possible
  */
 
 import { shardOf } from '../lib/article-page';
@@ -150,9 +150,11 @@ function maybeShowBanner(force = false) {
 }
 
 function updateInstallLink() {
+    const show = canInstall() && !readInstallState().installed;
+    const cta = document.getElementById('pwa-install-cta');
+    if (cta) cta.hidden = !show;
     const link = document.getElementById('pwa-install-link');
     if (!link) return;
-    const show = canInstall();
     link.hidden = !show;
     if (link.previousElementSibling?.classList.contains('footer-separator')) {
         (link.previousElementSibling as HTMLElement).hidden = !show;
@@ -177,8 +179,10 @@ function setupInstall() {
     // Saving an article is a good moment: offline reading is the pitch.
     window.addEventListener('bookmarks:changed', () => maybeShowBanner(true));
     document.addEventListener('click', (e) => {
-        if ((e.target as Element).closest?.('#pwa-install-link')) {
+        const trigger = (e.target as Element).closest?.('#pwa-install-link, #pwa-install-cta');
+        if (trigger) {
             e.preventDefault();
+            trackPwaEvent(trigger.id === 'pwa-install-cta' ? 'cta-clicked' : 'link-clicked');
             promptInstall();
         }
     });
