@@ -7,6 +7,8 @@
  *   POST /api/push/unsubscribe    { endpoint }
  *   POST /api/push/test           { endpoint } → one test notification (1/min)
  *   POST /api/push/event          { name } → daily counter (installs, clicks…)
+ *   POST /api/push/ping           { id, platform, push } → the installed app was
+ *                                 opened today (once a day per device; `installs`)
  *
  * The cron trigger (every 5 minutes) sends:
  *   1. digests: each subscription is due at SEND_HOUR_UTC daily, or on
@@ -67,6 +69,8 @@ const ALLOWED_ORIGINS = ['https://elhellal.com', 'https://www.elhellal.com'];
 const PUSH_HOSTS =
     /^(fcm\.googleapis\.com|android\.googleapis\.com|updates\.push\.services\.mozilla\.com|push\.services\.mozilla\.com|web\.push\.apple\.com|[\w-]+\.notify\.windows\.com)$/;
 const CATEGORY_RE = /^[a-z0-9-]{1,40}$/;
+const INSTALL_ID_RE = /^[\w-]{16,64}$/;
+const PLATFORMS = new Set(['ios', 'android', 'desktop', 'other']);
 const EVENTS = new Set([
     'installed',
     'install-accepted',
@@ -180,13 +184,14 @@ async function handleSubscribe(request: Request, env: Env, ctx: ExecutionContext
     const frequency = body.frequency === undefined && previous ? previous.frequency : parseFrequency(body.frequency);
 
     const now = Date.now();
+    const app = body.app === true ? 1 : 0;
     const statements = [
         env.DB.prepare(
-            `INSERT INTO subscriptions (endpoint, p256dh, auth, categories, frequency, since, next_due_at, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+            `INSERT INTO subscriptions (endpoint, p256dh, auth, categories, frequency, since, next_due_at, created_at, app)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
              ON CONFLICT (endpoint) DO UPDATE SET p256dh = ?2, auth = ?3, categories = ?4, frequency = ?5,
-                 next_due_at = CASE WHEN frequency = ?5 THEN next_due_at ELSE ?7 END, failures = 0`
-        ).bind(endpoint, p256dh, auth, categories, frequency, previous?.since ?? now, nextSlot(now, frequency, sendHour(env)), now),
+                 next_due_at = CASE WHEN frequency = ?5 THEN next_due_at ELSE ?7 END, failures = 0, app = MAX(app, ?9)`
+        ).bind(endpoint, p256dh, auth, categories, frequency, previous?.since ?? now, nextSlot(now, frequency, sendHour(env)), now, app),
     ];
     if (oldEndpoint && oldEndpoint !== endpoint) {
         statements.push(env.DB.prepare('DELETE FROM subscriptions WHERE endpoint = ?').bind(oldEndpoint));
@@ -252,6 +257,24 @@ async function handleEvent(request: Request, env: Env) {
     const body = await readBody(request);
     if (typeof body.name !== 'string' || !EVENTS.has(body.name)) throw new HttpError(400, 'unknown event');
     await countEvent(env, body.name);
+    return { ok: true };
+}
+
+/** The installed app's daily check-in: what the admin's install counts are made of. */
+async function handlePing(request: Request, env: Env) {
+    const body = await readBody(request);
+    if (typeof body.id !== 'string' || !INSTALL_ID_RE.test(body.id)) throw new HttpError(400, 'invalid id');
+    const platform = typeof body.platform === 'string' && PLATFORMS.has(body.platform) ? body.platform : 'other';
+    const push = body.push === true ? 1 : 0;
+    const now = Date.now();
+    const day = today(now);
+    const previous = await env.DB.prepare('SELECT last_seen FROM installs WHERE id = ?').bind(body.id).first<{ last_seen: number }>();
+    const newDay = !previous || today(previous.last_seen) !== day;
+    await env.DB.prepare(
+        `INSERT INTO installs (id, platform, first_seen, last_seen, days, push) VALUES (?1, ?2, ?3, ?3, 1, ?4)
+         ON CONFLICT (id) DO UPDATE SET platform = ?2, last_seen = ?3, push = ?4, days = days + ?5`
+    ).bind(body.id, platform, now, push, previous && newDay ? 1 : 0).run();
+    if (newDay) await countEvent(env, 'app-open');
     return { ok: true };
 }
 
@@ -458,6 +481,8 @@ export default {
                     return json(await handleTest(request, env), 200, origin);
                 case 'POST /api/push/event':
                     return json(await handleEvent(request, env), 200, origin);
+                case 'POST /api/push/ping':
+                    return json(await handlePing(request, env), 200, origin);
                 default:
                     return json({ error: 'not found' }, 404, origin);
             }

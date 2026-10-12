@@ -21,6 +21,9 @@ export interface InstallState {
     installed?: boolean;
     /** When the reader last dismissed the installed app's notifications banner (ms). */
     notifyDismissedAt?: number;
+    /** The installed app's random id for /api/push/ping, and the last day (YYYY-MM-DD) it pinged. */
+    appId?: string;
+    pingedOn?: string;
 }
 
 function read<T>(key: string, fallback: T): T {

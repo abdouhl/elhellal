@@ -2398,18 +2398,54 @@ const PUSH_BATCH = 40;
 const pushD1 = (sql: string) => d1Results(sql, 'elhellal-push', PUSH_DIR);
 const sqlText = (value: string) => `'${value.replace(/'/g, "''")}'`;
 
-function pushTarget(category: string) {
-    return category ? `categories = '*' OR categories LIKE ${sqlText(`%,${category},%`)}` : '1';
+const PUSH_SERVICES: Record<string, string> = {
+    apple: 'web.push.apple.com',
+    fcm: 'googleapis.com',
+    mozilla: 'mozilla.com',
+    windows: 'notify.windows.com',
+};
+
+/** SQL condition for a send's audience: category, installed app vs browser, push service. */
+function pushTarget(body: Body) {
+    const category = String(body.category ?? '').trim();
+    const audience = String(body.audience ?? '');
+    const service = String(body.service ?? '');
+    if (category && !/^[a-z0-9-]{1,40}$/.test(category)) throw new HttpError(400, 'Invalid category');
+    if (audience && audience !== 'app' && audience !== 'web') throw new HttpError(400, 'Invalid audience');
+    if (service && !PUSH_SERVICES[service]) throw new HttpError(400, 'Invalid push service');
+    const where = ['1'];
+    if (category) where.push(`(categories = '*' OR categories LIKE ${sqlText(`%,${category},%`)})`);
+    if (audience) where.push(`app = ${audience === 'app' ? 1 : 0}`);
+    if (service) where.push(`endpoint LIKE ${sqlText(`https://%${PUSH_SERVICES[service]}/%`)}`);
+    const label = [category || '*', audience, service].filter(Boolean).join(' · ');
+    return { where: where.join(' AND '), label };
 }
 
-async function pushStats() {
-    const [totals, categoryRows, events, outbox, broadcasts] = await pushD1(
+/** Which push service (≈ browser) a subscription belongs to, as SQL. */
+const SERVICE_SQL = `CASE ${Object.entries(PUSH_SERVICES)
+    .map(([name, host]) => `WHEN endpoint LIKE '%${host}/%' THEN '${name}'`)
+    .join(' ')} ELSE 'other' END`;
+
+async function pushStats(params: URLSearchParams) {
+    const days = Math.min(365, Math.max(1, Number(params.get('days')) || 14));
+    const since = `date('now', '-${days - 1} day')`;
+    const sinceMs = `(unixepoch(${since}) * 1000)`;
+    const dayOf = (col: string) => `date(${col} / 1000, 'unixepoch')`;
+    const ago = (n: number) => `(unixepoch('now') - ${n * 86400}) * 1000`;
+    const [totals, categoryRows, events, outbox, broadcasts, services, allTime, installs, platforms, newDays] = await pushD1(
         [
-            "SELECT COUNT(*) AS total, COALESCE(SUM(frequency = 'daily'), 0) AS daily, COALESCE(SUM(frequency = 'weekly'), 0) AS weekly, COALESCE(SUM(categories = '*'), 0) AS everything FROM subscriptions",
+            "SELECT COUNT(*) AS total, COALESCE(SUM(frequency = 'daily'), 0) AS daily, COALESCE(SUM(frequency = 'weekly'), 0) AS weekly, COALESCE(SUM(categories = '*'), 0) AS everything, COALESCE(SUM(app), 0) AS app FROM subscriptions",
             "SELECT categories FROM subscriptions WHERE categories != '*'",
-            "SELECT day, name, n FROM events WHERE day >= date('now', '-14 day') ORDER BY day DESC",
+            `SELECT day, name, n FROM events WHERE day >= ${since} ORDER BY day DESC`,
             'SELECT COUNT(*) AS pending FROM outbox',
             'SELECT * FROM broadcasts ORDER BY id DESC LIMIT 15',
+            `SELECT ${SERVICE_SQL} AS service, COUNT(*) AS n, COALESCE(SUM(app), 0) AS app FROM subscriptions GROUP BY 1 ORDER BY 2 DESC`,
+            'SELECT name, SUM(n) AS n FROM events GROUP BY name',
+            `SELECT COUNT(*) AS total, COALESCE(SUM(last_seen >= ${ago(1)}), 0) AS d1, COALESCE(SUM(last_seen >= ${ago(7)}), 0) AS d7, COALESCE(SUM(last_seen >= ${ago(30)}), 0) AS d30, COALESCE(SUM(push), 0) AS push, COALESCE(SUM(days >= 2), 0) AS came_back, COALESCE(ROUND(AVG(days), 1), 0) AS avg_days FROM installs`,
+            `SELECT platform, COUNT(*) AS n, COALESCE(SUM(last_seen >= ${ago(30)}), 0) AS active, COALESCE(SUM(push), 0) AS push FROM installs GROUP BY platform ORDER BY n DESC`,
+            // Per-day series not kept as counters: new installs and new subscriptions.
+            `SELECT ${dayOf('first_seen')} AS day, 'new-install' AS name, COUNT(*) AS n FROM installs WHERE first_seen >= ${sinceMs} GROUP BY 1
+             UNION ALL SELECT ${dayOf('created_at')}, 'new-sub', COUNT(*) FROM subscriptions WHERE created_at >= ${sinceMs} GROUP BY 1`,
         ].join('; ')
     );
     const byCategory = new Map<string, number>();
@@ -2417,9 +2453,14 @@ async function pushStats() {
         for (const c of String(row.categories).split(',').filter(Boolean)) byCategory.set(c, (byCategory.get(c) ?? 0) + 1);
     }
     return {
+        days,
         totals: totals?.[0],
         categories: [...byCategory].sort((a, b) => b[1] - a[1]).map(([category, n]) => ({ category, n })),
-        events,
+        events: [...(events ?? []), ...(newDays ?? [])],
+        allTime: Object.fromEntries((allTime ?? []).map((r) => [r.name, r.n])),
+        services,
+        installs: installs?.[0],
+        platforms,
         pending: outbox?.[0]?.pending ?? 0,
         batch: PUSH_BATCH,
         broadcasts,
@@ -2430,23 +2471,30 @@ async function pushSend(body: Body) {
     const title = String(body.title ?? '').trim();
     const text = String(body.body ?? '').trim();
     const url = String(body.url ?? '/').trim() || '/';
-    const category = String(body.category ?? '').trim();
+    const image = String(body.image ?? '').trim();
     if (!title || title.length > 80) throw new HttpError(400, 'Title is required (80 characters max)');
     if (!text || text.length > 240) throw new HttpError(400, 'Body is required (240 characters max)');
     if (!url.startsWith('/') && !url.startsWith('https://elhellal.com/')) throw new HttpError(400, 'URL must be a path on elhellal.com');
-    if (category && !/^[a-z0-9-]{1,40}$/.test(category)) throw new HttpError(400, 'Invalid category');
+    if (image && (!/^https:\/\//.test(image) || image.length > 500)) throw new HttpError(400, 'Image must be an https URL');
+    const { where, label } = pushTarget(body);
 
     const now = Date.now();
-    const payload = JSON.stringify({ title, body: text, url, tag: `broadcast-${now}` });
-    const where = pushTarget(category);
+    const payload = JSON.stringify({ title, body: text, url, tag: `broadcast-${now}`, ...(image ? { image } : {}) });
     const [count] = await pushD1(
         [
             `SELECT COUNT(*) AS n FROM subscriptions WHERE ${where}`,
-            `INSERT INTO broadcasts (title, body, url, target, queued, created_at) SELECT ${sqlText(title)}, ${sqlText(text)}, ${sqlText(url)}, ${sqlText(category || '*')}, COUNT(*), ${now} FROM subscriptions WHERE ${where}`,
+            `INSERT INTO broadcasts (title, body, url, target, queued, created_at) SELECT ${sqlText(title)}, ${sqlText(text)}, ${sqlText(url)}, ${sqlText(label)}, COUNT(*), ${now} FROM subscriptions WHERE ${where}`,
             `INSERT INTO outbox (endpoint, payload, created_at) SELECT endpoint, ${sqlText(payload)}, ${now} FROM subscriptions WHERE ${where}`,
         ].join('; ')
     );
     return { queued: count?.[0]?.n ?? 0 };
+}
+
+/** How many subscribers a send would reach, for the form's live count. */
+async function pushAudience(params: URLSearchParams) {
+    const { where } = pushTarget(Object.fromEntries(params));
+    const [rows] = await pushD1(`SELECT COUNT(*) AS n FROM subscriptions WHERE ${where}`);
+    return { n: rows?.[0]?.n ?? 0 };
 }
 
 async function pushClearOutbox() {
@@ -2541,6 +2589,7 @@ const GET: Record<string, (params: URLSearchParams) => unknown | Promise<unknown
     '/api/leads/live': checkLive,
     '/api/leads/article': readBlogArticle,
     '/api/push/stats': pushStats,
+    '/api/push/audience': pushAudience,
 };
 
 Bun.serve({

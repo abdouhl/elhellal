@@ -12,6 +12,8 @@
  *  - subscribes the installed app to the daily digest: silently when
  *    notifications are already allowed, otherwise through a one-tap banner
  *    (iOS only asks for permission from a tap)
+ *  - checks the installed app in once a day (/api/push/ping), which is how the
+ *    admin panel counts installs and active installs
  */
 
 import { shardOf } from '../lib/article-page';
@@ -260,6 +262,32 @@ async function setupAppNotifications() {
     showNotifyBanner();
 }
 
+// ─── Install count ───────────────────────────────────────────────────────────
+
+function platform(): string {
+    if (isIos()) return 'ios';
+    if (/Android/.test(navigator.userAgent)) return 'android';
+    if (/Windows|Macintosh|Linux|CrOS/.test(navigator.userAgent)) return 'desktop';
+    return 'other';
+}
+
+/** Once a day per installed app: an anonymous random id, the platform, and whether notifications are on. */
+async function pingInstall() {
+    if (!isStandalone() || !import.meta.env.PROD) return;
+    const day = new Date().toISOString().slice(0, 10);
+    let state = readInstallState();
+    if (state.pingedOn === day) return;
+    if (!state.appId) state = updateInstallState({ appId: crypto.randomUUID() });
+    const push = pushSupport() === 'ok' && Notification.permission === 'granted' && !!(await currentSubscription().catch(() => null));
+    const res = await fetch('/api/push/ping', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: state.appId, platform: platform(), push }),
+        keepalive: true,
+    });
+    if (res.ok) updateInstallState({ pingedOn: day, installed: true });
+}
+
 // ─── App shell (installed app) ───────────────────────────────────────────────
 
 function setMoreOpen(open: boolean) {
@@ -326,6 +354,7 @@ function onPageLoad() {
     updateInstallLink();
     maybeShowBanner();
     setupAppNotifications().catch(() => {});
+    pingInstall().catch(() => {});
 }
 
 registerServiceWorker();

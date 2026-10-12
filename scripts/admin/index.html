@@ -181,7 +181,7 @@ const TABS = [
     ['publish', '⇡', 'Publish', 'Commit & push to GitHub, then build and deploy the site.'],
     ['social', '✦', 'Social', 'Schedule X / LinkedIn posts and generate TikTok slideshows.'],
     ['pins', '📌', 'Pins', 'Generate or remove Pinterest pin images on R2.'],
-    ['push', '🔔', 'Push', 'Notification subscribers and install stats; send a one-off notification.'],
+    ['push', '🔔', 'App & push', 'Installed-app users (installs, active, platforms), notification subscribers, and sending notifications.'],
   ]],
   ['More', [
     ['stats', '▥', 'Stats', 'Weekly volume, sources, top authors and most-read articles.'],
@@ -1166,14 +1166,28 @@ async function renderStats() {
 }
 
 // ─── Push notifications (workers/push) ───
-const push = { stats: null, error: null, loading: false, form: { title: '', body: '', url: '/', category: '' } };
-const EVENT_LABELS = { sent: 'Sent', failed: 'Failed', gone: 'Expired', subscribed: 'Subscribed', unsubscribed: 'Unsubscribed', click: 'Clicks', installed: 'Installed', 'install-accepted': 'Install accepted', 'install-dismissed': 'Install dismissed', 'banner-dismissed': 'Banner dismissed' };
+const PUSH_FORM = { title: '', body: '', url: '/', image: '', category: '', audience: '', service: '' };
+const push = { stats: null, error: null, loading: false, days: 14, form: { ...PUSH_FORM }, reach: null };
+const EVENT_LABELS = { 'new-install': 'New installs', 'app-open': 'App opens', installed: 'Installed (Chrome)', 'install-accepted': 'Install accepted', 'install-dismissed': 'Install declined', 'banner-dismissed': 'Banner dismissed', 'cta-clicked': 'Install button', 'link-clicked': 'Install link', 'new-sub': 'New subscribers', subscribed: 'Subscribed', unsubscribed: 'Unsubscribed', 'notify-dismissed': 'Notify banner dismissed', sent: 'Sent', click: 'Clicks', failed: 'Failed', gone: 'Expired' };
+const PLATFORM_LABELS = { ios: 'iPhone / iPad', android: 'Android', desktop: 'Desktop', other: 'Other' };
+const SERVICE_LABELS = { apple: 'Apple (Safari / iOS)', fcm: 'Chrome / Edge / Android', mozilla: 'Firefox', windows: 'Windows', other: 'Other' };
 
 async function loadPush() {
   push.loading = true;
-  try { push.stats = await api('/api/push/stats'); push.error = null; }
+  try { push.stats = await api(`/api/push/stats?days=${push.days}`); push.error = null; }
   catch (e) { push.error = e.message; }
   push.loading = false;
+}
+
+let reachTimer;
+function updateReach() {
+  clearTimeout(reachTimer);
+  reachTimer = setTimeout(async () => {
+    const { category, audience, service } = push.form;
+    try { push.reach = (await api('/api/push/audience?' + new URLSearchParams({ category, audience, service }))).n; } catch { push.reach = null; }
+    const el = document.getElementById('push-reach');
+    if (el) el.textContent = push.reach == null ? '' : `Reaches ${push.reach.toLocaleString()} subscriber(s)`;
+  }, 300);
 }
 
 async function renderPush() {
@@ -1182,45 +1196,85 @@ async function renderPush() {
   if (push.error) {
     return paint('push', h('div', { class: 'toolbar' }, refresh),
       h('div', { class: 'card bad' }, push.error),
-      h('div', { class: 'card' }, h('p', {}, 'First-time setup (from workers/push):'),
-        h('pre', {}, 'bunx wrangler d1 create elhellal-push        # paste database_id into wrangler.jsonc\nbunx wrangler secret put VAPID_PRIVATE_JWK   # the JWK in .dev.vars\nbunx wrangler d1 migrations apply elhellal-push --remote\nbunx wrangler deploy')));
+      h('div', { class: 'card' }, h('p', {}, 'Setup (from workers/push). A "no such table: installs" error means the new migration is not applied yet:'),
+        h('pre', {}, 'bunx wrangler d1 migrations apply elhellal-push --remote   # creates/updates the tables\nbunx wrangler deploy                                       # the Worker with /api/push/ping\n\n# first time only:\nbunx wrangler d1 create elhellal-push        # paste database_id into wrangler.jsonc\nbunx wrangler secret put VAPID_PRIVATE_JWK   # the JWK in .dev.vars')));
   }
-  const d = push.stats, t = d.totals ?? {};
-  const days = [...new Set(d.events.map((e) => e.day))];
+  const d = push.stats, t = d.totals ?? {}, ins = d.installs ?? {}, all = d.allTime ?? {};
+  const days = [...new Set(d.events.map((e) => e.day))].sort().reverse();
   const names = Object.keys(EVENT_LABELS).filter((n) => d.events.some((e) => e.name === n));
   const count = (day, name) => d.events.find((e) => e.day === day && e.name === name)?.n ?? '';
   const sum = (name) => d.events.filter((e) => e.name === name).reduce((n, e) => n + e.n, 0);
+  const pct = (a, b) => (b ? `${Math.round((a / b) * 100)}%` : '—');
+  const span = `${d.days} days`;
   const f = push.form;
   const field = (key, props) => h(props.rows ? 'textarea' : 'input', { ...props, value: f[key], oninput: (e) => { f[key] = e.target.value; } });
+  const pick = (key, options) => h('select', { onchange: (e) => { f[key] = e.target.value; updateReach(); } },
+    options.map(([value, label]) => h('option', { value, selected: f[key] === value }, label)));
   const minutes = Math.ceil(d.pending / d.batch) * 5;
+  const sent = sum('sent');
+  if (push.reach == null) updateReach();
 
   paint('push',
-    h('div', { class: 'toolbar' }, h('span', { class: 'meta' }, 'Digests go out at 17:00 UTC (daily) and Fridays (weekly), only when there are new articles in a subscriber\'s categories.'), refresh),
+    h('div', { class: 'toolbar' },
+      h('span', { class: 'meta' }, 'Installs are counted when the installed app is opened (once a day per device, iOS included). Digests go out at 17:00 UTC (daily) and Fridays (weekly).'),
+      h('select', { onchange: (e) => { push.days = Number(e.target.value); push.stats = null; renderPush(); } },
+        [7, 14, 30, 90, 365].map((n) => h('option', { value: n, selected: n === push.days }, `Last ${n} days`))),
+      refresh),
+    h('h2', {}, 'Installed app'),
     h('div', { class: 'toolbar', style: 'align-items:stretch' },
-      tile('Subscribers', (t.total ?? 0).toLocaleString(), `${t.daily ?? 0} daily · ${t.weekly ?? 0} weekly`),
-      tile('All categories', (t.everything ?? 0).toLocaleString(), `${(t.total ?? 0) - (t.everything ?? 0)} picked categories`),
-      tile('Sent, 14 days', sum('sent').toLocaleString(), `${sum('click')} clicks`),
-      tile('Installs, 14 days', sum('installed').toLocaleString(), `${sum('install-dismissed')} declined the prompt`),
+      tile('Installs', (ins.total ?? 0).toLocaleString(), `${sum('new-install')} new in ${span}`),
+      tile('Active today', (ins.d1 ?? 0).toLocaleString(), `${ins.d7 ?? 0} this week · ${ins.d30 ?? 0} this month`),
+      tile('Still used', pct(ins.d30 ?? 0, ins.total ?? 0), 'opened in the last 30 days'),
+      tile('Came back', pct(ins.came_back ?? 0, ins.total ?? 0), `opened on 2+ days · ${ins.avg_days ?? 0} days on average`),
+      tile('Notifications on', pct(ins.push ?? 0, ins.total ?? 0), `${ins.push ?? 0} installs`),
+    ),
+    h('div', { class: 'toolbar', style: 'align-items:stretch' },
+      tile('Install prompt', `${sum('install-accepted')} / ${sum('install-accepted') + sum('install-dismissed')}`, `accepted in ${span} (Chrome/Android)`),
+      tile('Install buttons', (sum('cta-clicked') + sum('link-clicked')).toLocaleString(), `clicks · ${sum('banner-dismissed')} banners dismissed`),
+      tile('App opens', sum('app-open').toLocaleString(), `device-days in ${span}`),
+    ),
+    d.platforms?.length ? h('div', { class: 'list' }, h('table', {},
+      h('tr', {}, h('th', {}, 'Platform'), h('th', { class: 'num' }, 'Installs'), h('th', { class: 'num' }, 'Active 30d'), h('th', { class: 'num' }, 'Notifications on')),
+      d.platforms.map((p) => h('tr', {}, h('td', {}, PLATFORM_LABELS[p.platform] ?? p.platform), h('td', { class: 'num' }, p.n), h('td', { class: 'num' }, p.active), h('td', { class: 'num' }, p.push)))))
+      : h('div', { class: 'empty' }, 'No installs counted yet — they appear once the updated site is deployed and someone opens the installed app.'),
+
+    h('h2', {}, 'Notifications'),
+    h('div', { class: 'toolbar', style: 'align-items:stretch' },
+      tile('Subscribers', (t.total ?? 0).toLocaleString(), `${t.app ?? 0} from the app · ${(t.total ?? 0) - (t.app ?? 0)} from a browser`),
+      tile('Frequency', `${t.daily ?? 0} / ${t.weekly ?? 0}`, `daily / weekly · ${t.everything ?? 0} follow everything`),
+      tile(`Sent, ${span}`, sent.toLocaleString(), `${(all.sent ?? 0).toLocaleString()} all time`),
+      tile('Click rate', pct(sum('click'), sent), `${sum('click')} clicks in ${span}`),
+      tile('Churn', `+${sum('new-sub')} / −${sum('unsubscribed') + sum('gone')}`, `subscribed / left in ${span}`),
       tile('Queued', d.pending.toLocaleString(), d.pending ? `≈ ${minutes} min to deliver` : 'outbox empty'),
     ),
+
     h('h2', {}, 'Send a notification'),
     h('div', { class: 'card', style: 'display:grid;gap:8px;max-width:640px' },
       field('title', { placeholder: 'Title (Arabic), e.g. الهلال — مختارات خاصة', maxlength: 80, dir: 'auto' }),
       field('body', { placeholder: 'Body', maxlength: 240, rows: 3, dir: 'auto' }),
       field('url', { placeholder: '/ or /articles/<slug>/', dir: 'ltr' }),
-      h('select', { onchange: (e) => { f.category = e.target.value; } },
-        h('option', { value: '' }, 'Everyone'),
-        ...stats.categories.map((c) => h('option', { value: c.category, selected: c.category === f.category }, `Subscribed to ${c.title} (${c.category}) or everything`))),
+      field('image', { placeholder: 'Image URL (optional, https://…) — shown big on Android/desktop', dir: 'ltr' }),
+      h('div', { class: 'toolbar' },
+        pick('category', [['', 'Every category'], ...stats.categories.map((c) => [c.category, `Follows ${c.title} (or everything)`])]),
+        pick('audience', [['', 'App + browser'], ['app', 'Installed app only'], ['web', 'Browser only']]),
+        pick('service', [['', 'Any browser'], ...Object.entries(SERVICE_LABELS).filter(([k]) => k !== 'other')])),
       h('div', { class: 'toolbar' },
         h('button', { class: 'btn primary', onclick: () => {
-          if (!confirm(`Queue "${f.title}" for ${f.category ? 'subscribers of ' + f.category : 'every subscriber'}?`)) return;
-          act(async () => { const r = await api('/api/push/send', { ...f }); push.form = { title: '', body: '', url: '/', category: '' }; push.stats = null; return r; }, (r) => `Queued for ${r.queued} subscriber(s)`);
+          if (!confirm(`Queue "${f.title}" for ${push.reach ?? 'the selected'} subscriber(s)?`)) return;
+          act(async () => { const r = await api('/api/push/send', { ...f }); push.form = { ...PUSH_FORM }; push.reach = null; push.stats = null; return r; }, (r) => `Queued for ${r.queued} subscriber(s) — delivered within ~5 min per ${d.batch}`);
         } }, 'Queue notification'),
+        h('span', { class: 'meta', id: 'push-reach' }, push.reach == null ? '' : `Reaches ${push.reach.toLocaleString()} subscriber(s)`),
         d.pending ? h('button', { class: 'btn', onclick: () => { if (confirm(`Drop ${d.pending} queued message(s)?`)) act(async () => { await api('/api/push/clear', {}); push.stats = null; }, 'Outbox cleared'); } }, 'Clear queue') : null)),
-    h('h2', {}, 'Last 14 days'),
+
+    h('h2', {}, `Day by day, last ${span}`),
     days.length ? h('div', { class: 'list' }, h('table', {}, h('tr', {}, h('th', {}, 'Day'), names.map((n) => h('th', { class: 'num' }, EVENT_LABELS[n]))),
+      h('tr', {}, h('td', {}, h('b', {}, 'Total')), names.map((n) => h('td', { class: 'num' }, h('b', {}, sum(n))))),
       days.map((day) => h('tr', {}, h('td', {}, day), names.map((n) => h('td', { class: 'num' }, count(day, n)))))))
       : h('div', { class: 'empty' }, 'No activity yet'),
+    h('h2', {}, 'Subscribers by browser'),
+    d.services?.length ? h('div', { class: 'list' }, h('table', {}, h('tr', {}, h('th', {}, 'Push service'), h('th', { class: 'num' }, 'Subscribers'), h('th', { class: 'num' }, 'From the app')),
+      d.services.map((x) => h('tr', {}, h('td', {}, SERVICE_LABELS[x.service] ?? x.service), h('td', { class: 'num' }, x.n), h('td', { class: 'num' }, x.app)))))
+      : h('div', { class: 'empty' }, 'No subscribers yet'),
     h('h2', {}, 'Categories picked'),
     d.categories.length ? h('div', { class: 'list' }, h('table', {}, h('tr', {}, h('th', {}, 'Category'), h('th', { class: 'num' }, 'Subscribers')),
       d.categories.map((c) => h('tr', {}, h('td', {}, stats.categories.find((x) => x.category === c.category)?.title ?? c.category), h('td', { class: 'num' }, c.n)))))

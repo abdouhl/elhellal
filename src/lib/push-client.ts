@@ -15,10 +15,12 @@ const API = '/api/push';
 
 export type PushSupport = 'ok' | 'unsupported' | 'ios-install';
 
+const isStandalone = () =>
+    window.matchMedia('(display-mode: standalone)').matches ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true;
+
 export function pushSupport(): PushSupport {
-    const standalone =
-        window.matchMedia('(display-mode: standalone)').matches ||
-        (navigator as Navigator & { standalone?: boolean }).standalone === true;
+    const standalone = isStandalone();
     const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     // iOS only offers push to apps added to the home screen.
     if (ios && !standalone) return 'ios-install';
@@ -61,7 +63,8 @@ export async function fetchPrefs(sub: PushSubscription): Promise<PushPrefs | nul
 }
 
 export async function savePrefs(sub: PushSubscription, prefs: PushPrefs): Promise<void> {
-    await call('/subscribe', { method: 'POST', body: JSON.stringify({ subscription: sub.toJSON(), ...prefs }) });
+    // `app`: lets the admin panel tell installed-app subscribers from browser ones.
+    await call('/subscribe', { method: 'POST', body: JSON.stringify({ subscription: sub.toJSON(), ...prefs, app: isStandalone() }) });
 }
 
 /** Asks for permission (if needed), subscribes and stores the preferences. */
