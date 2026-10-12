@@ -630,6 +630,9 @@ interface Candidate {
     keywords?: string[] | undefined;
     latest_post?: string | undefined;
     sample?: { title: string; url: string } | undefined;
+    /** Posts on their Substack, and the day that was counted (see countPosts). */
+    posts?: number | undefined;
+    posts_at?: string | undefined;
 }
 
 function loadCandidates(): Candidate[] {
@@ -744,6 +747,55 @@ function removeCandidates(body: Body) {
     const kept = list.filter((c) => !names.has(c.username));
     saveCandidates(kept);
     return { removed: list.length - kept.length };
+}
+
+const SUBSTACK_HEADERS = { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', Accept: '*/*' };
+
+/** How many posts a Substack has: the /p/ URLs in its sitemap (one request), or,
+ *  for publications without one, the archive API paged through to the end. */
+async function substackPostCount(username: string): Promise<number> {
+    const base = `https://${username}.substack.com`;
+    const sm = await fetch(`${base}/sitemap.xml`, { headers: SUBSTACK_HEADERS, signal: AbortSignal.timeout(20000) });
+    if (sm.ok) {
+        const xml = await sm.text();
+        if (xml.includes('<urlset')) return new Set(xml.match(/<loc>[^<]*\/p\/[^<]*<\/loc>/g) ?? []).size;
+    }
+    const slugs = new Set<string>();
+    for (let offset = 0; offset < 10_000; offset += 50) {
+        const res = await fetch(`${base}/api/v1/archive?sort=new&offset=${offset}&limit=50`, { headers: SUBSTACK_HEADERS, signal: AbortSignal.timeout(15000) });
+        if (!res.ok) throw new Error(`archive ${res.status}`);
+        const page = (await res.json()) as { slug: string }[];
+        const before = slugs.size;
+        for (const p of page) slugs.add(p.slug);
+        if (!page.length || slugs.size === before) break; // end, or a publication that repeats its last page
+    }
+    return slugs.size;
+}
+
+/** Counts the posts of the given usernames (or every candidate not counted yet). */
+async function countCandidatePosts(body: Body) {
+    const wanted = ids(body.usernames);
+    const targets = loadCandidates().filter((c) => (wanted.size ? wanted.has(c.username) : c.posts == null)).map((c) => c.username);
+    const counts = new Map<string, number>();
+    const failed: string[] = [];
+    const queue = [...targets];
+    await Promise.all(Array.from({ length: 6 }, async () => {
+        for (let u = queue.shift(); u; u = queue.shift()) {
+            try {
+                counts.set(u, await substackPostCount(u));
+            } catch {
+                failed.push(u);
+            }
+        }
+    }));
+    // Re-read: the list may have changed while we were fetching.
+    const list = loadCandidates();
+    for (const c of list) {
+        const n = counts.get(c.username);
+        if (n != null) Object.assign(c, { posts: n, posts_at: today() });
+    }
+    saveCandidates(list);
+    return { counted: counts.size, failed };
 }
 
 function runDiscover(body: Body) {
@@ -1149,6 +1201,8 @@ function openOutput(body: Body) {
 // being picked twice) are never touched.
 
 const QUIZ_VIDEO_DIR = path.join(ROOT, '../elhellal-quiz/video');
+/** Where make.ts writes its videos (its --out). */
+const QUIZ_VIDEOS_OUT = (process.env.QUIZ_VIDEOS_DIR || path.join(os.homedir(), 'Desktop/quiz-videos')).replace(/^~/, os.homedir());
 
 interface MediaRoot {
     key: string;
@@ -1168,7 +1222,7 @@ const MEDIA_ROOTS: MediaRoot[] = [
         // ../elhellal-quiz/video/make.ts — `bun run video` (Shorts: NNN-<id>/) and `--long` (YouTube: long-<date>-…/).
         key: 'quiz-videos',
         label: 'Quiz videos (YouTube / Shorts / Reels)',
-        dir: (process.env.QUIZ_VIDEOS_DIR || path.join(os.homedir(), 'Desktop/quiz-videos')).replace(/^~/, os.homedir()),
+        dir: QUIZ_VIDEOS_OUT,
         dates: () => {
             // Shorts folders are numbered; used.json has the day each number was made.
             const map = new Map<string, string>();
@@ -1276,6 +1330,8 @@ interface SiteStep {
     env?: Record<string, string>;
     /** Extra CLI args the page may pass (validated by this pattern), e.g. Goodreads slugs. */
     args?: RegExp;
+    /** Working directory relative to the site (default: the site's root). */
+    cwd?: string;
 }
 interface Site {
     title: string;
@@ -1342,6 +1398,14 @@ const SITES: Record<string, Site> = {
                 writes: true,
                 env: { QUOTES_JSON: path.join(siteDir('elhellal-quotes'), 'src/data/quotes.json') },
             },
+            // One long video + one Short per day of a range, in one folder with an upload prompt (see quizBatches).
+            'youtube-batch': {
+                label: 'YouTube batch',
+                cmd: [BUN, 'make.ts', '--out', QUIZ_VIDEOS_OUT, '--youtube'],
+                display: 'bun run video --youtube',
+                cwd: 'video',
+                args: /^(\d{4}-\d{2}-\d{2}|\d{2}:\d{2}|\d{1,2}|--(long-time|short-time|long|timer|no-voice))$/,
+            },
             'd1-migrate': {
                 label: 'Apply D1 migrations',
                 cmd: [BUN, 'x', 'wrangler', 'd1', 'migrations', 'apply', 'elhellal-quiz', '--remote'],
@@ -1394,7 +1458,7 @@ function runSite(body: Body) {
     if (args.length && !step.args) throw new HttpError(400, `${stepName} takes no arguments`);
     const bad = args.find((a) => !step.args!.test(a));
     if (bad) throw new HttpError(400, `Invalid argument ${bad}`);
-    return startCommand(sitesSlot, [...step.cmd, ...args], [step.display, ...args].join(' '), { mode: `${s.name}:${stepName}`, scopes: [s.name] }, s.dir, step.env);
+    return startCommand(sitesSlot, [...step.cmd, ...args], [step.display, ...args].join(' '), { mode: `${s.name}:${stepName}`, scopes: [s.name] }, path.join(s.dir, step.cwd ?? ''), step.env);
 }
 
 function sitesJob(params: URLSearchParams) {
@@ -1842,6 +1906,36 @@ function describeQuizId(statId: string) {
     const row = readJson<(BankRow | null)[]>(quizFile('bank'))[i];
     const t = lang === 'ar' ? null : readJson<{ bank: TRow[] }>(quizFile(lang)).bank?.[i];
     return { lang, id, kind: m[1] === 't' ? 'true/false' : 'bank', i, row, translation: t ?? null };
+}
+
+// YouTube batches: <QUIZ_VIDEOS_OUT>/youtube-<from>_<to>/ with videos.json and upload-prompt.txt (make.ts --youtube).
+function quizBatchDir(name: unknown) {
+    const n = str(name);
+    if (!/^youtube-\d{4}-\d{2}-\d{2}_\d{4}-\d{2}-\d{2}$/.test(n)) throw new HttpError(400, 'Bad batch name');
+    const dir = path.join(QUIZ_VIDEOS_OUT, n);
+    if (!fs.existsSync(dir)) throw new HttpError(404, 'No such batch');
+    return dir;
+}
+
+function quizBatches() {
+    if (!fs.existsSync(QUIZ_VIDEOS_OUT)) return { dir: QUIZ_VIDEOS_OUT, batches: [] };
+    const batches = fs.readdirSync(QUIZ_VIDEOS_OUT).filter((n) => /^youtube-\d{4}-\d{2}-\d{2}_\d{4}-\d{2}-\d{2}$/.test(n)).sort().reverse().map((name) => {
+        const [from, to] = name.slice('youtube-'.length).split('_');
+        let videos: { kind: string }[] = [];
+        try { videos = readJson(path.join(QUIZ_VIDEOS_OUT, name, 'videos.json')); } catch {}
+        const days = Math.round((Date.parse(to!) - Date.parse(from!)) / 86400000) + 1;
+        return { name, from, to, days, long: videos.filter((v) => v.kind === 'long').length, short: videos.filter((v) => v.kind === 'short').length, prompt: fs.existsSync(path.join(QUIZ_VIDEOS_OUT, name, 'upload-prompt.txt')) };
+    });
+    return { dir: QUIZ_VIDEOS_OUT, batches };
+}
+
+function quizBatchPrompt(params: URLSearchParams) {
+    return { text: fs.readFileSync(path.join(quizBatchDir(params.get('name')), 'upload-prompt.txt'), 'utf-8') };
+}
+
+function openQuizBatch(body: Body) {
+    Bun.spawn(['open', quizBatchDir(body.name)]);
+    return { ok: true };
 }
 
 async function quizReports(params: URLSearchParams) {
@@ -2375,6 +2469,7 @@ const POST: Record<string, (body: Body) => unknown | Promise<unknown>> = {
     '/api/candidates/add': addCandidates,
     '/api/candidates/remove': removeCandidates,
     '/api/candidates/merge': () => ({ added: mergeDiscovery() }),
+    '/api/candidates/count': countCandidatePosts,
     '/api/discover/run': runDiscover,
     '/api/discover/stop': () => stopJob(discoverSlot),
     '/api/publish/run': runPublish,
@@ -2395,6 +2490,7 @@ const POST: Record<string, (body: Body) => unknown | Promise<unknown>> = {
     '/api/entries/remove': removeEntry,
     '/api/entries/markdown': saveMarkdown,
     '/api/quiz/bank/edit': editBank,
+    '/api/quiz/batch/open': openQuizBatch,
     '/api/leads/status': setLeadStatus,
     '/api/leads/add': addLead,
     '/api/leads/remove': removeLeads,
@@ -2437,6 +2533,8 @@ const GET: Record<string, (params: URLSearchParams) => unknown | Promise<unknown
     '/api/entries/markdown': readMarkdown,
     '/api/quiz/bank': listBank,
     '/api/quiz/reports': quizReports,
+    '/api/quiz/batches': quizBatches,
+    '/api/quiz/batch/prompt': quizBatchPrompt,
     '/api/leads': listLeads,
     '/api/blog/articles': listBlogArticles,
     '/api/leads/job': leadJob,

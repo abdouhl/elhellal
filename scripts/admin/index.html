@@ -594,6 +594,12 @@ function addCandidates() {
   }, (r) => `Added ${r.added}` + (r.skipped.length ? ` · skipped blocked: ${r.skipped.join(', ')}` : ''));
 }
 
+function countPosts() {
+  const usernames = [...cands.sel];
+  act(async () => { const r = await api('/api/candidates/count', { usernames }); await loadCandidates(); return r; },
+    (r) => `Counted ${r.counted} author(s)` + (r.failed.length ? ` · failed: ${r.failed.join(', ')}` : ''));
+}
+
 function removeCandidates() {
   const usernames = [...cands.sel];
   if (!confirm(`Remove ${usernames.length} author(s) from the import list?`)) return;
@@ -633,6 +639,8 @@ function substackPanel(running) {
     h('button', { class: 'btn', disabled: running, onclick: () => setSel(pickable.map((c) => c.username)) }, 'All'),
     h('button', { class: 'btn', disabled: running, onclick: () => setSel(pickable.filter((c) => !c.articles).map((c) => c.username)) }, 'Not imported yet'),
     h('button', { class: 'btn', disabled: running, onclick: () => setSel([]) }, 'None'),
+    h('button', { class: 'btn', disabled: running, onclick: countPosts,
+      title: 'Count how many posts each author has on Substack — the selected ones, or every author not counted yet' }, 'Count posts'),
     h('button', { class: 'btn danger', disabled: running || !cands.sel.size, onclick: removeCandidates }, 'Remove selected'),
     selCount,
   );
@@ -642,6 +650,7 @@ function substackPanel(running) {
     h('div', { class: 'body' },
       h('div', { class: 'title' }, '@' + c.username, ' ', c.name ? h('span', { class: 'meta', style: 'display:inline' }, c.name) : null, ' ',
         h('span', { class: 'pill' }, c.source), ' ',
+        c.posts != null ? h('span', { class: 'pill', title: `Posts on Substack (counted ${c.posts_at})` }, `${c.posts.toLocaleString()} on Substack`) : null, ' ',
         c.blocked ? h('span', { class: 'pill bad' }, 'blocked') : c.articles ? h('span', { class: 'pill ok' }, `${c.articles} in catalog`) : null),
       h('div', { class: 'meta' },
         h('a', { href: `https://${c.username}.substack.com`, target: '_blank', rel: 'noreferrer', onclick: (e) => e.stopPropagation() }, `${c.username}.substack.com`),
@@ -1263,6 +1272,7 @@ function siteCard(s, running) {
     if (st.key === 'import-quotes') return [h('input', { placeholder: 'Goodreads slugs (optional)', value: sites.args, style: 'min-width:220px', oninput: (e) => { sites.args = e.target.value; } }),
       step(st.key, st.label, '', 'Import from Goodreads? It re-checks every known author too (slow, needs Ollama running) and writes quotes.json as it goes.', sites.args)];
     if (st.key === 'd1-migrate') return step(st.key, st.label, '', 'Apply pending migrations to the live quiz D1 database?');
+    if (st.key === 'youtube-batch') return null; // its own form in quizSection
     return step(st.key, st.label);
   });
 
@@ -1431,6 +1441,7 @@ const QUIZ_CATS = { geo: 'Geography', sci: 'Science', hist: 'History', gen: 'Gen
 async function quizSection() {
   const data = await api('/api/quiz/bank?' + new URLSearchParams({ q: sites.q, cat: sites.cat, untranslated: sites.untranslated ? '1' : '', page: state.page }));
   return h('div', {},
+    await youtubeSection(),
     reportsSection(),
     h('h2', {}, 'Question bank'),
     h('div', { class: 'toolbar' }, siteSearch('Search questions, answers, or an id like b12…'),
@@ -1480,6 +1491,45 @@ function bankEditor(x, langs) {
       await api('/api/quiz/bank/edit', { i: x.i, ar: { cat: catSel.value, ...ar.get() }, translations: Object.fromEntries(tr.map(([l, f]) => [l, f.get()])) });
       sites.editing = null;
     }, 'Saved') }, 'Save')));
+}
+
+// One long video + one Short per day → one folder + upload-prompt.txt for Claude in Chrome (video/make.ts --youtube).
+const isoDay = (d) => d.toISOString().slice(0, 10);
+const ytForm = { from: isoDay(new Date(Date.now() + 86400000)), to: isoDay(new Date(Date.now() + 10 * 86400000)), longTime: '19:00', shortTime: '13:00', questions: '20', voice: false };
+
+async function youtubeSection() {
+  const running = !!siteJob.job?.running;
+  const data = await api('/api/quiz/batches');
+  const days = Math.round((Date.parse(ytForm.to) - Date.parse(ytForm.from)) / 86400000) + 1;
+  const field = (label, el) => h('label', { style: 'display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--muted)' }, label, el);
+  const input = (key, props) => h('input', { ...props, value: ytForm[key], disabled: running, oninput: (e) => { ytForm[key] = e.target.value; }, onchange: () => render() });
+  const start = () => {
+    if (!(days >= 1)) return toast('"To" must be on or after "From"', true);
+    if (!confirm(`Render ${days} long video(s) and ${days} Short(s), ${ytForm.from} → ${ytForm.to}? This takes a while${ytForm.voice ? ' and spends ElevenLabs credits' : ''}.`)) return;
+    const args = [ytForm.from, ytForm.to, '--long', ytForm.questions || '20', '--long-time', ytForm.longTime, '--short-time', ytForm.shortTime, ...(ytForm.voice ? [] : ['--no-voice'])];
+    siteJob.start('/api/sites/run', { site: 'quiz', step: 'youtube-batch', args: args.join(' ') });
+  };
+  const copy = (name) => act(async () => navigator.clipboard.writeText((await api('/api/quiz/batch/prompt?' + new URLSearchParams({ name }))).text), 'Prompt copied — paste it into Claude in Chrome');
+  return h('div', { class: 'card', style: 'margin-top:18px' },
+    h('h2', { style: 'margin-top:0' }, 'YouTube batch'),
+    h('div', { class: 'meta', style: 'margin-bottom:8px' }, 'One long video and one Short per day, all in one folder, plus upload-prompt.txt: give it to Claude in Chrome to upload, fill in and schedule them in YouTube Studio. Running the same range again picks up where it stopped.'),
+    h('div', { class: 'toolbar', style: 'align-items:flex-end' },
+      field('From', input('from', { type: 'date' })),
+      field('To', input('to', { type: 'date' })),
+      field('Long at', input('longTime', { type: 'time' })),
+      field('Short at', input('shortTime', { type: 'time' })),
+      field('Questions / long', input('questions', { type: 'number', min: 3, max: 60, style: 'width:90px' })),
+      h('label', {}, h('input', { type: 'checkbox', checked: ytForm.voice, disabled: running, onchange: (e) => { ytForm.voice = e.target.checked; } }), ' Voice (ElevenLabs)'),
+      h('button', { class: 'btn primary', disabled: running || !(days >= 1), onclick: start },
+        running && siteJob.job?.mode === 'quiz:youtube-batch' ? 'Rendering…' : days >= 1 ? `Make ${days} day(s) · ${days * 2} videos` : 'Pick a range')),
+    data.batches.length ? h('table', { style: 'margin-top:10px' },
+      data.batches.map((b) => h('tr', {},
+        h('td', {}, `${b.from} → ${b.to}`),
+        h('td', {}, h('span', { class: 'meta' }, `${b.long}/${b.days} long · ${b.short}/${b.days} shorts`, b.long + b.short < b.days * 2 ? ' (incomplete — run the range again to finish)' : '')),
+        h('td', { style: 'text-align:end;white-space:nowrap' },
+          h('button', { class: 'btn', disabled: !b.prompt, onclick: () => copy(b.name) }, 'Copy prompt'), ' ',
+          h('button', { class: 'btn', onclick: () => act(() => api('/api/quiz/batch/open', { name: b.name }), 'Opened in Finder') }, 'Open folder')))))
+      : h('div', { class: 'meta', style: 'margin-top:8px' }, `No batches yet in ${data.dir}.`));
 }
 
 function reportsSection() {
