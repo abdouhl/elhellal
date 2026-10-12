@@ -2,7 +2,7 @@
     "id": "/",
     "name": "الهلال — دليل منتقى لأفضل المقالات العربية",
     "short_name": "الهلال",
-    "description": "دليل منتقى لأفضل المقالات العربية على الإنترنت",
+    "description": "أفضل المقالات العربية على شاشتك الرئيسية: يفتح بلمسة، يعمل دون إنترنت، ويرسل لك أفضل الجديد بإشعار يومي.",
     "start_url": "/?source=pwa",
     "scope": "/",
     "display": "standalone",
@@ -45,6 +45,50 @@
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "maskable"
+        }
+    ],
+    "screenshots": [
+        {
+            "src": "/screenshots/home.jpg",
+            "sizes": "824x1830",
+            "type": "image/jpeg",
+            "form_factor": "narrow",
+            "label": "الصفحة الرئيسية: أحدث المقالات العربية المنتقاة"
+        },
+        {
+            "src": "/screenshots/article.jpg",
+            "sizes": "824x1830",
+            "type": "image/jpeg",
+            "form_factor": "narrow",
+            "label": "صفحة مقال: ملخص المقال ولماذا يستحق القراءة"
+        },
+        {
+            "src": "/screenshots/category.jpg",
+            "sizes": "824x1830",
+            "type": "image/jpeg",
+            "form_factor": "narrow",
+            "label": "التصنيفات: علم النفس، السياسة، الفلسفة وغيرها"
+        },
+        {
+            "src": "/screenshots/home-wide.jpg",
+            "sizes": "1280x800",
+            "type": "image/jpeg",
+            "form_factor": "wide",
+            "label": "الصفحة الرئيسية"
+        },
+        {
+            "src": "/screenshots/article-wide.jpg",
+            "sizes": "1280x800",
+            "type": "image/jpeg",
+            "form_factor": "wide",
+            "label": "صفحة مقال"
+        },
+        {
+            "src": "/screenshots/category-wide.jpg",
+            "sizes": "1280x800",
+            "type": "image/jpeg",
+            "form_factor": "wide",
+            "label": "تصنيف"
         }
     ],
     "shortcuts": [

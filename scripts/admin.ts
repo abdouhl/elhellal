@@ -2595,6 +2595,8 @@ const GET: Record<string, (params: URLSearchParams) => unknown | Promise<unknown
 Bun.serve({
     hostname: '127.0.0.1',
     port: PORT,
+    // Some handlers (Substack fetches, catalog-wide stats) outlast Bun's 10s default; 255 is the max.
+    idleTimeout: 255,
     async fetch(req: Request) {
         const url = new URL(req.url);
         // Reject other hostnames (DNS rebinding) and cross-site writes: browsers

@@ -16,6 +16,8 @@ export interface RecentPage {
 export interface InstallState {
     /** Article pages read on this device. */
     reads: number;
+    /** The last few days (YYYY-MM-DD) this device visited: a third one shows the install banner. */
+    visitDays?: string[];
     /** When the reader last dismissed the install banner (ms). */
     dismissedAt?: number;
     installed?: boolean;
@@ -24,6 +26,8 @@ export interface InstallState {
     /** The installed app's random id for /api/push/ping, and the last day (YYYY-MM-DD) it pinged. */
     appId?: string;
     pingedOn?: string;
+    /** The last day (YYYY-MM-DD) the installed app saved the day's top articles for offline reading. */
+    dailyOn?: string;
 }
 
 function read<T>(key: string, fallback: T): T {

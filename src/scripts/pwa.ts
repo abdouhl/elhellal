@@ -5,10 +5,11 @@
  *    never competes with first paint
  *  - mirrors bookmarks into the worker's offline "saved" cache
  *  - remembers recently read articles for /offline/
- *  - shows an install banner (or, on iOS, how to add to the home screen) to
- *    returning readers, and the header's install button (touch devices) and
- *    the footer's install link wherever installing is possible
- *  - drives the installed app's shell: tab bar, back button, "more" sheet
+ *  - offers installing the app (pwa-install.ts)
+ *  - drives the installed app's shell: tab bar, back button, "more" sheet,
+ *    and "recently read" on the home page
+ *  - has the installed app save the home page's top articles for offline
+ *    reading once a day
  *  - subscribes the installed app to the daily digest: silently when
  *    notifications are already allowed, otherwise through a one-tap banner
  *    (iOS only asks for permission from a tap)
@@ -19,45 +20,48 @@
 import { shardOf } from '../lib/article-page';
 import { getBookmarks } from '../utils/bookmarks';
 import { currentSubscription, pushSupport, subscribe } from '../lib/push-client';
-import { readInstallState, rememberRecent, updateInstallState } from './pwa-store';
+import { hideBanner, isIos, isStandalone, onInstallPageLoad, setupInstall, trackPwaEvent } from './pwa-install';
+import { readInstallState, readRecent, rememberRecent, updateInstallState } from './pwa-store';
 
-interface BeforeInstallPromptEvent extends Event {
-    prompt(): Promise<void>;
-    userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
-}
-
-/** Article pages read before the banner shows. */
-const READS_BEFORE_BANNER = 2;
-const DISMISS_DAYS = 14;
-const BANNER_SESSION_KEY = 'elhellal_install_banner_shown';
-
-let installEvent: BeforeInstallPromptEvent | null = null;
-
-const isStandalone = () =>
-    window.matchMedia('(display-mode: standalone)').matches ||
-    (navigator as Navigator & { standalone?: boolean }).standalone === true;
-
-const isIos = () =>
-    /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-
-export function trackPwaEvent(name: string) {
-    fetch('/api/push/event', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
-        keepalive: true,
-    }).catch(() => {});
-}
+/** Top articles on the home page the installed app keeps for offline reading. */
+const DAILY_ARTICLES = 12;
+const RECENT_SHOWN = 6;
 
 // ─── Service worker ──────────────────────────────────────────────────────────
 
+/** An article page and the data shard the site Worker fills it from. */
+function addArticle(urls: Set<string>, slug: string) {
+    urls.add(`/articles/${encodeURIComponent(slug)}/`);
+    urls.add(`/_data/articles/${shardOf(slug)}.json`);
+}
+
 function savedUrls(): string[] {
     const urls = new Set(['/saved/']);
-    for (const slug of getBookmarks()) {
-        urls.add(`/articles/${encodeURIComponent(slug)}/`);
-        urls.add(`/_data/articles/${shardOf(slug)}.json`);
-    }
+    for (const slug of getBookmarks()) addArticle(urls, slug);
     return [...urls];
+}
+
+/**
+ * Once a day, the installed app's home page hands the service worker its top
+ * articles to keep (its "daily" cache), so there's something new to read offline.
+ */
+function syncDaily() {
+    const day = new Date().toISOString().slice(0, 10);
+    if (location.pathname !== '/' || readInstallState().dailyOn === day || !navigator.onLine) return;
+    // The feed renders on idle: give it a moment.
+    setTimeout(async () => {
+        if (location.pathname !== '/') return;
+        const urls = new Set<string>();
+        for (const a of document.querySelectorAll<HTMLAnchorElement>('main a[href^="/articles/"]')) {
+            const slug = a.pathname.match(/^\/articles\/([^/]+)\/$/)?.[1];
+            if (slug) addArticle(urls, decodeURIComponent(slug));
+            if (urls.size >= DAILY_ARTICLES * 2) break;
+        }
+        if (!urls.size || !navigator.serviceWorker?.controller) return;
+        const reg = await navigator.serviceWorker.ready;
+        reg.active?.postMessage({ type: 'sync-daily', urls: ['/', ...urls] });
+        updateInstallState({ dailyOn: day });
+    }, 8000);
 }
 
 async function syncSaved() {
@@ -80,118 +84,6 @@ function registerServiceWorker() {
 
     window.addEventListener('bookmarks:changed', () => {
         if (navigator.serviceWorker.controller) syncSaved();
-    });
-}
-
-// ─── Install banner ──────────────────────────────────────────────────────────
-
-const SHARE_ICON = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>`;
-
-function canInstall() {
-    return !isStandalone() && (installEvent !== null || isIos());
-}
-
-function hideBanner() {
-    document.getElementById('pwa-banner')?.remove();
-}
-
-function showBanner() {
-    if (document.getElementById('pwa-banner')) return;
-    const banner = document.createElement('div');
-    banner.id = 'pwa-banner';
-    banner.className = 'pwa-banner';
-    banner.setAttribute('role', 'dialog');
-    banner.setAttribute('aria-label', 'تثبيت تطبيق الهلال');
-    const ios = !installEvent && isIos();
-    banner.innerHTML = `
-        <img src="/icon-192.png" width="44" height="44" alt="" class="pwa-banner-icon" />
-        <div class="pwa-banner-text">
-            <strong>ثبّت تطبيق الهلال</strong>
-            <span>${
-                ios
-                    ? `اضغط على زر المشاركة ${SHARE_ICON} ثم «إضافة إلى الشاشة الرئيسية».`
-                    : 'اقرأ مقالاتك المحفوظة دون اتصال، وافتح الهلال بلمسة واحدة.'
-            }</span>
-        </div>
-        <div class="pwa-banner-actions">
-            ${ios ? '' : '<button type="button" class="pwa-banner-install">تثبيت</button>'}
-            <button type="button" class="pwa-banner-close" aria-label="إغلاق">لاحقاً</button>
-        </div>`;
-    banner.querySelector('.pwa-banner-install')?.addEventListener('click', promptInstall);
-    banner.querySelector('.pwa-banner-close')?.addEventListener('click', () => {
-        updateInstallState({ dismissedAt: Date.now() });
-        trackPwaEvent('banner-dismissed');
-        hideBanner();
-    });
-    document.body.append(banner);
-    try {
-        sessionStorage.setItem(BANNER_SESSION_KEY, '1');
-    } catch {}
-}
-
-async function promptInstall() {
-    if (!installEvent) {
-        // iOS has no install prompt: the banner is the instructions.
-        showBanner();
-        return;
-    }
-    hideBanner();
-    const event = installEvent;
-    installEvent = null;
-    await event.prompt();
-    const { outcome } = await event.userChoice;
-    trackPwaEvent(outcome === 'accepted' ? 'install-accepted' : 'install-dismissed');
-    if (outcome === 'dismissed') updateInstallState({ dismissedAt: Date.now() });
-    updateInstallLink();
-}
-
-function maybeShowBanner(force = false) {
-    if (!canInstall()) return;
-    const state = readInstallState();
-    if (state.installed) return;
-    if (state.dismissedAt && Date.now() - state.dismissedAt < DISMISS_DAYS * 86_400_000) return;
-    try {
-        if (sessionStorage.getItem(BANNER_SESSION_KEY)) return;
-    } catch {}
-    if (force || state.reads >= READS_BEFORE_BANNER) showBanner();
-}
-
-function updateInstallLink() {
-    const show = canInstall() && !readInstallState().installed;
-    const cta = document.getElementById('pwa-install-cta');
-    if (cta) cta.hidden = !show;
-    const link = document.getElementById('pwa-install-link');
-    if (!link) return;
-    link.hidden = !show;
-    if (link.previousElementSibling?.classList.contains('footer-separator')) {
-        (link.previousElementSibling as HTMLElement).hidden = !show;
-    }
-}
-
-function setupInstall() {
-    window.addEventListener('beforeinstallprompt', (e) => {
-        // Our own banner replaces Chrome's mini-infobar.
-        e.preventDefault();
-        installEvent = e as BeforeInstallPromptEvent;
-        updateInstallLink();
-        maybeShowBanner();
-    });
-    window.addEventListener('appinstalled', () => {
-        updateInstallState({ installed: true });
-        trackPwaEvent('installed');
-        installEvent = null;
-        hideBanner();
-        updateInstallLink();
-    });
-    // Saving an article is a good moment: offline reading is the pitch.
-    window.addEventListener('bookmarks:changed', () => maybeShowBanner(true));
-    document.addEventListener('click', (e) => {
-        const trigger = (e.target as Element).closest?.('#pwa-install-link, #pwa-install-cta');
-        if (trigger) {
-            e.preventDefault();
-            trackPwaEvent(trigger.id === 'pwa-install-cta' ? 'cta-clicked' : 'link-clicked');
-            promptInstall();
-        }
     });
 }
 
@@ -337,6 +229,25 @@ function setupAppShell() {
     });
 }
 
+/** The installed app's home page lists the last articles read ([data-app-recent], index.astro). */
+function renderRecent() {
+    const section = document.querySelector<HTMLElement>('[data-app-recent]');
+    const list = section?.querySelector('ul');
+    if (!section || !list) return;
+    const recent = readRecent().slice(0, RECENT_SHOWN);
+    list.replaceChildren(
+        ...recent.map((page) => {
+            const li = document.createElement('li');
+            const a = document.createElement('a');
+            a.href = page.url;
+            a.textContent = page.title;
+            li.append(a);
+            return li;
+        })
+    );
+    section.hidden = !isStandalone() || recent.length === 0;
+}
+
 // ─── Every page ──────────────────────────────────────────────────────────────
 
 function onPageLoad() {
@@ -348,11 +259,13 @@ function onPageLoad() {
     if (/^\/articles\/[^/]+\/$/.test(location.pathname)) {
         const title = document.querySelector('h1')?.textContent?.trim() || document.title.replace(/ \| الهلال$/, '');
         rememberRecent({ url: location.pathname, title });
-        updateInstallState({ reads: readInstallState().reads + 1 });
     }
 
-    updateInstallLink();
-    maybeShowBanner();
+    onInstallPageLoad();
+    if (standalone) {
+        renderRecent();
+        syncDaily();
+    }
     setupAppNotifications().catch(() => {});
     pingInstall().catch(() => {});
 }

@@ -1,0 +1,249 @@
+---
+// /app/ — why and how to install the app. The button does whatever installing
+// means in the reader's browser (src/scripts/pwa-install.ts): the native
+// prompt, iOS "Add to Home Screen" steps, or leaving an in-app browser. Link
+// here from social bios, video descriptions and the sister sites.
+import Layout from "../layouts/Layout.astro";
+
+const benefits = [
+    ["بلمسة واحدة", "يفتح الهلال من شاشتك الرئيسية مباشرة، بلا بحث ولا كتابة عنوان."],
+    ["دون إنترنت", "مقالاتك المحفوظة، وأبرز مقالات اليوم، تُقرأ حتى في الطائرة أو المترو."],
+    ["إشعار يومي", "أفضل المقالات الجديدة مرة في اليوم أو في الأسبوع، في المواضيع التي تختارها."],
+    ["خفيف وآمن", "لا متجر تطبيقات ولا مساحة تُذكر، ولا يطلب أي صلاحية سوى الإشعارات إن أردتها."],
+];
+
+const screenshots = [
+    ["/screenshots/home.jpg", "الصفحة الرئيسية"],
+    ["/screenshots/article.jpg", "صفحة مقال"],
+    ["/screenshots/category.jpg", "تصنيف"],
+];
+
+const faq = [
+    ["هل هو مجاني؟", "نعم، تماماً."],
+    ["كم يأخذ من مساحة؟", "القليل جداً: لا شيء يُنزَّل من متجر، وما يحفظه هو المقالات التي تقرؤها دون إنترنت فقط."],
+    ["لماذا لا أجده في متجر التطبيقات؟", "لأنه تطبيق ويب: يُثبَّت من المتصفح مباشرة ويتحدّث وحده دائماً."],
+    ["أنا على iPhone، لماذا لا يظهر زر التثبيت؟", "Safari لا يعرض زراً للتثبيت؛ اضغط «ثبّت التطبيق» أعلاه لترى الخطوات الثلاث. وعلى iPhone لا تصل الإشعارات إلا عبر التطبيق المثبّت."],
+    ["كيف أحذفه؟", "كأي تطبيق: اضغط على أيقونته مطوّلاً واختر الحذف."],
+];
+---
+
+<Layout
+    site="الهلال"
+    title="تطبيق الهلال"
+    tagline="دليل منتقى لأفضل المقالات العربية على الإنترنت"
+    pageTitle="تطبيق الهلال — أفضل المقالات العربية على شاشتك الرئيسية"
+    pageDescription="ثبّت تطبيق الهلال مجاناً على هاتفك: يفتح بلمسة، يعمل دون إنترنت، ويرسل لك أفضل المقالات العربية الجديدة بإشعار يومي. دون متجر تطبيقات."
+    canonicalUrl="https://elhellal.com/app/"
+    ogUrl="https://elhellal.com/app/"
+    ogTitle="تطبيق الهلال — أفضل المقالات العربية على شاشتك الرئيسية"
+    ogDescription="ثبّت تطبيق الهلال مجاناً: يفتح بلمسة، يعمل دون إنترنت، ويرسل لك أفضل المقالات بإشعار يومي."
+>
+    <main id="main-content" class="app-page">
+        <section class="app-hero">
+            <img src="/icon-512.png" width="112" height="112" alt="" class="app-hero-icon" />
+            <h1>تطبيق الهلال</h1>
+            <p class="app-hero-lead">أفضل المقالات العربية على شاشتك الرئيسية: يفتح بلمسة، يعمل دون إنترنت، ويصلك منه إشعار يومي بالجديد.</p>
+
+            <div class="app-state" data-app-state="install">
+                <button type="button" class="app-install" data-install-trigger="app">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" /></svg>
+                    <span>ثبّت التطبيق</span>
+                </button>
+                <p class="app-hint">مجاني · دون متجر تطبيقات · لا يأخذ مساحة تُذكر</p>
+            </div>
+            <div class="app-state" data-app-state="installed" hidden>
+                <p class="app-done">✓ أنت تستخدم تطبيق الهلال الآن.</p>
+                <a href="/notifications/" class="app-install">إعدادات الإشعارات</a>
+            </div>
+            <div class="app-state" data-app-state="desktop" hidden>
+                <p class="app-hint">افتح <strong dir="ltr">elhellal.com/app</strong> على هاتفك لتثبيت التطبيق.</p>
+            </div>
+        </section>
+
+        <section class="app-benefits" aria-label="المزايا">
+            {benefits.map(([title, text]) => (
+                <div class="app-benefit">
+                    <h2>{title}</h2>
+                    <p>{text}</p>
+                </div>
+            ))}
+        </section>
+
+        <section class="app-shots" aria-label="صور من التطبيق">
+            {screenshots.map(([src, label]) => (
+                <figure>
+                    <img src={src} alt={label} width="412" height="915" loading="lazy" decoding="async" />
+                    <figcaption>{label}</figcaption>
+                </figure>
+            ))}
+        </section>
+
+        <section class="app-faq">
+            <h2>أسئلة شائعة</h2>
+            {faq.map(([q, a]) => (
+                <details>
+                    <summary>{q}</summary>
+                    <p>{a}</p>
+                </details>
+            ))}
+        </section>
+    </main>
+</Layout>
+
+<script>
+    import { canInstall, isStandalone, trackPwaEvent } from "../scripts/pwa-install";
+
+    function render() {
+        if (location.pathname !== "/app/") return;
+        // Phones without an install route still get the button: it falls back to the menu steps.
+        const touch = matchMedia("(pointer: coarse)").matches;
+        const state = isStandalone() ? "installed" : canInstall() || touch ? "install" : "desktop";
+        for (const el of document.querySelectorAll<HTMLElement>("[data-app-state]")) {
+            el.hidden = el.dataset.appState !== state;
+        }
+    }
+
+    document.addEventListener("astro:page-load", () => {
+        if (location.pathname !== "/app/") return;
+        render();
+        trackPwaEvent("app-page");
+    });
+    // Chrome's install prompt arrives after load.
+    window.addEventListener("beforeinstallprompt", () => setTimeout(render));
+</script>
+
+<style>
+    .app-page {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: var(--spacing-08, 32px) 16px var(--spacing-10, 48px);
+        color: var(--content-primary);
+    }
+    .app-hero {
+        display: grid;
+        justify-items: center;
+        gap: 14px;
+        text-align: center;
+    }
+    .app-hero-icon {
+        border-radius: 26px;
+        box-shadow: 0 12px 40px rgb(0 0 0 / 0.4);
+    }
+    .app-hero h1 {
+        margin: 6px 0 0;
+        font-size: clamp(28px, 6vw, 40px);
+    }
+    .app-hero-lead {
+        max-width: 34rem;
+        margin: 0;
+        color: var(--content-secondary);
+        font-size: 17px;
+        line-height: 1.8;
+    }
+    .app-state {
+        display: grid;
+        justify-items: center;
+        gap: 10px;
+        margin-top: 8px;
+    }
+    .app-state[hidden] {
+        display: none;
+    }
+    .app-install {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 32px;
+        border: 0;
+        border-radius: 999px;
+        background: var(--content-primary);
+        color: var(--background);
+        font: inherit;
+        font-size: 18px;
+        text-decoration: none;
+        cursor: pointer;
+        touch-action: manipulation;
+    }
+    .app-install:active {
+        transform: scale(0.98);
+    }
+    .app-hint,
+    .app-done {
+        margin: 0;
+        color: var(--content-secondary);
+        font-size: 14px;
+    }
+    .app-done {
+        font-size: 16px;
+        color: var(--content-primary);
+    }
+    .app-benefits {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 12px;
+        margin-top: 40px;
+    }
+    .app-benefit {
+        padding: 16px;
+        border: 0.5px solid var(--border-muted);
+        border-radius: 16px;
+    }
+    .app-benefit h2 {
+        margin: 0 0 6px;
+        font-size: 17px;
+    }
+    .app-benefit p {
+        margin: 0;
+        color: var(--content-secondary);
+        font-size: 14px;
+        line-height: 1.7;
+    }
+    .app-shots {
+        display: flex;
+        gap: 14px;
+        margin: 40px -16px 0;
+        padding: 0 16px 8px;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        scrollbar-width: none;
+    }
+    .app-shots figure {
+        flex: none;
+        width: min(62vw, 240px);
+        margin: 0 auto;
+        scroll-snap-align: center;
+        text-align: center;
+    }
+    .app-shots img {
+        width: 100%;
+        height: auto;
+        border: 0.5px solid var(--border-muted);
+        border-radius: 22px;
+    }
+    .app-shots figcaption {
+        margin-top: 8px;
+        color: var(--content-secondary);
+        font-size: 13px;
+    }
+    .app-faq {
+        max-width: 640px;
+        margin: 40px auto 0;
+    }
+    .app-faq h2 {
+        font-size: 20px;
+        margin: 0 0 12px;
+    }
+    .app-faq details {
+        border-bottom: 0.5px solid var(--border-muted);
+        padding: 12px 0;
+    }
+    .app-faq summary {
+        cursor: pointer;
+        font-weight: 600;
+    }
+    .app-faq p {
+        margin: 8px 0 0;
+        color: var(--content-secondary);
+        line-height: 1.8;
+    }
+</style>

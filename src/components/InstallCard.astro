@@ -1,0 +1,19 @@
+---
+// An inline "install the app" card. Hidden until src/scripts/pwa-install.ts
+// finds this browser can install (or leave its in-app browser to), then filled
+// with the right wording for `place` and the browser. Styles: Layout.astro.
+interface Props {
+    place: "home" | "article";
+}
+
+const { place } = Astro.props;
+---
+
+<aside class="install-card" data-install-card={place} aria-label="تطبيق الهلال" hidden>
+    <img src="/icon-192.png" width="48" height="48" alt="" loading="lazy" />
+    <div class="install-card-body">
+        <strong class="install-card-title"></strong>
+        <span class="install-card-text"></span>
+    </div>
+    <button type="button" class="install-card-button" data-install-trigger="card"></button>
+</aside>

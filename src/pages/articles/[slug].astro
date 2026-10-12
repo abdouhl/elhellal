@@ -199,6 +199,7 @@ const breadcrumbs = [
   { name: v!.categoryTitle, url: `https://elhellal.com${v!.categoryHref}` },
   { name: v!.title },
 ];
+import InstallCard from "../../components/InstallCard.astro";
 ---
 
 <Layout
@@ -578,6 +579,8 @@ const breadcrumbs = [
 
       </aside>
     </div>
+
+    <InstallCard place="article" />
 
     <!-- Related articles -->
     {v.related.length > 0 && (

@@ -314,6 +314,7 @@ const {
                             type="button"
                             class="header-install"
                             id="pwa-install-cta"
+                            data-install-trigger="header"
                             hidden
                         >
                             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -381,7 +382,7 @@ const {
                 <span class="footer-separator" aria-hidden="true">·</span>
                 <a href="/notifications/" class="nu-u-link--subtle">الإشعارات</a>
                 <span class="footer-separator" aria-hidden="true" hidden>·</span>
-                <a href="#" class="nu-u-link--subtle" id="pwa-install-link" hidden>تثبيت التطبيق</a>
+                <a href="/app/" class="nu-u-link--subtle" id="pwa-install-link" data-install-trigger="footer" hidden>تثبيت التطبيق</a>
             </nav>
             <p class="footer-copy">
                 ABDERAHMANE HELLAL 2026 ©
@@ -861,7 +862,7 @@ const {
         display: none;
     }
 
-    /* Install CTA (src/scripts/pwa.ts unhides it when installing is possible).
+    /* Install CTA (src/scripts/pwa-install.ts unhides it when installing is possible).
        Phones and tablets only: desktop keeps the footer link and the banner. */
     .header-install {
         display: inline-flex;
@@ -1649,5 +1650,226 @@ const {
         border: 0;
         background: transparent;
         color: var(--content-secondary);
+    }
+    /* Install steps sheet (src/scripts/pwa-install.ts): iOS "Add to Home
+       Screen", leaving an in-app browser, Firefox's menu. */
+    .pwa-sheet {
+        position: fixed;
+        inset: 0;
+        z-index: 1001;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+    }
+    .pwa-sheet-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgb(0 0 0 / 0.6);
+        animation: pwa-fade-in 0.2s ease-out;
+    }
+    .pwa-sheet-panel {
+        position: relative;
+        width: min(100%, 520px);
+        max-height: 85vh;
+        overflow-y: auto;
+        margin: 0 12px calc(72px + env(safe-area-inset-bottom, 0px));
+        padding: 20px 18px 16px;
+        border: 0.5px solid var(--border-muted);
+        border-radius: 18px;
+        background: var(--background);
+        color: var(--content-primary);
+        box-shadow: 0 20px 50px rgb(0 0 0 / 0.5);
+        animation: pwa-banner-in 0.25s ease-out;
+    }
+    .pwa-sheet-head {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        margin-bottom: 14px;
+    }
+    .pwa-sheet-head img {
+        flex: none;
+        border-radius: 12px;
+    }
+    .pwa-sheet-head div {
+        display: grid;
+        gap: 2px;
+        line-height: 1.5;
+    }
+    .pwa-sheet-head span,
+    .pwa-sheet-note {
+        color: var(--content-secondary);
+        font-size: 14px;
+    }
+    .pwa-sheet-steps {
+        list-style: none;
+        counter-reset: step;
+        display: grid;
+        gap: 10px;
+        margin: 0;
+        padding: 0;
+    }
+    .pwa-sheet-steps li {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: var(--background-secondary, rgb(127 127 127 / 0.1));
+        font-size: 15px;
+        line-height: 1.6;
+    }
+    .pwa-sheet-steps svg {
+        vertical-align: -4px;
+    }
+    .pwa-sheet-step-icon {
+        flex: none;
+        display: grid;
+        place-items: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        background: var(--content-primary);
+        color: var(--background);
+    }
+    .pwa-sheet-note {
+        margin: 12px 0 0;
+        line-height: 1.6;
+    }
+    .pwa-sheet-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 16px;
+    }
+    .pwa-sheet-primary,
+    .pwa-sheet-secondary {
+        flex: 1;
+        display: inline-flex;
+        justify-content: center;
+        padding: 10px 16px;
+        border-radius: 999px;
+        font: inherit;
+        font-size: 15px;
+        text-decoration: none;
+        white-space: nowrap;
+        cursor: pointer;
+    }
+    .pwa-sheet-primary {
+        flex-basis: 100%;
+        border: 0;
+        background: var(--content-primary);
+        color: var(--background);
+    }
+    .pwa-sheet-secondary {
+        border: 0.5px solid var(--border-muted);
+        background: transparent;
+        color: var(--content-primary);
+    }
+    /* Points at the browser's own share button. */
+    .pwa-sheet-arrow {
+        position: absolute;
+        inset-inline: 0;
+        display: flex;
+        justify-content: center;
+        color: #fff;
+        pointer-events: none;
+        animation: pwa-arrow 1s ease-in-out infinite alternate;
+    }
+    .pwa-sheet-arrow--down {
+        bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    }
+    .pwa-sheet-arrow--up {
+        top: 8px;
+        justify-content: flex-end;
+        padding-inline: 24px;
+        transform: rotate(180deg);
+        animation-name: pwa-arrow-up;
+    }
+    .pwa-sheet:has(.pwa-sheet-arrow--up) {
+        align-items: center;
+    }
+    .pwa-sheet:has(.pwa-sheet-arrow--up) .pwa-sheet-panel {
+        margin-bottom: 0;
+    }
+    @keyframes pwa-arrow {
+        to {
+            transform: translateY(8px);
+        }
+    }
+    @keyframes pwa-arrow-up {
+        from {
+            transform: rotate(180deg);
+        }
+        to {
+            transform: rotate(180deg) translateY(8px);
+        }
+    }
+    @keyframes pwa-fade-in {
+        from {
+            opacity: 0;
+        }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .pwa-sheet-backdrop,
+        .pwa-sheet-panel,
+        .pwa-sheet-arrow {
+            animation: none;
+        }
+    }
+
+    /* Install cards (src/components/InstallCard.astro). */
+    .install-card {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin: var(--spacing-06, 24px) auto;
+        padding: 16px;
+        max-width: 720px;
+        border: 0.5px solid var(--border-muted);
+        border-radius: 16px;
+        color: var(--content-primary);
+    }
+    .install-card[hidden] {
+        display: none;
+    }
+    .install-card img {
+        flex: none;
+        border-radius: 12px;
+    }
+    .install-card-body {
+        flex: 1;
+        min-width: 0;
+        display: grid;
+        gap: 2px;
+        line-height: 1.6;
+    }
+    .install-card-text {
+        color: var(--content-secondary);
+        font-size: 14px;
+    }
+    .install-card-button {
+        flex: none;
+        padding: 8px 16px;
+        border: 0;
+        border-radius: 999px;
+        background: var(--content-primary);
+        color: var(--background);
+        font: inherit;
+        font-size: 14px;
+        white-space: nowrap;
+        cursor: pointer;
+    }
+    @media (max-width: 30rem) {
+        .install-card {
+            flex-wrap: wrap;
+        }
+        .install-card-body {
+            flex-basis: calc(100% - 62px);
+        }
+        .install-card-button {
+            flex: 1;
+            padding-block: 10px;
+        }
     }
 </style>

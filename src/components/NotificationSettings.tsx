@@ -140,6 +140,10 @@ export default function NotificationSettings({ categories }: NotificationSetting
                     <li>اختر «إضافة إلى الشاشة الرئيسية».</li>
                     <li>افتح الهلال من الشاشة الرئيسية وارجع إلى هذه الصفحة.</li>
                 </ol>
+                {/* src/scripts/pwa-install.ts shows the steps for this browser. */}
+                <button type="button" className="notif-button" data-install-trigger="card">
+                    اعرض خطوات التثبيت
+                </button>
             </div>
         );
     }

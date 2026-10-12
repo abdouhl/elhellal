@@ -17,6 +17,8 @@
  * Saved articles (src/utils/bookmarks.ts) are mirrored into their own cache,
  * which is never trimmed: the page sends the full list of their URLs
  * ({ type: 'sync-saved' }, src/scripts/pwa.ts) whenever bookmarks change.
+ * The installed app likewise hands over the home page's top articles once a
+ * day ({ type: 'sync-daily' }), replacing the previous day's "daily" cache.
  *
  * scripts/build-worker-data.ts stamps the build id below into dist/sw.js, so
  * every deploy installs a new worker and refreshes the precache. Pages are
@@ -31,6 +33,7 @@ const DATA = 'data';
 const STATIC = 'static';
 const IMAGES = 'images';
 const SAVED = 'saved';
+const DAILY = 'daily';
 const LIMITS = { [PAGES]: 80, [DATA]: 150, [STATIC]: 200, [IMAGES]: 300 };
 const NETWORK_TIMEOUT_MS = 4000;
 
@@ -229,12 +232,16 @@ function stripSearch(href) {
 self.addEventListener('message', (event) => {
     const msg = event.data;
     if (msg && msg.type === 'sync-saved' && Array.isArray(msg.urls)) {
-        event.waitUntil(syncSaved(msg.urls));
+        event.waitUntil(syncCache(SAVED, msg.urls));
+    }
+    if (msg && msg.type === 'sync-daily' && Array.isArray(msg.urls)) {
+        event.waitUntil(syncCache(DAILY, msg.urls.slice(0, 60)));
     }
 });
 
-async function syncSaved(urls) {
-    const cache = await caches.open(SAVED);
+/** Makes cacheName hold exactly urls: drops the rest, fetches what's missing. */
+async function syncCache(cacheName, urls) {
+    const cache = await caches.open(cacheName);
     const wanted = new Set(urls.map((u) => stripSearch(new URL(u, self.location.origin).href)));
     const have = new Set();
     for (const req of await cache.keys()) {
@@ -242,7 +249,7 @@ async function syncSaved(urls) {
         else await cache.delete(req);
     }
     const missing = [...wanted].filter((u) => !have.has(u));
-    // A few at a time: a first sync can be hundreds of bookmarks.
+    // A few at a time: a first sync of saved articles can be hundreds of bookmarks.
     for (let i = 0; i < missing.length; i += 4) {
         await Promise.all(
             missing.slice(i, i + 4).map(async (url) => {

@@ -1168,7 +1168,7 @@ async function renderStats() {
 // ─── Push notifications (workers/push) ───
 const PUSH_FORM = { title: '', body: '', url: '/', image: '', category: '', audience: '', service: '' };
 const push = { stats: null, error: null, loading: false, days: 14, form: { ...PUSH_FORM }, reach: null };
-const EVENT_LABELS = { 'new-install': 'New installs', 'app-open': 'App opens', installed: 'Installed (Chrome)', 'install-accepted': 'Install accepted', 'install-dismissed': 'Install declined', 'banner-dismissed': 'Banner dismissed', 'cta-clicked': 'Install button', 'link-clicked': 'Install link', 'new-sub': 'New subscribers', subscribed: 'Subscribed', unsubscribed: 'Unsubscribed', 'notify-dismissed': 'Notify banner dismissed', sent: 'Sent', click: 'Clicks', failed: 'Failed', gone: 'Expired' };
+const EVENT_LABELS = { 'new-install': 'New installs', 'app-open': 'App opens', installed: 'Installed (Chrome)', 'install-accepted': 'Install accepted', 'install-dismissed': 'Install declined', 'banner-shown': 'Banner shown', 'banner-shown-ios': 'Banner shown (iOS)', 'banner-clicked': 'Banner tapped', 'banner-dismissed': 'Banner dismissed', 'cta-clicked': 'Install button', 'link-clicked': 'Install link', 'card-clicked': 'Install card', 'app-page': '/app/ views', 'app-clicked': '/app/ button', 'guide-shown': 'Steps shown', 'inapp-shown': 'In-app browser', 'inapp-opened': 'Left in-app browser', 'new-sub': 'New subscribers', subscribed: 'Subscribed', unsubscribed: 'Unsubscribed', 'notify-dismissed': 'Notify banner dismissed', sent: 'Sent', click: 'Clicks', failed: 'Failed', gone: 'Expired' };
 const PLATFORM_LABELS = { ios: 'iPhone / iPad', android: 'Android', desktop: 'Desktop', other: 'Other' };
 const SERVICE_LABELS = { apple: 'Apple (Safari / iOS)', fcm: 'Chrome / Edge / Android', mozilla: 'Firefox', windows: 'Windows', other: 'Other' };
 
@@ -1230,7 +1230,10 @@ async function renderPush() {
     ),
     h('div', { class: 'toolbar', style: 'align-items:stretch' },
       tile('Install prompt', `${sum('install-accepted')} / ${sum('install-accepted') + sum('install-dismissed')}`, `accepted in ${span} (Chrome/Android)`),
-      tile('Install buttons', (sum('cta-clicked') + sum('link-clicked')).toLocaleString(), `clicks · ${sum('banner-dismissed')} banners dismissed`),
+      tile('Install buttons', (sum('cta-clicked') + sum('link-clicked') + sum('card-clicked') + sum('app-clicked')).toLocaleString(), `header ${sum('cta-clicked')} · footer ${sum('link-clicked')} · cards ${sum('card-clicked')} · /app/ ${sum('app-clicked')}`),
+      tile('Banner', `${pct(sum('banner-clicked'), sum('banner-shown') + sum('banner-shown-ios'))}`, `tapped of ${(sum('banner-shown') + sum('banner-shown-ios')).toLocaleString()} shown (${sum('banner-shown-ios')} iOS) · ${sum('banner-dismissed')} dismissed`),
+      tile('In-app browsers', `${pct(sum('inapp-opened'), sum('inapp-shown'))}`, `left for a real browser · ${sum('inapp-shown')} prompted`),
+      tile('/app/ page', sum('app-page').toLocaleString(), `views · ${sum('guide-shown')} step sheets shown`),
       tile('App opens', sum('app-open').toLocaleString(), `device-days in ${span}`),
     ),
     d.platforms?.length ? h('div', { class: 'list' }, h('table', {},
