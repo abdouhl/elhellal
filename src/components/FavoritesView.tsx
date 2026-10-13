@@ -5,6 +5,8 @@ import EmptyState, { BookmarkIcon } from './EmptyState';
 import './CardsContainer.css';
 import { lookupCards } from '../lib/article-lookup';
 import { compareAlpha, compareNewest, toFeedCard, type FeedCard } from '../lib/feed';
+import { getSisterSaves, removeSisterSave, SISTER_SAVES_EVENT, type SisterSave } from '../utils/sisterSaves';
+import './SisterSaves.css';
 
 type FavoritesSortKey = 'nameAsc' | 'nameDesc' | 'dateNewest' | 'dateOldest';
 
@@ -15,6 +17,46 @@ const comparators: Record<FavoritesSortKey, (a: FeedCard, b: FeedCard) => number
     dateOldest: (a, b) => compareNewest(b, a),
 };
 
+const SISTER_LABELS: Record<SisterSave['kind'], string> = {
+    quotes: 'اقتباس',
+    books: 'ملخص كتاب',
+    biographies: 'سيرة كاتب',
+};
+
+/** Quotes, books and writers saved from /explore/ (src/utils/sisterSaves.ts). */
+function SisterSaves({ saves }: { saves: SisterSave[] }) {
+    if (saves.length === 0) return null;
+    return (
+        <section className="sister-saves" aria-labelledby="sister-saves-title">
+            <h2 id="sister-saves-title" className="sister-saves-title">من مواقع الهلال</h2>
+            <ul role="list">
+                {saves.map((save) => (
+                    <li key={save.url} className={`sister-save sister-save--${save.kind}`}>
+                        <a href={save.url}>
+                            {save.image && save.kind !== 'quotes' && <img src={save.image} alt="" loading="lazy" width="56" height={save.kind === 'books' ? 84 : 56} />}
+                            <span>
+                                <small>{SISTER_LABELS[save.kind]}</small>
+                                {save.kind === 'quotes' ? (
+                                    <>
+                                        <q>{save.text}</q>
+                                        <strong>{save.title}{save.meta ? ` · ${save.meta}` : ''}</strong>
+                                    </>
+                                ) : (
+                                    <>
+                                        <strong>{save.title}</strong>
+                                        {save.meta && <em>{save.meta}</em>}
+                                    </>
+                                )}
+                            </span>
+                        </a>
+                        <button type="button" aria-label="إزالة من المحفوظة" onClick={() => removeSisterSave(save.url)}>×</button>
+                    </li>
+                ))}
+            </ul>
+        </section>
+    );
+}
+
 interface FavoritesViewProps {
     extraArticles?: BookmarkedArticle[];
 }
@@ -24,6 +66,14 @@ export default function FavoritesView({ extraArticles = [] }: FavoritesViewProps
     const [sortBy, setSortBy] = useState<FavoritesSortKey>('nameAsc');
     // The service worker (public/sw.js) keeps a copy of every saved article.
     const [offlineReady, setOfflineReady] = useState(false);
+    const [sisterSaves, setSisterSaves] = useState<SisterSave[]>([]);
+
+    useEffect(() => {
+        const load = () => setSisterSaves(getSisterSaves());
+        load();
+        window.addEventListener(SISTER_SAVES_EVENT, load);
+        return () => window.removeEventListener(SISTER_SAVES_EVENT, load);
+    }, []);
 
     useEffect(() => {
         setOfflineReady(Boolean(navigator.serviceWorker?.controller));
@@ -55,12 +105,12 @@ export default function FavoritesView({ extraArticles = [] }: FavoritesViewProps
     // Still reading the shards — render nothing rather than flash the empty state.
     if (bookmarkedArticles === null) return null;
 
-    if (bookmarkedArticles.length === 0) {
+    if (bookmarkedArticles.length === 0 && sisterSaves.length === 0) {
         return (
             <section>
                 <EmptyState
                     icon={<BookmarkIcon />}
-                    message="احفظ المقالات التي تعجبك بالنقر على أيقونة الحفظ في أي بطاقة مقال. ستظهر مقالاتك المحفوظة هنا للوصول إليها بسرعة."
+                    message="احفظ المقالات التي تعجبك بالنقر على أيقونة الحفظ في أي بطاقة مقال، والاقتباسات والكتب من تبويب «استكشف». ستظهر هنا للوصول إليها بسرعة."
                     actionText="تصفح المقالات"
                     actionHref="/"
                 />
@@ -68,9 +118,13 @@ export default function FavoritesView({ extraArticles = [] }: FavoritesViewProps
         );
     }
 
+    if (bookmarkedArticles.length === 0) return <SisterSaves saves={sisterSaves} />;
+
     const sortedTools = [...bookmarkedArticles].sort(comparators[sortBy]);
 
     return (
+        <>
+        <SisterSaves saves={sisterSaves} />
         <section>
             <div className="favorites-header">
                 <div className="favorites-info">
@@ -112,5 +166,6 @@ export default function FavoritesView({ extraArticles = [] }: FavoritesViewProps
                 ))}
             </ul>
         </section>
+        </>
     );
 }

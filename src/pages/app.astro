@@ -9,6 +9,7 @@ const benefits = [
     ["بلمسة واحدة", "يفتح الهلال من شاشتك الرئيسية مباشرة، بلا بحث ولا كتابة عنوان."],
     ["دون إنترنت", "مقالاتك المحفوظة، وأبرز مقالات اليوم، تُقرأ حتى في الطائرة أو المترو."],
     ["إشعار يومي", "أفضل المقالات الجديدة مرة في اليوم أو في الأسبوع، في المواضيع التي تختارها."],
+    ["كل مواقع الهلال", "اقتباس وملخص كتاب وسيرة كاتب وسؤال جديد كل يوم في تبويب «استكشف»، إلى جانب المقالات."],
     ["خفيف وآمن", "لا متجر تطبيقات ولا مساحة تُذكر، ولا يطلب أي صلاحية سوى الإشعارات إن أردتها."],
 ];
 
@@ -107,6 +108,9 @@ const faq = [
         if (location.pathname !== "/app/") return;
         render();
         trackPwaEvent("app-page");
+        // Sister sites link here with ?source=quotes|books|biographies|quiz.
+        const source = new URLSearchParams(location.search).get("source");
+        if (source && ["quotes", "books", "biographies", "quiz"].includes(source)) trackPwaEvent(`app-page-${source}`);
     });
     // Chrome's install prompt arrives after load.
     window.addEventListener("beforeinstallprompt", () => setTimeout(render));

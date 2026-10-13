@@ -12,6 +12,10 @@
  *   cover images          cache first, CORS-fetched so the cache holds real
  *                         (not opaque, quota-padded) responses; an SVG
  *                         placeholder when offline
+ *   sister-site feeds     network first, then the cache: the Explore tab's
+ *                         https://{quotes,books,biographies,quiz}.elhellal.com
+ *                         /app-feed.json, also fetched at install so Explore
+ *                         works offline from the first launch
  *   /api/, ads, the rest  untouched
  *
  * Saved articles (src/utils/bookmarks.ts) are mirrored into their own cache,
@@ -34,12 +38,14 @@ const STATIC = 'static';
 const IMAGES = 'images';
 const SAVED = 'saved';
 const DAILY = 'daily';
+const SISTERS = 'sisters';
 const LIMITS = { [PAGES]: 80, [DATA]: 150, [STATIC]: 200, [IMAGES]: 300 };
 const NETWORK_TIMEOUT_MS = 4000;
 
 const PRECACHE_URLS = [
     '/',
     '/saved/',
+    '/explore/',
     '/offline/',
     '/manifest.json',
     '/xarticles.svg',
@@ -48,6 +54,9 @@ const PRECACHE_URLS = [
     '/fonts/rom-bold-latin.woff2',
     '/fonts/rom-mono-latin.woff2',
 ];
+
+const SISTER_FEEDS = ['quotes', 'books', 'biographies', 'quiz'].map((s) => `https://${s}.elhellal.com/app-feed.json`);
+const SISTER_HOSTS = /^(quotes|books|biographies|quiz)\.elhellal\.com$/;
 
 const IMAGE_HOSTS = /(^|\.)(substackcdn\.com|xarticl\.es|elhellal\.com|unsplash\.com)$/;
 
@@ -66,6 +75,8 @@ self.addEventListener('install', (event) => {
             }
             const statics = await caches.open(STATIC);
             await Promise.all([...assets].map((url) => statics.add(url).catch(() => {})));
+            const sisters = await caches.open(SISTERS);
+            await Promise.all(SISTER_FEEDS.map((url) => sisters.add(new Request(url, { mode: 'cors' })).catch(() => {})));
             await self.skipWaiting();
         })()
     );
@@ -104,6 +115,10 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    if (SISTER_HOSTS.test(url.hostname) && url.pathname === '/app-feed.json') {
+        event.respondWith(networkFirst(event, SISTERS));
+        return;
+    }
     if (req.destination === 'image' && IMAGE_HOSTS.test(url.hostname)) {
         event.respondWith(image(event));
     }

@@ -9,6 +9,8 @@
  *   POST /api/push/event          { name } → daily counter (installs, clicks…)
  *   POST /api/push/ping           { id, platform, push } → the installed app was
  *                                 opened today (once a day per device; `installs`)
+ *   POST /api/push/quiz           { endpoint, day } → this subscriber answered the
+ *                                 Explore tab's question of the day (its streak)
  *
  * The cron trigger (every 5 minutes) sends:
  *   1. digests: each subscription is due at SEND_HOUR_UTC daily, or on
@@ -17,8 +19,13 @@
  *      dist/_data/push-digest.json (src/lib/push-digest.ts). "Appeared" is
  *      when this Worker first saw an article in the digest (articles_seen),
  *      not its created_at: imports trail publication by days, and dating by
- *      created_at would skip whatever arrived late. Nothing new → nothing sent.
- *   2. the outbox: one-off messages the admin panel queues (scripts/admin.ts).
+ *      created_at would skip whatever arrived late. Each digest ends with the
+ *      quote of the day (the one the app's Explore tab shows, from
+ *      quotes.elhellal.com/app-feed.json); with no new articles a daily
+ *      subscriber still gets the quote alone, a weekly one nothing.
+ *   2. streak reminders: at REMIND_HOUR_UTC, subscribers whose quiz streak
+ *      (2+ days) ends yesterday get one nudge to keep it.
+ *   3. the outbox: one-off messages the admin panel queues (scripts/admin.ts).
  * At most PUSH_BATCH messages per run: the free plan allows 50 subrequests and
  * 10 ms of CPU per invocation, so big sends are spread over several runs
  * (40 per 5 minutes ≈ 11k a day).
@@ -38,6 +45,17 @@ interface Env {
     VAPID_SUBJECT: string;
     PUSH_BATCH?: string;
     SEND_HOUR_UTC?: string;
+    REMIND_HOUR_UTC?: string;
+    /** The quotes site's Worker, for the quote of the day. */
+    QUOTES?: Fetcher;
+}
+
+/** One item of a sister site's /app-feed.json (../elhellal-quotes/src/pages/app-feed.json.ts). */
+export interface FeedQuote {
+    text: string;
+    /** the author */
+    title: string;
+    url: string;
 }
 
 type Frequency = 'daily' | 'weekly';
@@ -54,6 +72,8 @@ interface SubscriptionRow {
     next_due_at: number;
     last_test_at: number | null;
     failures: number;
+    quiz_day: number;
+    quiz_streak: number;
 }
 
 interface Job {
@@ -84,6 +104,11 @@ const EVENTS = new Set([
     'card-clicked',
     'app-clicked',
     'app-page',
+    'quiz-answered',
+    'app-page-quotes',
+    'app-page-books',
+    'app-page-biographies',
+    'app-page-quiz',
     'guide-shown',
     'inapp-shown',
     'inapp-opened',
@@ -305,9 +330,18 @@ function signer(env: Env): VapidSigner {
     return cachedSigner.signer;
 }
 
+function hourVar(value: string | undefined, fallback: number): number {
+    const hour = Number(value ?? fallback);
+    return Number.isInteger(hour) && hour >= 0 && hour < 24 ? hour : fallback;
+}
+
 function sendHour(env: Env): number {
-    const hour = Number(env.SEND_HOUR_UTC ?? 17);
-    return Number.isInteger(hour) && hour >= 0 && hour < 24 ? hour : 17;
+    return hourVar(env.SEND_HOUR_UTC, 17);
+}
+
+/** Days since the epoch, UTC: what the Explore tab deals its daily items by. */
+export function dayNumber(now: number): number {
+    return Math.floor(now / DAY_MS);
 }
 
 function today(now: number): string {
@@ -330,18 +364,32 @@ function moreArticles(k: number): string {
     return `و${k} مقالاً آخر`;
 }
 
+function clip(text: string, max: number): string {
+    return text.length > max ? `${text.slice(0, max).replace(/\s+\S*$/, '')}…` : text;
+}
+
 /** The notification for one subscription, or null when nothing is new for it. */
 export function digestMessage(
     digest: PushDigest,
     /** slug → when this Worker first saw it (ms) */
     seen: Map<string, number>,
-    sub: Pick<SubscriptionRow, 'categories' | 'frequency' | 'since'>
+    sub: Pick<SubscriptionRow, 'categories' | 'frequency' | 'since'>,
+    quote: FeedQuote | null = null
 ): Record<string, unknown> | null {
     const wanted = sub.categories === '*' ? null : new Set(sub.categories.split(',').filter(Boolean));
     const fresh: DigestArticle[] = digest.articles.filter(
         (a) => (seen.get(a.s) ?? 0) > sub.since && (!wanted || wanted.has(a.c))
     );
-    if (fresh.length === 0) return null;
+    if (fresh.length === 0) {
+        if (!quote || sub.frequency !== 'daily') return null;
+        return {
+            title: 'الهلال — اقتباس اليوم',
+            body: `❝ ${clip(quote.text, 140)}\n— ${quote.title}`,
+            url: '/explore/?utm_source=push&utm_medium=quote',
+            count: 0,
+            tag: 'digest',
+        };
+    }
 
     const top = fresh[0]!;
     const categories = [...new Set(fresh.map((a) => a.c))];
@@ -354,7 +402,8 @@ export function digestMessage(
     const where = categories.length === 1 && digest.categories[categories[0]!] ? ` في ${digest.categories[categories[0]!]}` : '';
     return {
         title: sub.frequency === 'weekly' ? `الهلال — مختارات الأسبوع${where}` : `الهلال — جديد اليوم${where}`,
-        body: fresh.length === 1 ? top.t : `${top.t}\n${moreArticles(fresh.length - 1)}`,
+        body: (fresh.length === 1 ? top.t : `${top.t}\n${moreArticles(fresh.length - 1)}`) +
+            (quote ? `\n❝ ${clip(quote.text, 80)} — ${quote.title}` : ''),
         url,
         image: top.i,
         count: fresh.length,
@@ -388,6 +437,45 @@ async function fetchDigest(env: Env): Promise<PushDigest | null> {
     }
 }
 
+/** Today's quote, the same one the app's Explore tab shows (src/pages/explore.astro). */
+async function fetchQuote(env: Env, now: number): Promise<FeedQuote | null> {
+    const url = 'https://quotes.elhellal.com/app-feed.json';
+    try {
+        const res = env.QUOTES ? await env.QUOTES.fetch(url) : await fetch(url);
+        if (!res.ok) return null;
+        const items = ((await res.json()) as { items?: FeedQuote[] }).items ?? [];
+        return items.length ? items[dayNumber(now) % items.length]! : null;
+    } catch {
+        return null;
+    }
+}
+
+export function streakReminder(streak: number): Record<string, unknown> {
+    return {
+        title: `🔥 ${streak} أيام متتالية`,
+        body: 'لم تجب عن سؤال اليوم بعد. أجب قبل منتصف الليل لتبقى سلسلتك.',
+        url: '/explore/?utm_source=push&utm_medium=quiz#quiz',
+        tag: 'quiz-streak',
+    };
+}
+
+/** Records an answer to the question of the day; the streak grows on consecutive days. */
+async function handleQuiz(request: Request, env: Env) {
+    const body = await readBody(request);
+    const endpoint = validEndpoint(body.endpoint);
+    const day = body.day;
+    // The reader's local day: within a day of UTC's.
+    if (typeof day !== 'number' || !Number.isInteger(day) || Math.abs(day - dayNumber(Date.now())) > 1) throw new HttpError(400, 'invalid day');
+    const result = await env.DB.prepare(
+        `UPDATE subscriptions SET
+            quiz_streak = CASE WHEN quiz_day = ?1 THEN quiz_streak WHEN quiz_day = ?1 - 1 THEN quiz_streak + 1 ELSE 1 END,
+            quiz_day = ?1
+         WHERE endpoint = ?2 AND quiz_day <= ?1`
+    ).bind(day, endpoint).run();
+    await countEvent(env, 'quiz-answered');
+    return { ok: true, recorded: result.meta.changes > 0 };
+}
+
 async function run(env: Env) {
     const now = Date.now();
     const batch = Math.max(1, Math.min(45, Number(env.PUSH_BATCH) || 40));
@@ -402,13 +490,28 @@ async function run(env: Env) {
         await env.DB.batch(
             due.map((s) => env.DB.prepare('UPDATE subscriptions SET next_due_at = ? WHERE endpoint = ?').bind(nextSlot(now, s.frequency, hour), s.endpoint))
         );
-        const digest = await fetchDigest(env);
+        const [digest, quote] = await Promise.all([fetchDigest(env), fetchQuote(env, now)]);
         if (digest) {
             const seen = await markSeen(env, digest, now);
             for (const sub of due) {
-                const payload = digestMessage(digest, seen, sub);
+                const payload = digestMessage(digest, seen, sub, quote);
                 if (payload) jobs.push({ target: sub, payload, topic: 'digest', digest: true });
             }
+        }
+    }
+
+    const day = dayNumber(now);
+    if (new Date(now).getUTCHours() === hourVar(env.REMIND_HOUR_UTC, 19) && jobs.length < batch) {
+        const lapsing = (
+            await env.DB.prepare(
+                `SELECT endpoint, p256dh, auth, quiz_streak FROM subscriptions
+                 WHERE quiz_day = ?1 - 1 AND quiz_streak >= 2 AND quiz_reminded < ?1 LIMIT ?2`
+            ).bind(day, batch - jobs.length).all<PushTarget & { quiz_streak: number }>()
+        ).results;
+        if (lapsing.length) {
+            // Claimed first, like the digests: one reminder a day at most.
+            await env.DB.batch(lapsing.map((s) => env.DB.prepare('UPDATE subscriptions SET quiz_reminded = ? WHERE endpoint = ?').bind(day, s.endpoint)));
+            for (const s of lapsing) jobs.push({ target: s, payload: streakReminder(s.quiz_streak), topic: 'quiz' });
         }
     }
 
@@ -459,11 +562,11 @@ async function run(env: Env) {
         }
     });
     updates.push(env.DB.prepare('DELETE FROM subscriptions WHERE failures >= ?').bind(MAX_FAILURES));
-    const day = today(now);
+    const date = today(now);
     for (const [name, n] of [['sent', sent], ['gone', gone], ['failed', failed]] as const) {
         if (n) {
             updates.push(
-                env.DB.prepare('INSERT INTO events (day, name, n) VALUES (?, ?, ?) ON CONFLICT (day, name) DO UPDATE SET n = n + excluded.n').bind(day, name, n)
+                env.DB.prepare('INSERT INTO events (day, name, n) VALUES (?, ?, ?) ON CONFLICT (day, name) DO UPDATE SET n = n + excluded.n').bind(date, name, n)
             );
         }
     }
@@ -492,6 +595,8 @@ export default {
                     return json(await handleEvent(request, env), 200, origin);
                 case 'POST /api/push/ping':
                     return json(await handlePing(request, env), 200, origin);
+                case 'POST /api/push/quiz':
+                    return json(await handleQuiz(request, env), 200, origin);
                 default:
                     return json({ error: 'not found' }, 404, origin);
             }

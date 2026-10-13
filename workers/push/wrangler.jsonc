@@ -22,7 +22,11 @@
 		}
 	],
 	// The site Worker, to read dist/_data/push-digest.json.
-	"services": [{ "binding": "SITE", "service": "elhellal" }],
+	// …and the quotes site's, for the quote of the day closing each digest.
+	"services": [
+		{ "binding": "SITE", "service": "elhellal" },
+		{ "binding": "QUOTES", "service": "elhellal-quotes" }
+	],
 	"triggers": { "crons": ["*/5 * * * *"] },
 	"vars": {
 		"SITE_URL": "https://elhellal.com",
@@ -31,7 +35,9 @@
 		// Messages per cron run (free plan: 50 subrequests per invocation).
 		"PUSH_BATCH": "40",
 		// Digests go out at 17:00 UTC (18:00 Algeria, 20:00 Riyadh).
-		"SEND_HOUR_UTC": "17"
+		"SEND_HOUR_UTC": "17",
+		// Quiz streak reminders at 19:00 UTC (20:00 Algeria, 22:00 Riyadh).
+		"REMIND_HOUR_UTC": "19"
 	},
 	"observability": {
 		"enabled": true

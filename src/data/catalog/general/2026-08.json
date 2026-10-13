@@ -65,7 +65,8 @@
     "screen_name": "saleemii",
     "created_at": "2026-08-02",
     "url": "https://saleemii.substack.com/p/41",
-    "original_img_url": "https://substack-post-media.s3.amazonaws.com/public/images/17b6135d-9e27-4de9-83b3-0b6f940207ef_1280x720.png"
+    "original_img_url": "https://substack-post-media.s3.amazonaws.com/public/images/17b6135d-9e27-4de9-83b3-0b6f940207ef_1280x720.png",
+    "slug": "41-الكاتب-السمين-والكاتب-النحيل"
   },
   {
     "id_str": "1501783941915914570",
@@ -74,7 +75,8 @@
     "screen_name": "saleemii",
     "created_at": "2026-08-16",
     "url": "https://saleemii.substack.com/p/42",
-    "original_img_url": "https://substack-post-media.s3.amazonaws.com/public/images/cabd311c-41a2-4b7e-bd37-e3220279c6f2_1280x720.png"
+    "original_img_url": "https://substack-post-media.s3.amazonaws.com/public/images/cabd311c-41a2-4b7e-bd37-e3220279c6f2_1280x720.png",
+    "slug": "42-هز-الورد"
   },
   {
     "id_str": "5906194562020319191",
@@ -169,6 +171,16 @@
       "تنسيق الديكور"
     ],
     "slug": "اختيار-الخامة-المثالية-للوحة-الجدارية-المنزلية"
+  },
+  {
+    "id_str": "9088640780338905224",
+    "title": "الأمر اض المزمنة، لماذا لا يفحصون مبكرا",
+    "preview_text": "لطالما اعتبرنا الكشف المبكر والفحوصات الدورية صمام الأمان وخط الدفاع الأول في مكافحة الأمراض المزمنة. وبإعادة النظر إليه في ظل النموذج الطبي السائد والمبني على قناعة طبية ترى أن الأمراض المزمنة “قدر مستدام يرافق الإنسان مدى الحياة” وهو منظور ينبغي إعادة النظر فيه. فهذا المنظور قد يشكل عائقاً نفسياً واجتماعياً، ويُخشى أن يحول هذا المنظور الكشف المبكر من بوابة للأمل والوقاية إلى منطلق لدوامة طبية لا",
+    "screen_name": "salih123",
+    "created_at": "2026-08-04",
+    "url": "https://salih123.substack.com/p/78c",
+    "original_img_url": "https://substackcdn.com/image/fetch/$s_!wDWF!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F4cd22ad4-ccbd-44bc-bc34-631486caed8a_600x397.jpeg",
+    "slug": "الأمر-اض-المزمنة-لماذا-لا-يفحصون-مبكرا"
   },
   {
     "id_str": "6569446827089708570",
@@ -1383,6 +1395,26 @@
     "url": "https://athar525.substack.com/p/6f7",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!Vnwx!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F961c755e-6038-471f-a33b-5e286409274e_736x818.jpeg",
     "slug": "وحدي-وسط-الزحام"
+  },
+  {
+    "id_str": "8813340762008737391",
+    "title": "وهم \"الوحش الأليف\": لماذا ننجذب للغموض ونحاول إصلاح العلاقات السامة؟",
+    "preview_text": "هناك ظاهرة نراها تتكرر في علم النفس التحليلي وفي أروقة العلاقات البشرية: الانجذاب غير المشروط لمن يؤذينا، والتغاضي عن النوايا غير الصريحة . تتساءل دائمًا: لماذا يتجاهل العقل الإشارات الحمراء (Red Flags) البارزة ويركض نحو الشخص الغامض أو المتقلب؟ الجواب لا يكمن في الحظ، بل في الآليات العصبية والنفسية التي تُدار بها عقولنا دون أن نشعر. 1. تأثير الراديو الخربان (Variable Rewards) في أربعينيات القرن ا",
+    "screen_name": "ivplg",
+    "created_at": "2026-08-22",
+    "url": "https://ivplg.substack.com/p/fd4",
+    "original_img_url": "https://substackcdn.com/image/fetch/$s_!JQz7!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fe71f4c96-8069-4e8d-9e5d-5b898ee7a086_1024x1024.jpeg",
+    "slug": "وهم-الوحش-الأليف-لماذا-ننجذب-للغموض-ونحاول-إصلاح-العلاقات-السامة"
+  },
+  {
+    "id_str": "4728299453470014422",
+    "title": "وهم الاغتراب الذاتي: بحثٌ مبسط تحليلي في سيكولوجية الشعور بالاختلاف",
+    "preview_text": "المقدمة: مُعضلتنا اليوم، \"هل أنا غريب؟\" تبدأ إحدى أعمق أزمات الوعي الذاتي الإنساني بسؤال يبدو بسيطًا في ظاهره، ولكنه يحمل ثقلًا نفسيًا هائلًا \"هل أنا غريب؟\". ينبثق هذا التساؤل من منظور الشخص لنفسه، ومن شعوره المستمر بعدم التوافق مع بيئته، وكأنه يُغرد خارج السرب بصورة تسبب له الانزعاج وعدم الانتماء. يميل الإنسان بطبيعته إلى التقليل من قيمة ذاته ومقارنة باطنهِ المعقد بظاهر الآخرين المرتب، مما يولد إ",
+    "screen_name": "rudyru",
+    "created_at": "2026-08-09",
+    "url": "https://rudyru.substack.com/p/bb2",
+    "original_img_url": "https://substackcdn.com/image/fetch/$s_!dEPs!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F9ea60e56-4d4d-4506-b28c-040ecc0f3700_667x599.jpeg",
+    "slug": "وهم-الاغتراب-الذاتي-بحث-مبسط-تحليلي-في-سيكولوجية-الشعور-بالاختلاف"
   },
   {
     "id_str": "2355263096323482650",

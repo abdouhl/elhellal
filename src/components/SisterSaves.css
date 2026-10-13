@@ -1,0 +1,74 @@
+.sister-saves {
+    margin-bottom: var(--spacing-08, 32px);
+    color: var(--content-primary);
+}
+.sister-saves-title {
+    margin: 0 0 12px;
+    color: var(--content-secondary);
+    font-size: 15px;
+    font-weight: normal;
+}
+.sister-saves ul {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.sister-save {
+    position: relative;
+    border: 0.5px solid var(--border-muted);
+    border-radius: 14px;
+}
+.sister-save a {
+    display: flex;
+    gap: 12px;
+    height: 100%;
+    padding: 14px 16px;
+    padding-inline-end: 44px;
+    color: inherit;
+    text-decoration: none;
+}
+.sister-save img {
+    flex: none;
+    border-radius: 6px;
+    object-fit: cover;
+}
+.sister-save--biographies img {
+    border-radius: 50%;
+}
+.sister-save span {
+    display: grid;
+    align-content: start;
+    gap: 4px;
+    line-height: 1.7;
+}
+.sister-save small,
+.sister-save em {
+    color: var(--content-secondary);
+    font-size: 13px;
+    font-style: normal;
+}
+.sister-save q {
+    font-size: 16px;
+    line-height: 1.9;
+}
+.sister-save--quotes strong {
+    font-size: 14px;
+    font-weight: normal;
+    color: var(--content-secondary);
+}
+.sister-save button {
+    position: absolute;
+    top: 6px;
+    inset-inline-end: 6px;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--content-secondary);
+    font-size: 1.3rem;
+    cursor: pointer;
+}

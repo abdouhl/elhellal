@@ -191,7 +191,7 @@ export default function NotificationSettings({ categories }: NotificationSetting
                         checked={prefs.frequency === 'daily'}
                         onChange={() => setFrequency('daily')}
                     />
-                    يومياً، مساءً
+                    يومياً، مساءً: الجديد واقتباس اليوم
                 </label>
                 <label className="notif-option">
                     <input
@@ -203,6 +203,10 @@ export default function NotificationSettings({ categories }: NotificationSetting
                     أسبوعياً، كل جمعة
                 </label>
             </fieldset>
+
+            <p className="notif-message">
+                وإن كانت لك سلسلة في «سؤال اليوم» (تبويب استكشف) ولم تجب بعد، نذكّرك بها مرة واحدة ليلاً.
+            </p>
 
             <fieldset className="notif-group">
                 <legend>أي المواضيع؟</legend>

@@ -1,0 +1,471 @@
+---
+// /explore/ — the app's window onto the sister sites: today's quote, quiz
+// question, book summary and writer, dealt from each site's /app-feed.json
+// (src/pages/app-feed.json.ts in ../elhellal-{quotes,books,biographies,quiz}).
+// public/sw.js caches the feeds, so this page works offline in the app.
+import Layout from "../layouts/Layout.astro";
+
+const sites = [
+    ["https://quotes.elhellal.com/", "الاقتباسات", "أجمل ما قاله الكتّاب، مرتّباً بالكاتب والكتاب والموضوع."],
+    ["https://books.elhellal.com/", "ملخصات الكتب", "الأفكار الرئيسية في أشهر الكتب العربية، في دقائق."],
+    ["https://biographies.elhellal.com/", "السير الذاتية", "حياة الكتّاب العرب وأعمالهم في صفحة واحدة."],
+    ["https://quiz.elhellal.com/", "اختبر معلوماتك", "أسئلة لا تنتهي في الجغرافيا والعلوم والتاريخ والأدب."],
+];
+---
+
+<Layout
+    site="الهلال"
+    title="استكشف"
+    tagline="الاقتباسات والملخصات والسير والاختبار في مكان واحد"
+    pageTitle="استكشف عالم الهلال — اقتباس وكتاب وسؤال كل يوم"
+    pageDescription="كل يوم من مواقع الهلال: اقتباس مختار، ملخص كتاب، سيرة كاتب، وسؤال لتختبر معلوماتك."
+    canonicalUrl="https://elhellal.com/explore/"
+    ogUrl="https://elhellal.com/explore/"
+>
+    <main id="main-content" class="explore">
+        <h1 class="explore-title">استكشف</h1>
+
+        <section class="ex-quote" data-feed="quotes" hidden>
+            <div class="ex-row-head">
+                <h2 class="ex-label">اقتباس اليوم</h2>
+                <button type="button" class="ex-save" data-save aria-pressed="false" aria-label="احفظ"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z" /></svg></button>
+            </div>
+            <a class="ex-quote-card" data-link>
+                <blockquote data-text></blockquote>
+                <span class="ex-quote-by"><img data-image alt="" width="36" height="36" loading="lazy" /><span data-title></span><small data-meta></small></span>
+            </a>
+        </section>
+
+        <section class="ex-quiz" id="quiz" data-feed="quiz" hidden>
+            <div class="ex-row-head">
+                <h2 class="ex-label">سؤال اليوم</h2>
+                <span class="ex-streak" data-streak hidden></span>
+            </div>
+            <p class="ex-quiz-q" data-title></p>
+            <div class="ex-quiz-options" data-options></div>
+            <a class="ex-more" data-link data-after hidden>أكمل الاختبار ←</a>
+        </section>
+
+        <section class="ex-row" data-feed="books" hidden>
+            <div class="ex-row-head">
+                <h2 class="ex-label">كتاب اليوم</h2>
+                <button type="button" class="ex-save" data-save aria-pressed="false" aria-label="احفظ"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z" /></svg></button>
+                <a class="ex-more" data-site>كل الملخصات ←</a>
+            </div>
+            <a class="ex-feature" data-link>
+                <img data-image alt="" width="96" height="144" loading="lazy" />
+                <span><strong data-title></strong><small data-meta></small><span data-text></span></span>
+            </a>
+            <ul class="ex-strip" role="list" data-strip></ul>
+        </section>
+
+        <section class="ex-row" data-feed="biographies" hidden>
+            <div class="ex-row-head">
+                <h2 class="ex-label">كاتب اليوم</h2>
+                <button type="button" class="ex-save" data-save aria-pressed="false" aria-label="احفظ"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z" /></svg></button>
+                <a class="ex-more" data-site>كل السير ←</a>
+            </div>
+            <a class="ex-feature ex-feature-round" data-link>
+                <img data-image alt="" width="96" height="96" loading="lazy" />
+                <span><strong data-title></strong><small data-meta></small></span>
+            </a>
+            <ul class="ex-strip ex-strip-round" role="list" data-strip></ul>
+        </section>
+
+        <section class="ex-sites">
+            <h2 class="ex-label">مواقع الهلال</h2>
+            <ul role="list">
+                {sites.map(([href, name, text]) => (
+                    <li><a href={href}><strong>{name}</strong><span>{text}</span></a></li>
+                ))}
+                <li><a href="/tags/"><strong>الوسوم</strong><span>كل مواضيع المقالات.</span></a></li>
+                <li><a href="/authors/"><strong>الكتّاب</strong><span>كتّاب المقالات في الهلال.</span></a></li>
+            </ul>
+        </section>
+    </main>
+</Layout>
+
+<script>
+    import { isSisterSaved, toggleSisterSave, type SisterKind } from "../utils/sisterSaves";
+
+    type Item = { title: string; text?: string; meta?: string; image?: string; url: string; options?: string[]; answer?: number };
+    type Feed = { site: string; title: string; url: string; items: Item[] };
+
+    const STRIP = 8;
+    const QUIZ_KEY = "explore-quiz";
+
+    /** The quiz card's memory: the last day answered, what was picked, and the run of days in a row. */
+    type QuizState = { day?: number; picked?: number; streak?: number };
+
+    /** Today's position in a feed: the same for everyone on a given local day. */
+    function today(): number {
+        const d = new Date();
+        return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86_400_000);
+    }
+
+    function fill(root: Element, item: Item) {
+        for (const el of root.querySelectorAll<HTMLElement>("[data-title]")) el.textContent = item.title;
+        for (const el of root.querySelectorAll<HTMLElement>("[data-text]")) el.textContent = item.text ?? "";
+        for (const el of root.querySelectorAll<HTMLElement>("[data-meta]")) el.textContent = item.meta ?? "";
+        for (const el of root.querySelectorAll<HTMLAnchorElement>("[data-link]")) el.href = item.url;
+        for (const img of root.querySelectorAll<HTMLImageElement>("[data-image]")) {
+            img.hidden = !item.image;
+            if (item.image) {
+                img.onerror = () => (img.hidden = true);
+                img.src = item.image;
+            }
+        }
+    }
+
+    function strip(section: Element, items: Item[], start: number) {
+        const list = section.querySelector("[data-strip]");
+        if (!list) return;
+        const picks = Array.from({ length: Math.min(STRIP, items.length - 1) }, (_, i) => items[(start + 1 + i) % items.length]);
+        list.replaceChildren(
+            ...picks.map((item) => {
+                const li = document.createElement("li");
+                li.innerHTML = `<a><img alt="" loading="lazy" width="96" height="144" /><span></span></a>`;
+                li.querySelector("a")!.href = item.url;
+                li.querySelector("span")!.textContent = item.title;
+                const img = li.querySelector("img")!;
+                if (item.image) {
+                    img.onerror = () => (img.hidden = true);
+                    img.src = item.image;
+                } else img.hidden = true;
+                return li;
+            })
+        );
+    }
+
+    function quiz(section: Element, item: Item) {
+        const box = section.querySelector("[data-options]")!;
+        const after = section.querySelector<HTMLElement>("[data-after]")!;
+        const streakEl = section.querySelector<HTMLElement>("[data-streak]")!;
+        let saved: QuizState = {};
+        try {
+            saved = JSON.parse(localStorage.getItem(QUIZ_KEY) || "{}");
+        } catch {}
+        const showStreak = () => {
+            const alive = saved.day === today() || saved.day === today() - 1;
+            const streak = alive ? saved.streak ?? 1 : 0;
+            streakEl.hidden = streak < 2;
+            streakEl.textContent = saved.day === today() ? `🔥 ${streak} أيام متتالية` : `🔥 أجب لتبقى سلسلتك (${streak} أيام)`;
+        };
+        const reveal = (picked: number) => {
+            for (const [i, btn] of [...box.children].entries()) {
+                const b = btn as HTMLButtonElement;
+                b.disabled = true;
+                if (i === item.answer) b.dataset.state = "right";
+                else if (i === picked) b.dataset.state = "wrong";
+            }
+            after.hidden = false;
+        };
+        box.replaceChildren(
+            ...(item.options ?? []).map((option, i) => {
+                const b = document.createElement("button");
+                b.type = "button";
+                b.textContent = option;
+                b.addEventListener("click", () => {
+                    const streak = saved.day === today() - 1 ? (saved.streak ?? 1) + 1 : 1;
+                    saved = { day: today(), picked: i, streak };
+                    try {
+                        localStorage.setItem(QUIZ_KEY, JSON.stringify(saved));
+                    } catch {}
+                    reveal(i);
+                    showStreak();
+                    reportAnswer();
+                });
+                return b;
+            })
+        );
+        after.hidden = true;
+        if (saved.day === today() && typeof saved.picked === "number") reveal(saved.picked);
+        showStreak();
+    }
+
+    /** With notifications on, the push Worker keeps the streak too, to remind before it breaks. */
+    async function reportAnswer() {
+        try {
+            const reg = await navigator.serviceWorker?.getRegistration();
+            const sub = await reg?.pushManager?.getSubscription();
+            if (!sub) return;
+            await fetch("/api/push/quiz", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ endpoint: sub.endpoint, day: today() }),
+                keepalive: true,
+            });
+        } catch {}
+    }
+
+    function saveButton(section: Element, kind: SisterKind, item: Item) {
+        const btn = section.querySelector<HTMLButtonElement>("[data-save]");
+        if (!btn) return;
+        const sync = () => {
+            const on = isSisterSaved(item.url);
+            btn.setAttribute("aria-pressed", String(on));
+            btn.setAttribute("aria-label", on ? "إزالة من المحفوظة" : "احفظ");
+        };
+        btn.onclick = () => {
+            toggleSisterSave({ kind, url: item.url, title: item.title, text: item.text, meta: item.meta, image: item.image });
+            sync();
+        };
+        sync();
+    }
+
+    async function load(section: HTMLElement) {
+        const site = section.dataset.feed!;
+        try {
+            const res = await fetch(`https://${site}.elhellal.com/app-feed.json`, { mode: "cors" });
+            const feed: Feed = await res.json();
+            if (!feed.items?.length) return;
+            const i = today() % feed.items.length;
+            fill(section, feed.items[i]);
+            for (const a of section.querySelectorAll<HTMLAnchorElement>("[data-site]")) a.href = feed.url;
+            if (site === "quiz") quiz(section, feed.items[i]);
+            else saveButton(section, site as SisterKind, feed.items[i]);
+            strip(section, feed.items, i);
+            section.hidden = false;
+        } catch {
+            // Offline with nothing cached: the section stays hidden; the site links below remain.
+        }
+    }
+
+    document.addEventListener("astro:page-load", () => {
+        if (location.pathname !== "/explore/") return;
+        for (const section of document.querySelectorAll<HTMLElement>("[data-feed]")) load(section);
+    });
+</script>
+
+<style>
+    .explore {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: var(--spacing-06, 24px) 16px var(--spacing-10, 48px);
+        color: var(--content-primary);
+    }
+    .explore-title {
+        margin: 0 0 20px;
+        font-size: clamp(26px, 6vw, 34px);
+    }
+    .explore section {
+        margin-bottom: 28px;
+    }
+    .explore section[hidden] {
+        display: none;
+    }
+    .ex-label {
+        margin: 0 0 10px;
+        color: var(--content-secondary);
+        font-size: 14px;
+        font-weight: normal;
+    }
+    .ex-more {
+        color: var(--content-secondary);
+        font-size: 14px;
+        text-decoration: none;
+    }
+    .ex-more[hidden] {
+        display: none;
+    }
+    .ex-row-head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 10px;
+    }
+    .ex-row-head .ex-label {
+        margin: 0;
+        margin-inline-end: auto;
+    }
+    .ex-save {
+        display: grid;
+        place-items: center;
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        border: 0;
+        border-radius: 50%;
+        background: transparent;
+        color: var(--content-secondary);
+        cursor: pointer;
+    }
+    .ex-save[aria-pressed="true"] {
+        color: var(--content-primary);
+    }
+    .ex-save[aria-pressed="true"] path {
+        fill: currentColor;
+    }
+    .ex-streak {
+        font-size: 14px;
+    }
+    .ex-streak[hidden] {
+        display: none;
+    }
+
+    .ex-quote-card {
+        display: grid;
+        gap: 14px;
+        padding: 22px 20px;
+        border-radius: 18px;
+        background: #18123a;
+        color: #fff;
+        text-decoration: none;
+    }
+    .ex-quote-card blockquote {
+        margin: 0;
+        font-size: 20px;
+        line-height: 1.9;
+    }
+    .ex-quote-card blockquote::before {
+        content: "❝ ";
+        opacity: 0.6;
+    }
+    .ex-quote-by {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px 10px;
+        font-size: 15px;
+    }
+    .ex-quote-by img {
+        border-radius: 50%;
+        object-fit: cover;
+    }
+    .ex-quote-by small {
+        opacity: 0.7;
+    }
+
+    .ex-quiz {
+        padding: 18px;
+        border: 0.5px solid var(--border-muted);
+        border-radius: 18px;
+    }
+    .ex-quiz-q {
+        margin: 0 0 14px;
+        font-size: 19px;
+        line-height: 1.7;
+    }
+    .ex-quiz-options {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+    .ex-quiz-options :global(button) {
+        min-height: 48px;
+        padding: 10px;
+        border: 0.5px solid var(--border-muted);
+        border-radius: 12px;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+        touch-action: manipulation;
+    }
+    .ex-quiz-options :global(button[data-state="right"]) {
+        border-color: #1f9d55;
+        background: color-mix(in srgb, #1f9d55 22%, transparent);
+    }
+    .ex-quiz-options :global(button[data-state="wrong"]) {
+        border-color: #d64545;
+        background: color-mix(in srgb, #d64545 22%, transparent);
+    }
+    .ex-quiz-options :global(button:disabled) {
+        cursor: default;
+    }
+
+    .ex-feature {
+        display: flex;
+        gap: 14px;
+        margin-bottom: 12px;
+        color: inherit;
+        text-decoration: none;
+    }
+    .ex-feature img {
+        flex: none;
+        width: 96px;
+        height: 144px;
+        border-radius: 8px;
+        object-fit: cover;
+    }
+    .ex-feature-round img {
+        height: 96px;
+        border-radius: 50%;
+    }
+    .ex-feature > span {
+        display: grid;
+        align-content: start;
+        gap: 4px;
+        line-height: 1.7;
+    }
+    .ex-feature strong {
+        font-size: 18px;
+    }
+    .ex-feature small {
+        color: var(--content-secondary);
+    }
+    .ex-feature [data-text] {
+        color: var(--content-secondary);
+        font-size: 14px;
+    }
+
+    .ex-strip {
+        display: flex;
+        gap: 12px;
+        margin: 0 -16px;
+        padding: 0 16px 4px;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        scrollbar-width: none;
+        list-style: none;
+    }
+    .ex-strip :global(li) {
+        flex: none;
+        width: 96px;
+        scroll-snap-align: start;
+    }
+    .ex-strip :global(a) {
+        display: grid;
+        gap: 6px;
+        color: inherit;
+        font-size: 13px;
+        line-height: 1.5;
+        text-decoration: none;
+    }
+    .ex-strip :global(img) {
+        width: 96px;
+        height: 144px;
+        border-radius: 8px;
+        object-fit: cover;
+        background: var(--border-muted);
+    }
+    .ex-strip-round :global(img) {
+        height: 96px;
+        border-radius: 50%;
+    }
+
+    .ex-sites ul {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 10px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+    .ex-sites a {
+        display: grid;
+        gap: 4px;
+        height: 100%;
+        padding: 14px 16px;
+        border: 0.5px solid var(--border-muted);
+        border-radius: 14px;
+        color: inherit;
+        text-decoration: none;
+    }
+    .ex-sites span {
+        color: var(--content-secondary);
+        font-size: 14px;
+        line-height: 1.6;
+    }
+</style>

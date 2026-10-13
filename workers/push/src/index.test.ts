@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { digestMessage, nextSlot } from './index';
+import { dayNumber, digestMessage, nextSlot, streakReminder } from './index';
 import type { PushDigest } from '../../../src/lib/push-digest';
 
 const at = (iso: string) => Date.parse(iso);
@@ -56,5 +56,31 @@ describe('digestMessage', () => {
     it('sends nothing when nothing is new, or for articles never seen', () => {
         expect(digestMessage(digest, seen, { categories: ',history,', frequency: 'daily', since: 250 })).toBeNull();
         expect(digestMessage(digest, new Map(), { categories: '*', frequency: 'daily', since: 0 })).toBeNull();
+    });
+
+    const quote = { text: 'نص الاقتباس', title: 'كاتب', url: 'https://quotes.elhellal.com/x/1/' };
+
+    it('ends the digest with the quote of the day', () => {
+        const m = digestMessage(digest, seen, { categories: '*', frequency: 'daily', since: 250 }, quote)!;
+        expect(m.body).toBe('ثالث\n❝ نص الاقتباس — كاتب');
+    });
+
+    it('sends a daily subscriber the quote alone when nothing is new, a weekly one nothing', () => {
+        const m = digestMessage(digest, seen, { categories: ',history,', frequency: 'daily', since: 250 }, quote)!;
+        expect(m.title).toBe('الهلال — اقتباس اليوم');
+        expect(m.body).toBe('❝ نص الاقتباس\n— كاتب');
+        expect(m.url).toBe('/explore/?utm_source=push&utm_medium=quote');
+        expect(digestMessage(digest, seen, { categories: ',history,', frequency: 'weekly', since: 250 }, quote)).toBeNull();
+    });
+});
+
+describe('quiz streaks', () => {
+    it('counts days the way the Explore tab does', () => {
+        expect(dayNumber(at('2026-10-13T00:00:00Z'))).toBe(Date.UTC(2026, 9, 13) / 86_400_000);
+        expect(dayNumber(at('2026-10-13T23:59:59Z'))).toBe(dayNumber(at('2026-10-13T00:00:00Z')));
+    });
+    it('names the streak in the reminder', () => {
+        expect(streakReminder(5).title).toBe('🔥 5 أيام متتالية');
+        expect(streakReminder(5).url).toBe('/explore/?utm_source=push&utm_medium=quiz#quiz');
     });
 });

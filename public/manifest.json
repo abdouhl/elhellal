@@ -2,7 +2,7 @@
     "id": "/",
     "name": "الهلال — دليل منتقى لأفضل المقالات العربية",
     "short_name": "الهلال",
-    "description": "أفضل المقالات العربية على شاشتك الرئيسية: يفتح بلمسة، يعمل دون إنترنت، ويرسل لك أفضل الجديد بإشعار يومي.",
+    "description": "أفضل المقالات العربية، ومعها الاقتباسات وملخصات الكتب وسير الكتّاب والاختبار، على شاشتك الرئيسية: يفتح بلمسة ويعمل دون إنترنت.",
     "start_url": "/?source=pwa",
     "scope": "/",
     "display": "standalone",
@@ -116,9 +116,9 @@
             ]
         },
         {
-            "name": "السياسة والشأن العام",
-            "short_name": "السياسة",
-            "url": "/politics/?source=shortcut",
+            "name": "استكشف: اقتباس وكتاب وسؤال اليوم",
+            "short_name": "استكشف",
+            "url": "/explore/?source=shortcut",
             "icons": [
                 {
                     "src": "/icon-192.png",
@@ -144,5 +144,23 @@
             "navigate-existing",
             "auto"
         ]
-    }
+    },
+    "scope_extensions": [
+        {
+            "type": "origin",
+            "origin": "https://quotes.elhellal.com"
+        },
+        {
+            "type": "origin",
+            "origin": "https://books.elhellal.com"
+        },
+        {
+            "type": "origin",
+            "origin": "https://biographies.elhellal.com"
+        },
+        {
+            "type": "origin",
+            "origin": "https://quiz.elhellal.com"
+        }
+    ]
 }
