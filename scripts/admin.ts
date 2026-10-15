@@ -10,7 +10,9 @@
  * build and wrangler deploy and commits the data changes; Social runs the X /
  * LinkedIn schedulers and TikTok generators and deletes the media they wrote; Stats charts the catalog.
  * Sites does the same for the sibling repos (../elhellal-quotes, -books,
- * -biographies, -quiz): edit their data, run their scripts, build, deploy, commit;
+ * -biographies, -quiz): edit their data, run their scripts, build, deploy, commit,
+ * and run their Claude Code skills (book summaries, biographies, quiz questions,
+ * translations, new quiz languages) headless with a live log or in Terminal;
  * and for ../abderahmane, whose deploy is a push to main (Cloudflare builds from GitHub).
  * Leads manages the abderahmane blog's /functional-food-leads queue: pick leads to
  * write (opens an interactive Claude Code session), edit / remove / deploy the
@@ -1441,7 +1443,7 @@ function site(name: unknown): Site & { name: string } {
 function siteWritable(name: string) {
     const mode = sitesSlot.proc ? sitesSlot.job?.mode ?? '' : '';
     const [busy, step] = mode.split(':');
-    if (busy === name && (SITES[name]!.steps[step!]?.writes || step === 'build' || step === 'build+deploy')) {
+    if (busy === name && (SITES[name]!.steps[step!]?.writes || step === 'build' || step === 'build+deploy' || step!.startsWith('ai-'))) {
         throw new HttpError(409, `${SITES[name]!.title}: ${step} is running — edit when it has finished`);
     }
 }
@@ -1952,6 +1954,94 @@ async function quizReports(params: URLSearchParams) {
     return value;
 }
 
+// AI: each sibling repo has Claude Code skills that write its content (../<repo>/.claude/skills/).
+// A task runs one headlessly as a site job (scripts/lib/claude-run.ts: file edits accepted, no
+// commit/push/deploy, live log in the page), or opens it interactively in Terminal.
+
+interface AiInput { count: number; target: string; cat: string; topic: string; lang: string; name: string }
+interface AiTask { label: string; prompt: (x: AiInput) => string }
+
+/** Quotes authors with no biography yet, most quoted first. */
+function bioCandidates() {
+    const have = new Set(readJson<{ slug: string }[]>(BIOS_JSON).map((a) => a.slug));
+    return quoteAuthors().filter((a) => !have.has(a.slug)).map((a) => ({ slug: a.slug, name: a.name, quotes: quoteCount(a) })).sort((x, y) => y.quotes - x.quotes);
+}
+
+const AI_TASKS: Record<string, Record<string, AiTask>> = {
+    books: {
+        summaries: { label: 'Write book summaries', prompt: (x) => `/long-form-summary ${x.target || x.count}` },
+    },
+    biographies: {
+        biography: {
+            label: 'Write biographies',
+            prompt: (x) => {
+                const names = x.target ? [x.target] : bioCandidates().slice(0, x.count).map((a) => a.slug);
+                if (!names.length) throw new HttpError(400, 'Every quotes author already has a biography');
+                const [first, ...rest] = names;
+                return rest.length ? `/write-biography ${first} — then do the same, one author at a time, for each of: ${rest.join(', ')}` : `/write-biography ${first}`;
+            },
+        },
+    },
+    quiz: {
+        questions: { label: 'Generate questions', prompt: (x) => `/add-questions ${x.count} ${x.cat || 'any'}${x.topic ? ` ${x.topic}` : ''}` },
+        translate: {
+            label: 'Translate questions',
+            prompt: (x) => {
+                if (!QUIZ_LANG_FILES.includes(x.lang)) throw new HttpError(400, `Pick one of ${QUIZ_LANG_FILES.join(', ')}`);
+                return `/translate-quiz ${x.lang} ${x.count}`;
+            },
+        },
+        language: {
+            label: 'Add a language',
+            prompt: (x) => {
+                if (!/^[a-z]{2}$/.test(x.lang)) throw new HttpError(400, 'Language code must be 2 lowercase letters (ISO 639-1), e.g. fr');
+                if (QUIZ_LANGS.includes(x.lang)) throw new HttpError(409, `${x.lang} is already a quiz language`);
+                return `/add-language ${x.lang}${x.name ? ` ${x.name}` : ''}`;
+            },
+        },
+    },
+};
+const AI_MODELS = ['', 'opus', 'sonnet', 'haiku'];
+
+function aiInfo() {
+    let bios: ReturnType<typeof bioCandidates> = [];
+    try { bios = bioCandidates(); } catch {}
+    return {
+        tasks: Object.fromEntries(Object.entries(AI_TASKS).map(([site, tasks]) => [site, Object.entries(tasks).map(([key, t]) => ({ key, label: t.label }))])),
+        models: AI_MODELS,
+        bioCandidates: bios.slice(0, 60),
+        bioMissing: bios.length,
+        quiz: { langs: QUIZ_LANG_FILES, allLangs: QUIZ_LANGS, cats: QUIZ_CATS },
+    };
+}
+
+function runAi(body: Body) {
+    const s = site(body.site);
+    const taskName = str(body.task);
+    const task = AI_TASKS[s.name]?.[taskName];
+    if (!task) throw new HttpError(400, `Unknown AI task ${taskName}`);
+    const i = (body.input ?? {}) as Body;
+    // Free text ends up in a prompt (and, for Terminal, a shell line): one line, bounded.
+    const text = (v: unknown, max = 200) => str(v).replace(/[\r\n\t]+/g, ' ').trim().slice(0, max);
+    const count = Number(i.count) || 0;
+    const input: AiInput = {
+        count: Math.min(200, Math.max(1, Math.round(count || 5))),
+        target: text(i.target),
+        cat: QUIZ_CATS.includes(str(i.cat)) ? str(i.cat) : '',
+        topic: text(i.topic),
+        lang: text(i.lang, 2).toLowerCase(),
+        name: text(i.name, 40),
+    };
+    const prompt = task.prompt(input);
+    const model = str(body.model);
+    if (!AI_MODELS.includes(model)) throw new HttpError(400, `model must be one of ${AI_MODELS.filter(Boolean).join(', ')}`);
+    if (str(body.where) === 'terminal') return openClaude(prompt, model ? ['--model', model] : [], s.dir);
+    if (sitesSlot.proc) throw new HttpError(409, `${sitesSlot.job?.mode} is already running`);
+    const addDirs = [SITES.quotes!.dir, SITES.books!.dir].filter((d) => d !== s.dir).flatMap((d) => ['--add-dir', d]);
+    const cmd = [BUN, path.join(ROOT, 'scripts/lib/claude-run.ts'), '--cwd', s.dir, ...addDirs, ...(model ? ['--model', model] : []), '--', prompt];
+    return startCommand(sitesSlot, cmd, `claude -p ${shellQuote(prompt)}`, { mode: `${s.name}:ai-${taskName}`, scopes: [s.name] }, s.dir);
+}
+
 // ─── Functional-food leads ────────────────────────────────────────────────────
 // news-medical.net "Functional Food" items queued by the abderahmane blog's
 // /functional-food-leads skill (../abderahmane/.claude/skills/functional-food-leads).
@@ -2243,9 +2333,9 @@ function copyForX(body: Body) {
 
 const shellQuote = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
 
-/** Opens Terminal on the blog repo running an interactive `claude <prompt>`. */
-function openClaude(prompt: string, flags: string[] = []) {
-    const command = `cd ${shellQuote(BLOG_DIR)} && claude ${flags.join(' ')} ${shellQuote(prompt)}`.replace(/ {2,}/g, ' ');
+/** Opens Terminal on a repo (the blog by default) running an interactive `claude <prompt>`. */
+function openClaude(prompt: string, flags: string[] = [], dir = BLOG_DIR) {
+    const command = `cd ${shellQuote(dir)} && claude ${flags.join(' ')} ${shellQuote(prompt)}`.replace(/ {2,}/g, ' ');
     const script = `tell application "Terminal"\nactivate\ndo script "${command.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"\nend tell`;
     const res = Bun.spawnSync(['osascript', '-e', script]);
     if (res.exitCode !== 0) throw new HttpError(500, res.stderr.toString() || 'Could not open Terminal');
@@ -2530,6 +2620,7 @@ const POST: Record<string, (body: Body) => unknown | Promise<unknown>> = {
     '/api/media/delete': deleteMedia,
     '/api/sites/run': runSite,
     '/api/sites/stop': () => stopJob(sitesSlot),
+    '/api/sites/ai': runAi,
     '/api/sites/commit': commitSite,
     '/api/quotes/edit': editQuote,
     '/api/quotes/remove': removeQuotes,
@@ -2576,6 +2667,7 @@ const GET: Record<string, (params: URLSearchParams) => unknown | Promise<unknown
     '/api/dashboard': statsDashboard,
     '/api/sites': sitesOverview,
     '/api/sites/job': sitesJob,
+    '/api/sites/ai': aiInfo,
     '/api/quotes': listQuotes,
     '/api/entries': listCollection,
     '/api/entries/markdown': readMarkdown,

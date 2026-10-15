@@ -1290,8 +1290,8 @@ async function renderPush() {
 }
 
 // ─── Sites (quotes / books / biographies / quiz) ───
-const sites = { site: 'quotes', overview: null, message: {}, args: '', q: '', author: '', book: '', sort: 'likes', cat: '', untranslated: false, editing: null, markdown: null, reports: null, reportsLoading: false };
-const siteJob = jobPoller('site', '/api/sites/job', 'sites', async () => { await loadSites(); if (state.tab === 'sites') renderSites(); });
+const sites = { site: 'quotes', ai: null, aiIn: {}, aiModel: '', overview: null, message: {}, args: '', q: '', author: '', book: '', sort: 'likes', cat: '', untranslated: false, editing: null, markdown: null, reports: null, reportsLoading: false };
+const siteJob = jobPoller('site', '/api/sites/job', 'sites', async () => { sites.ai = null; await loadSites(); if (state.tab === 'sites') renderSites(); });
 
 async function loadSites() {
   try { sites.overview = await api('/api/sites'); renderNav(); } catch (e) { toast(e.message, true); }
@@ -1311,8 +1311,13 @@ async function renderSites() {
   try { content = await ({ quotes: quotesSection, books: () => entriesSection('books'), biographies: () => entriesSection('biographies'), quiz: quizSection, abderahmane: blogSection })[s.name](running); }
   catch (e) { content = h('div', { class: 'card bad' }, e.message); }
 
+  const ai = await aiCard(s, running).catch((e) => h('div', { class: 'card bad' }, e.message));
+
   if (state.tab !== 'sites' || sites.site !== s.name) return;
-  paint('sites', siteCard(s, running), content, ...(siteJob.job?.scopes?.[0] === s.name ? siteJob.view() : []));
+  // An AI job's log sits right under the AI card; other jobs' logs stay below the site's data.
+  const log = siteJob.job?.scopes?.[0] === s.name ? siteJob.view() : [];
+  const aiLog = siteJob.job?.mode?.startsWith(`${s.name}:ai-`);
+  paint('sites', siteCard(s, running), ai, ...(aiLog ? log : []), content, ...(aiLog ? [] : log));
   siteJob.update(true);
 }
 
@@ -1420,6 +1425,70 @@ function quoteRow(x) {
       h('button', { class: 'btn', onclick: () => { sites.editing = editing ? null : x.id; render(); } }, editing ? 'Close' : 'Edit'),
       h('button', { class: 'btn danger', onclick: () => siteAct(() => api('/api/quotes/remove', { ids: [x.id] }), 'Deleted') }, 'Delete')),
   );
+}
+
+// AI: runs the sibling repo's Claude Code skills, headless here (live log below) or in Terminal.
+async function aiCard(s, running) {
+  if (!sites.ai) sites.ai = await api('/api/sites/ai');
+  const tasks = sites.ai.tasks[s.name];
+  if (!tasks?.length) return null;
+  const quiz = sites.ai.quiz;
+  const inputs = (task, defaults) => (sites.aiIn[`${s.name}:${task}`] ??= { ...defaults });
+  const field = (v, key, attrs = {}) => h('input', { value: v[key] ?? '', dir: 'auto', disabled: running, oninput: (e) => { v[key] = e.target.value; }, ...attrs });
+  const select = (v, key, options) => h('select', { disabled: running, onchange: (e) => { v[key] = e.target.value; } },
+    options.map(([val, label]) => h('option', { value: val, selected: String(v[key] ?? '') === val }, label)));
+  const isRunning = (task) => running && siteJob.job?.mode === `${s.name}:ai-${task}`;
+  const go = (task, v, where, confirmText) => {
+    if (where === 'run' && confirmText && !confirm(confirmText)) return;
+    const body = { site: s.name, task, input: v, where, model: sites.aiModel };
+    if (where === 'terminal') return act(() => api('/api/sites/ai', body), 'Opened Claude Code in Terminal');
+    siteJob.start('/api/sites/ai', body, 'Claude is working — follow the log below');
+  };
+  const buttons = (task, v, confirmText) => [
+    h('button', { class: 'btn primary', disabled: running, onclick: () => go(task, v, 'run', confirmText) }, isRunning(task) ? 'Running…' : 'Run here'),
+    h('button', { class: 'btn', title: 'Interactive session: you approve tools and can steer it', onclick: () => go(task, v, 'terminal') }, 'Open in Terminal'),
+  ];
+  const row = (title, hint, ...controls) => h('div', { style: 'margin-top:12px' },
+    h('h3', {}, title), h('div', { class: 'toolbar' }, ...controls.flat()), hint ? h('div', { class: 'meta' }, hint) : null);
+  const num = (v, max = 50) => field(v, 'count', { type: 'number', min: 1, max, style: 'width:80px', title: 'How many' });
+
+  const rows = [];
+  if (s.name === 'books') {
+    const v = inputs('summaries', { count: 3, target: '' });
+    rows.push(row('Book summaries', 'Long-form (1000–1500 words), sourced from Wikipedia and the web. Catalog books first, then quoted books not in the catalog yet (adds their entry too). Unsupported books are skipped, not padded.',
+      num(v, 20), h('span', { class: 'meta' }, 'books, or'), field(v, 'target', { placeholder: 'one title or slug', style: 'min-width:220px' }),
+      buttons('summaries', v, `Write ${v.target ? `a summary of “${v.target}”` : `${v.count} book summaries`} with Claude? It edits books.json and src/content/summaries/.`)));
+  }
+  if (s.name === 'biographies') {
+    const v = inputs('biography', { count: 1, target: '' });
+    const list = h('datalist', { id: 'bio-candidates' }, sites.ai.bioCandidates.map((a) => h('option', { value: a.slug }, `${a.name} · ${a.quotes} quotes`)));
+    rows.push(row('Biographies', `Long-form (1800–2800 words), every date sourced. ${sites.ai.bioMissing} quotes authors have no biography; empty = the most quoted of them.`,
+      num(v, 10), h('span', { class: 'meta' }, 'authors, or'), field(v, 'target', { placeholder: 'author slug or name', list: 'bio-candidates', style: 'min-width:240px' }), list,
+      buttons('biography', v, `Write ${v.target ? `the biography of ${v.target}` : `${v.count} biograph${v.count == 1 ? 'y' : 'ies'}`} with Claude? It edits authors.json.`)));
+  }
+  if (s.name === 'quiz') {
+    const q = inputs('questions', { count: 20, cat: '', topic: '' });
+    rows.push(row('Generate questions', `Appended to bank.json (ids never shift), translated into ${quiz.langs.join(', ')} at the same time, validated by scripts/quiz-data.mjs.`,
+      num(q, 200), select(q, 'cat', [['', 'Any category (smallest first)'], ...quiz.cats.map((c) => [c, c])]),
+      field(q, 'topic', { placeholder: 'topic (optional), e.g. African capitals', style: 'min-width:240px' }),
+      buttons('questions', q, `Generate ${q.count} ${q.cat || ''} questions with Claude?`)));
+    const t = inputs('translate', { lang: quiz.langs[0] ?? '', count: 100 });
+    rows.push(row('Translate questions', 'Fills bank rows that have no translation yet; Arabic-only rows (grammar, wordplay) are marked skipped.',
+      select(t, 'lang', quiz.langs.map((l) => [l, l])), num(t, 200), h('span', { class: 'meta' }, 'rows'),
+      buttons('translate', t, `Translate ${t.count} rows into ${t.lang} with Claude?`)));
+    const l = inputs('language', { lang: '', name: '' });
+    rows.push(row('Add a language', `Now: ${quiz.allLangs.join(', ')}. Adds UI strings, /<code>/ pages, manifest, service worker and the full translated question set, following the Spanish commit; then runs the build. Long — restart the admin afterwards to see it here.`,
+      field(l, 'lang', { placeholder: 'code, e.g. fr', maxlength: 2, style: 'width:110px' }), field(l, 'name', { placeholder: 'name, e.g. Français', style: 'width:160px' }),
+      buttons('language', l, `Add “${l.lang}” to the quiz with Claude? It edits code and data across the repo (no commit or deploy).`)));
+  }
+
+  return h('div', { class: 'card' },
+    h('div', { class: 'toolbar' }, h('h2', { style: 'margin:0' }, 'AI'),
+      h('span', { class: 'meta' }, 'Claude Code skills in ', s.dir.split('/').pop(), '/.claude/skills'),
+      h('label', { class: 'meta', style: 'margin-inline-start:auto' }, 'Model ',
+        h('select', { onchange: (e) => { sites.aiModel = e.target.value; } }, sites.ai.models.map((m) => h('option', { value: m, selected: m === sites.aiModel }, m || 'default'))))),
+    ...rows,
+    h('p', { class: 'meta', style: 'margin-bottom:0' }, '“Run here” edits files without asking and can search the web; it never commits, pushes or deploys. Review the changed files above, then commit and deploy. Stop ends it.'));
 }
 
 // Books / biographies: whole entries edited as JSON
