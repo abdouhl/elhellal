@@ -38,7 +38,8 @@
       "تجهيز بيت الزوجية",
       "أجهزة العروس",
       "تجهيزات العرائس"
-    ]
+    ],
+    "slug": "أهم-أدوات-الكهرباء-التي-تحتاجها-العروسة-في-تجهيز-البيت"
   },
   {
     "id_str": "1578495843303929376",
@@ -96,7 +97,8 @@
     "screen_name": "bysultan",
     "created_at": "2026-06-07",
     "url": "https://bysultan.substack.com/p/64a",
-    "original_img_url": "https://substackcdn.com/image/fetch/$s_!lisS!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fbcca3efe-66c1-4adc-bc67-b2d75753644b_2752x1536.png"
+    "original_img_url": "https://substackcdn.com/image/fetch/$s_!lisS!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fbcca3efe-66c1-4adc-bc67-b2d75753644b_2752x1536.png",
+    "slug": "الخارج-لا-يسمع-شيئا"
   },
   {
     "id_str": "3173057336162907652",
@@ -115,7 +117,17 @@
     "screen_name": "rixn8",
     "created_at": "2026-06-30",
     "url": "https://rixn8.substack.com/p/454",
-    "original_img_url": "https://substackcdn.com/image/fetch/$s_!e9HL!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fc28ca7b4-5867-4578-9fa0-c6692168d89c_425x640.jpeg"
+    "original_img_url": "https://substackcdn.com/image/fetch/$s_!e9HL!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fc28ca7b4-5867-4578-9fa0-c6692168d89c_425x640.jpeg",
+    "slug": "الرسائل-التي-ارعبت-مدينه-كامله"
+  },
+  {
+    "id_str": "1193306775255646928",
+    "title": "الصمت",
+    "preview_text": "ما الذي تُعلمنا إياه المدن من الصمت؟ في صخب المدينة، حيث تعانق الأبراج الصناعية الأفق وتتسارع عقارب الساعة مع دوران التروس، يظن الكثيرون أن \"الهدوء\" عملة نادرة أو ربما صفة سلبية تلازم الأماكن الخاوية. لكن، في قلب هذا التطور المتسارع، يكمن فنٌ لا يتقنه إلا القلة: كيف تجد في صمت المدينة صخباً من الجمال؟ جماليات \"الممل\".. حين تصبح الممرات حكايات غالبًا ما نصنف الأماكن التي نمر بها يوميًا –الطريق إلى ",
+    "screen_name": "memsocio",
+    "created_at": "2026-06-11",
+    "url": "https://memsocio.substack.com/p/bb7",
+    "original_img_url": "https://substackcdn.com/image/fetch/$s_!e9bh!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F1a037f6a-9157-434a-8f08-654ec624f633_1189x1323.png"
   },
   {
     "id_str": "2706368132857189027",
@@ -178,6 +190,14 @@
     "url": "https://gaga507304.substack.com/p/35e",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!1NGG!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F44e843aa-b2b8-485a-98b8-c72bf1d403a5_736x1308.jpeg",
     "slug": "الوهم-المرئي"
+  },
+  {
+    "id_str": "3365197198589275403",
+    "title": "بحران معاصر؛ از فقدان معنا تا انسداد گشودگی",
+    "preview_text": "اگر جامعه با گشودگی برای آفرینش معنا تاریخ می‌سازد، بحران عصر ما را نیز باید از همین منظر فهمید. بحران امروز جهان، صرفاً بحران جنگ، سرمایه، فناوری یا رقابت قدرت‌ها نیست. اینها صورت‌های بیرونی یک بحران عمیق‌ترند؛ بحرانی که در آن بسیاری از جوامع توانایی گشودن افق‌های تازه برای معنا را از دست می‌دهند. هنگامی که جامعه دیگر نتواند آینده‌ای متفاوت را تصور کند، گذشته به تنها مرجع حقیقت تبدیل می‌شود. در ا",
+    "screen_name": "khalidmustafawi",
+    "created_at": "2026-06-30",
+    "url": "https://khalidmustafawi.substack.com/p/110"
   },
   {
     "id_str": "8734444566991405794",
@@ -279,6 +299,15 @@
     "slug": "حوار-مع-ابن-مسكويه-حين-تصافح-الحكمة-الشريعة"
   },
   {
+    "id_str": "2628322824599823273",
+    "title": "حين ارتجفت الروح ولم تجد كلماتها: عن فتاة الحج وقاموس ضاع منا قبل أن ندرك",
+    "preview_text": "سكينة.. خشوع.. طمأنينة.. اقتراب.. مناجاة.. متى كانت آخر مرة سمعت إحدى هذه الكلمات خارج خطبة جمعة أو منشور ديني؟ متى قالها أحد وهو يصف ما يشعر به فعلًا، لا ما يفترض أن يشعر به؟ Exile & Ink.. Batawi Writes is a reader-supported publication. To receive new posts and support my work, consider becoming a free or paid subscriber. قبل أيام، قالت فتاة عادت من الحج إن “الحج محتاج ماركتنج”. سخر منها كثيرون،",
+    "screen_name": "malbatawy",
+    "created_at": "2026-06-08",
+    "url": "https://malbatawy.substack.com/p/70c",
+    "original_img_url": "https://substackcdn.com/image/fetch/$s_!xvH_!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fdcf16ac7-50d9-4a5a-97b0-d30b5a0dbdf9_1085x1449.png"
+  },
+  {
     "id_str": "7612055705082832523",
     "title": "حين يغيب الله من مركز الوعي… يبدأ كل شيء بالانهيار بصمت قراءة نفسية–فلسفية في بنية القلق الإنساني",
     "preview_text": "مقدمة عامة للسلسلة: ﴿وَمَنْ أَعْرَضَ عَنْ ذِكْرِي﴾ ليست هذه السلسلة تفسيرًا تقليديًا لآية، ولا محاولة وعظية لإعادة تكرار المعنى المعروف، بل هي رحلة في طبقات أعمق من السؤال نفسه: كيف يعيش الإنسان داخليًا حين يفقد مركز المعنى في وجوده؟ الآية الكريمة: ﴿وَمَنْ أَعْرَضَ عَنْ ذِكْرِي فَإِنَّ لَهُ مَعِيشَةً ضَنْكًا﴾ تبدو في ظاهرها بيانًا لعلاقة بين الإعراض والضيق. لكن حين تُقرأ من زاوية نفسية وفلسفية ووج",
@@ -286,6 +315,24 @@
     "created_at": "2026-06-27",
     "url": "https://professor1712.substack.com/p/2df",
     "slug": "حين-يغيب-الله-من-مركز-الوعي-يبدأ-كل-شيء-بالانهيار-بصمت-قراءة-نفسيةفلسفية-في-بنية-ا"
+  },
+  {
+    "id_str": "8810949453912323522",
+    "title": "خارج ضجيج الشاشات.. رسالةٌ إلى روحٍ تبحث عن أثرٍ حقيقي",
+    "preview_text": "في وقت متأخر من ليلة البارحة، وبينما كانت شوارع مدينتنا تغرق في هدوئها المعتاد، جلستُ في مقهىً صغير في زاويةٍ منسية. كنت أراقب الناس؛ لم يكن أحدٌ منهم يتحدث. الجميع، بغير استثناء، كانت وجوههم مضاءةً بوهجٍ أزرق خافت، يعبثون بهواتفهم بحثاً عن \"شيء\" ما، بينما الحياة الحقيقية تمر بجانبهم دون أن يلتفتوا لها. في تلك اللحظة، شعرتُ بـ \"الفقاعة\" التي نعيش بداخلها. نحن متصلون بالعالم، لكننا منفصلون عن أنفسن",
+    "screen_name": "memsocio",
+    "created_at": "2026-06-10",
+    "url": "https://memsocio.substack.com/p/f5d",
+    "original_img_url": "https://substackcdn.com/image/fetch/$s_!MLgm!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fb472841f-f16c-4d94-87fe-2e2ac083598d_1536x1024.png"
+  },
+  {
+    "id_str": "3876311341612645663",
+    "title": "خطأ قاتل في المعركة: كيف كان الجنود يعرفون من يقاتلون؟",
+    "preview_text": "كيف ميّز المحاربون العدو في المعارك؟ على العموم، في القدم لم تكن لدى الدول إمكانيات صناعة زيّ موحّد للجنود، فاعتمدوا بعض التقنيات: أولها التميّز في الملابس، كاختلاف ألوانها أو وضع أقمشة على الذراع أو أي مكان ظاهر. كما اعتمدت بعض الحضارات على وضع رموز أو نقوش على الدروع والخوذ والرايات وأغصان الزيتون. مصر سبقت كثيرًا من الدول في توفير ملابس متشابهة نسبيًا باللون الأبيض، وكانت تُصنع من خيوط الكتان ن",
+    "screen_name": "9x5hj",
+    "created_at": "2026-06-18",
+    "url": "https://9x5hj.substack.com/p/178",
+    "original_img_url": "https://substackcdn.com/image/fetch/$s_!SDge!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F32d8fce7-1ca6-43ab-bf2a-f7ac71a1e05a_500x595.jpeg"
   },
   {
     "id_str": "1038530121491789324",
@@ -296,6 +343,15 @@
     "url": "https://iqballatif.substack.com/p/e76",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!nL-T!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fdfb7d45a-2b6f-44d3-ae42-162827486b50_1289x1421.jpeg",
     "slug": "دوراندر-تصور-ا-افون-اور-و-امن-جس-ندوستان-ن-معاف-ن-ا"
+  },
+  {
+    "id_str": "2567667693488751021",
+    "title": "رحلة روحية Vip",
+    "preview_text": "“لسة راجعة من الحج، وحاسة إن الموضوع ده محتاج ماركتينج شوية، حاسة إن ما فيش pr كفاية”..ببساطة مطلقة أخبرتنا الفتاة الرقيقة أن الحج تجربة مجتاجة تسويق، ثم بدأت في مشاركتنا تجربتها الروحية. مشاركة جعلتني أصدق أنها حجت إلى جبل الأوليمب، وليس إلى جبل عرفت. Thanks for reading AlMudawana! Subscribe for free to receive new posts and support my work. تكلمت عن تجربتها الروحية “spiritual” في الحج. وعن المشق",
+    "screen_name": "omniaelhefnawy",
+    "created_at": "2026-06-07",
+    "url": "https://omniaelhefnawy.substack.com/p/vip",
+    "original_img_url": "https://substackcdn.com/image/fetch/$s_!akVd!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F8bc14fbb-5368-4387-a087-22c0345e79e8_2280x1680.jpeg"
   },
   {
     "id_str": "2265600461064653905",
@@ -327,6 +383,15 @@
     "url": "https://sedarat.substack.com/p/cd0",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!Yd4j!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F3d55f8e7-7714-414a-aeab-10d9f14f65ca_448x690.jpeg",
     "slug": "صدارت-در-ان-دوران-خطر-رورد-من-به-دام-سو-باد-باشد-معار-ست"
+  },
+  {
+    "id_str": "1623134993138047925",
+    "title": "ضحى ولا مضحاش",
+    "preview_text": "“ضحيت بعمري” جملة عبر بها محمد صلاح عن تجربته الطويلة، فهل أخطأ؟ إنه “ابننا” ويفعل ما اعتدنا فعله، وعادة خلال محاولات تصوير حياتنا كمأساة كبيرة نصف كل خطواتنا بكلمة “ضحيت”.. والجدل حول هل ضحى صلاح أم لم يضحى يحتاج إلى تفكيك الأمور. إذا، فلنبدأ باللغة. Thanks for reading AlMudawana! Subscribe for free to receive new posts and support my work. للتضحية في اللغة سياقان، فالأصل الحرفي لها جاء من فعل “ض",
+    "screen_name": "omniaelhefnawy",
+    "created_at": "2026-06-01",
+    "url": "https://omniaelhefnawy.substack.com/p/904",
+    "original_img_url": "https://substackcdn.com/image/fetch/$s_!qdkN!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F33ca5680-1b2a-4e56-b78b-9039220cbcde_2280x1680.jpeg"
   },
   {
     "id_str": "9843679227235617160",
@@ -438,7 +503,8 @@
       "تحضير فطور سريع",
       "توستر مثالي",
       "معدات المطبخ"
-    ]
+    ],
+    "slug": "كيف-تختار-التوستر-الكهربائي-المناسب-لتحضير-فطور-سريع"
   },
   {
     "id_str": "9283516341510013384",
@@ -461,6 +527,14 @@
     "slug": "كيف-يصبح-النوم-حياة-مؤجلة"
   },
   {
+    "id_str": "1557752235049926608",
+    "title": "لا أحد يمر من هنا",
+    "preview_text": "أمضيت وقتًا طويلًا مع نفسي حتى أصبحت أعرفها أكثر مما أحب. ومنذ ذلك الحين، لم تعد الوحدة تعني غياب الآخرين، بل تعني استحالة الهروب من هذا الحضور المستمر لي. كأنني أعيش في غرفة تتدلى جدرانها من الداخل لا من الخارج، غرفة لا تضيق بمساحتها بل بصداها. كل فكرة أقولها تعود إليّ مضاعفة، وكل شعور أتركه في زاوية أجده بعد أيام جالسًا في منتصف الطريق ينتظرني. لقد أصبحت مأهولة بنفسي أكثر مما أحتمل. أراقبها كما ",
+    "screen_name": "styxecho",
+    "created_at": "2026-06-17",
+    "url": "https://styxecho.substack.com/p/9bc"
+  },
+  {
     "id_str": "1402748897811522876",
     "title": "لماذا لا نشعر بالرضا رغم أننا نحقق ما نريد",
     "preview_text": "يعتقد الكثير من الناس أن السعادة تنتظرهم في المحطة القادمة من حياتهم فالبعض يظن أنه سيشعر بالراحة عندما يتخرج والبعض الآخر ينتظر الوظيفة التي يحلم بها وآخرون يربطون سعادتهم بالزواج أو بالمال أو بتحقيق هدف معين ويعيشون سنوات طويلة وهم يعتقدون أن الرضا الحقيقي سيبدأ عندما يصلون إلى ذلك الشيء الذي يسعون إليه لكن ما يحدث في كثير من الأحيان هو أننا نصل إلى ما أردناه ثم نكتشف أن الشعور الذي انتظرناه لم ",
@@ -477,7 +551,8 @@
     "screen_name": "bysultan",
     "created_at": "2026-06-11",
     "url": "https://bysultan.substack.com/p/e6b",
-    "original_img_url": "https://substack-post-media.s3.amazonaws.com/public/images/03cbcb29-210c-4102-adab-d139a2e0b7b2_1536x1024.png"
+    "original_img_url": "https://substack-post-media.s3.amazonaws.com/public/images/03cbcb29-210c-4102-adab-d139a2e0b7b2_1536x1024.png",
+    "slug": "لماذا-لا-يغير-بعض-الناس-رأيهم"
   },
   {
     "id_str": "8290652517565360317",
@@ -545,7 +620,8 @@
     "screen_name": "bysultan",
     "created_at": "2026-06-04",
     "url": "https://bysultan.substack.com/p/c67",
-    "original_img_url": "https://substack-post-media.s3.amazonaws.com/public/images/daa74442-5f25-4569-800f-ed97195e474b_1672x941.png"
+    "original_img_url": "https://substack-post-media.s3.amazonaws.com/public/images/daa74442-5f25-4569-800f-ed97195e474b_1672x941.png",
+    "slug": "من-يضيء-الآخر"
   },
   {
     "id_str": "6420189255871759503",
