@@ -25,8 +25,8 @@
  *   bun run scripts/import-substack.ts --fix                 # clean the catalog only
  *   bun run scripts/import-substack.ts --only 99iov          # just this author, skip the re-check
  *
- * --fix: scans the catalog and removes any article with no title, or a
- * title containing no Arabic characters (junk entries like the empty-slug
+ * --fix: scans the catalog and removes any article with no title, a Persian
+ * title/preview, or a title containing no Arabic characters (junk entries like the empty-slug
  * "-1", "-2", "-3" ones that slugify() produces from such titles). Doesn't
  * touch Ollama/Substack — just cleans the existing file and exits.
  *
@@ -160,9 +160,10 @@ function removeInvalidTitleArticles(data: ArticlesConfig): number {
     for (const cat of data.articles) {
         const before = cat.content.length;
         cat.content = cat.content.filter((a) => {
-            const ok = isValidArabicTitle(a.title);
+            const persian = isPersian(`${a.title ?? ''} ${a.preview_text ?? ''}`);
+            const ok = isValidArabicTitle(a.title) && !persian;
             if (!ok) {
-                const reason = !a.title?.trim() ? 'no title' : 'non-Arabic title';
+                const reason = !a.title?.trim() ? 'no title' : persian ? 'Persian' : 'non-Arabic title';
                 console.log(`🗑️  [${cat.category}] Removing (${reason}): "${a.title || ''}" [${a.id_str}]`);
             }
             return ok;
