@@ -31,6 +31,7 @@
  *   --dry-run     don't write seen.json
  */
 
+import { isPersian } from './lib/persian';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -284,6 +285,7 @@ async function main() {
                 if (seenPostIds.has(post.id)) continue;
                 seenPostIds.add(post.id);
                 if (!isArabic(`${post.title ?? ''} ${post.subtitle ?? ''}`)) continue;
+                if (isPersian(`${post.title ?? ''} ${post.subtitle ?? ''}`)) continue;
                 if (cutoff && new Date(post.post_date).getTime() < cutoff) continue;
 
                 const sub = subdomainFor(post, pubs);

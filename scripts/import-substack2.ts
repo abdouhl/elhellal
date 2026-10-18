@@ -43,6 +43,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { isPersian } from './lib/persian';
 import type { ArticlesConfig, Article } from '../src/types/index.ts';
 import { personalBlogs } from '../src/data/personal-blogs.ts';
 import { fetchAuthorName, loadAuthorNames, saveAuthorNames } from './lib/author-names.ts';
@@ -547,6 +548,11 @@ async function processItem(
     if (!isValidArabicTitle(item.title)) {
         const reason = !item.title?.trim() ? 'no title' : 'non-Arabic title';
         console.log(`⏭  ${label} Skip (${reason}): "${(item.title || '').slice(0, 55)}"`);
+        return false;
+    }
+
+    if (isPersian(`${item.title} ${item.previewText} ${item.fullContent.slice(0, 2000)}`)) {
+        console.log(`⏭  ${label} Skip (Persian): "${item.title.slice(0, 55)}"`);
         return false;
     }
 
