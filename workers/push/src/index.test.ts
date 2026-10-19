@@ -24,7 +24,7 @@ describe('digestMessage', () => {
         generatedAt: '2026-10-10T00:00:00Z',
         categories: { history: 'التاريخ', ai: 'الذكاء الاصطناعي' },
         articles: [
-            { s: 'c', t: 'ثالث', c: 'ai', d: '2026-10-10', i: 'https://img/c' },
+            { s: 'c', t: 'ثالث', c: 'ai', d: '2026-10-10', i: 'https://img/c', p: 'ملخص الثالث' },
             { s: 'b', t: 'ثاني', c: 'history', d: '2026-10-09' },
             // Published long ago but only imported now: still new.
             { s: 'a', t: 'أول', c: 'history', d: '2026-09-30' },
@@ -34,23 +34,31 @@ describe('digestMessage', () => {
 
     it('lists only articles first seen since the last digest', () => {
         const m = digestMessage(digest, seen, { categories: '*', frequency: 'daily', since: 250 })!;
-        expect(m.body).toBe('ثالث');
+        expect(m.title).toBe('ثالث');
+        expect(m.body).toBe('ملخص الثالث');
         expect(m.url).toBe('/articles/c/?utm_source=push&utm_medium=daily');
         expect(m.image).toBe('https://img/c');
+        expect(m.actions).toEqual([{ action: 'read', title: 'اقرأ المقال' }]);
     });
 
-    it('filters by category and names a single category', () => {
+    it('filters by category, opens the top article and offers the category', () => {
         const m = digestMessage(digest, seen, { categories: ',history,', frequency: 'weekly', since: 100 })!;
-        expect(m.title).toBe('الهلال — مختارات الأسبوع في التاريخ');
-        expect(m.body).toBe('ثاني\nومقال آخر');
-        expect(m.url).toBe('/history/?utm_source=push&utm_medium=weekly');
+        expect(m.title).toBe('ثاني');
+        // No preview: the category stands in.
+        expect(m.body).toBe('التاريخ\n📚 ومقال آخر في التاريخ');
+        expect(m.url).toBe('/articles/b/?utm_source=push&utm_medium=weekly');
+        expect(m.actions).toEqual([
+            { action: 'read', title: 'اقرأ المقال' },
+            { action: 'more', title: 'كل الجديد (2)', url: '/history/?utm_source=push&utm_medium=weekly' },
+        ]);
     });
 
-    it('links to the home page across categories', () => {
+    it('opens the top article and offers the home page across categories', () => {
         const m = digestMessage(digest, seen, { categories: '*', frequency: 'daily', since: 100 })!;
         expect(m.count).toBe(3);
-        expect(m.body).toBe('ثالث\nومقالان آخران');
-        expect(m.url).toBe('/?utm_source=push&utm_medium=daily');
+        expect(m.body).toBe('ملخص الثالث\n📚 ومقالان آخران');
+        expect(m.url).toBe('/articles/c/?utm_source=push&utm_medium=daily');
+        expect((m.actions as Array<{ url?: string }>)[1]!.url).toBe('/?utm_source=push&utm_medium=daily');
     });
 
     it('sends nothing when nothing is new, or for articles never seen', () => {
@@ -62,7 +70,7 @@ describe('digestMessage', () => {
 
     it('ends the digest with the quote of the day', () => {
         const m = digestMessage(digest, seen, { categories: '*', frequency: 'daily', since: 250 }, quote)!;
-        expect(m.body).toBe('ثالث\n❝ نص الاقتباس — كاتب');
+        expect(m.body).toBe('ملخص الثالث\n❝ نص الاقتباس — كاتب');
     });
 
     it('sends a daily subscriber the quote alone when nothing is new, a weekly one nothing', () => {

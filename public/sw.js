@@ -299,7 +299,16 @@ self.addEventListener('push', (event) => {
                 dir: 'rtl',
                 lang: 'ar',
                 tag: data.tag || 'elhellal',
-                data: { url: data.url || '/' },
+                // A new digest replacing yesterday's should still buzz.
+                renotify: true,
+                timestamp: Date.now(),
+                actions: Array.isArray(data.actions)
+                    ? data.actions.slice(0, 2).map((a) => ({ action: a.action, title: a.title }))
+                    : [],
+                data: {
+                    url: data.url || '/',
+                    actions: Object.fromEntries((data.actions || []).filter((a) => a.url).map((a) => [a.action, a.url])),
+                },
             });
             if (data.count && self.navigator.setAppBadge) {
                 await self.navigator.setAppBadge(data.count).catch(() => {});
@@ -310,7 +319,9 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
-    const url = new URL(event.notification.data?.url || '/', self.location.origin).href;
+    const data = event.notification.data || {};
+    const target = (event.action && data.actions && data.actions[event.action]) || data.url || '/';
+    const url = new URL(target, self.location.origin).href;
     event.waitUntil(
         (async () => {
             fetch('/api/push/event', {
@@ -321,10 +332,17 @@ self.addEventListener('notificationclick', (event) => {
             const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
             const same = windows.find((c) => c.url === url);
             if (same) return same.focus();
-            const open = windows[0];
-            if (open && 'navigate' in open) {
-                await open.focus();
-                return open.navigate(url);
+            // navigate() only works on a window this worker controls and can
+            // reject (or resolve null) otherwise; a new window always lands.
+            const open = windows.find((c) => c.url.startsWith(self.location.origin) && 'navigate' in c);
+            if (open) {
+                try {
+                    // Focus while the click still counts as a user gesture.
+                    await open.focus();
+                    if (await open.navigate(url)) return;
+                } catch {
+                    // fall through to a new window
+                }
             }
             return self.clients.openWindow(url);
         })()

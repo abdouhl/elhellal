@@ -391,23 +391,27 @@ export function digestMessage(
         };
     }
 
+    // The notification is about its top article: its title, its preview, its
+    // cover, and a tap opens it. The rest of the digest is one action away.
     const top = fresh[0]!;
     const categories = [...new Set(fresh.map((a) => a.c))];
     const utm = `utm_source=push&utm_medium=${sub.frequency}`;
-    const url = fresh.length === 1
-        ? `/articles/${encodeURIComponent(top.s)}/?${utm}`
-        : categories.length === 1
-            ? `/${categories[0]}/?${utm}`
-            : `/?${utm}`;
+    const listing = categories.length === 1 ? `/${categories[0]}/?${utm}` : `/?${utm}`;
     const where = categories.length === 1 && digest.categories[categories[0]!] ? ` في ${digest.categories[categories[0]!]}` : '';
+    const lines = [top.p ?? digest.categories[top.c] ?? ''];
+    if (fresh.length > 1) lines.push(`📚 ${moreArticles(fresh.length - 1)}${where}`);
+    else if (quote) lines.push(`❝ ${clip(quote.text, 80)} — ${quote.title}`);
     return {
-        title: sub.frequency === 'weekly' ? `الهلال — مختارات الأسبوع${where}` : `الهلال — جديد اليوم${where}`,
-        body: (fresh.length === 1 ? top.t : `${top.t}\n${moreArticles(fresh.length - 1)}`) +
-            (quote ? `\n❝ ${clip(quote.text, 80)} — ${quote.title}` : ''),
-        url,
+        title: top.t,
+        body: lines.filter(Boolean).join('\n'),
+        url: `/articles/${encodeURIComponent(top.s)}/?${utm}`,
         image: top.i,
         count: fresh.length,
         tag: 'digest',
+        actions: [
+            { action: 'read', title: 'اقرأ المقال' },
+            ...(fresh.length > 1 ? [{ action: 'more', title: `كل الجديد (${fresh.length})`, url: listing }] : []),
+        ],
     };
 }
 

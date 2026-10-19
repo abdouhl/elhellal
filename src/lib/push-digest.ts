@@ -14,6 +14,8 @@ export const DIGEST_DAYS = 14;
 const DIGEST_MAX = 400;
 /** Android shows the notification image at up to ~720px wide. */
 const DIGEST_IMAGE_WIDTH = 720;
+/** Notifications show two or three lines of body; the rest would be cut anyway. */
+const DIGEST_PREVIEW_MAX = 140;
 
 export interface DigestArticle {
     /** slug */
@@ -26,6 +28,8 @@ export interface DigestArticle {
     d: string;
     /** resized cover image */
     i?: string;
+    /** preview text, clipped to DIGEST_PREVIEW_MAX */
+    p?: string;
 }
 
 export interface PushDigest {
@@ -51,7 +55,19 @@ export function buildPushDigest(
             const image = r.original_img_url && isImageUrl(r.original_img_url)
                 ? resizeImage(r.original_img_url, DIGEST_IMAGE_WIDTH)
                 : undefined;
-            return { s: r.slug, t: r.title, c: r.category, d: r.created_at, ...(image ? { i: image } : {}) };
+            const preview = clip(r.preview_text?.replace(/\s+/g, ' ').trim() ?? '', DIGEST_PREVIEW_MAX);
+            return {
+                s: r.slug,
+                t: r.title,
+                c: r.category,
+                d: r.created_at,
+                ...(image ? { i: image } : {}),
+                ...(preview ? { p: preview } : {}),
+            };
         });
     return { generatedAt: now.toISOString(), categories, articles };
+}
+
+function clip(text: string, max: number): string {
+    return text.length > max ? `${text.slice(0, max).replace(/\s+\S*$/, '')}…` : text;
 }
