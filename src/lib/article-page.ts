@@ -11,6 +11,7 @@
 import type { TemplateData } from './shell-template';
 import { fnv1a } from './hash';
 import { HERO_WIDTHS, isImageUrl, RELATED_WIDTH, resizeImage, responsiveImage } from './images';
+import { sisterTiles, type SisterLink } from './sister-sites';
 
 export const ARTICLE_SHELL_SLUG = '__shell__';
 
@@ -47,8 +48,13 @@ export interface ArticleRecord {
     dateAr: string;
     /** [keyword, tag slug] — slug is null when the tag has no page */
     keywords?: Array<[string, string | null]>;
-    /** [slug, title, image, screen_name] of up to 3 articles from the same category */
-    related: Array<[string, string, string | undefined, string | undefined]>;
+    /**
+     * [slug, title, image, screen_name, category title] of up to RELATED_COUNT
+     * articles sharing the most specific tags, topped up from the same category
+     */
+    related: Array<[string, string, string | undefined, string | undefined, string]>;
+    /** The "من عالم الهلال" strip: sibling-site pages (src/lib/sister-sites.ts) */
+    sister?: SisterLink[];
 }
 
 export type ArticleShard = Record<string, ArticleRecord>;
@@ -159,12 +165,14 @@ export function articleTemplateData(r: ArticleRecord): TemplateData {
         xShareUrl: `https://x.com/intent/post?text=${encodedShareText}&url=${encodedCanonicalUrl}&via=${r.screen_name}`,
         linkedinShareUrl: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedCanonicalUrl}`,
         redditShareUrl: `https://www.reddit.com/submit?url=${encodedCanonicalUrl}&title=${encodedShareText}`,
-        related: r.related.map(([slug, title, image, screenName]) => ({
+        related: r.related.map(([slug, title, image, screenName, categoryTitle]) => ({
             href: `/articles/${encodeURIComponent(slug)}/`,
             image: isImageUrl(image) ? resizeImage(image, RELATED_WIDTH) : `/favicons/${slug}.png`,
             title,
             author: screenName ? `@${screenName}` : '',
+            category: categoryTitle ?? r.categoryTitle,
         })),
+        sister: sisterTiles(r.sister),
     };
 }
 

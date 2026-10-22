@@ -74,6 +74,7 @@ This architecture optimizes bundle size by loading only the required data per pa
 After `astro build`, **`scripts/build-worker-data.ts`** writes the data the site Worker (`workers/site/`) renders pages from, so they don't have to be prerendered (100k+ articles would blow Cloudflare's file limits):
 - `/articles/<slug>/`, `/tags/<slug>/`, `/authors/<name>/` are filled into Astro-built *shell* pages (rendered once with `{{tokens}}`, see `src/lib/shell-template.ts`) from hashed JSON shards in `dist/_data/` (`articles/`, `listings/`, `feeds/`). Data contracts: `src/lib/article-page.ts`, `src/lib/listing-page.ts`.
 - Personal-blog posts and writers stay prerendered; the Worker hands names it has no data for back to the static assets.
+- Cross-links to the sibling sites: `bun run build` first runs `scripts/fetch-sister-sites.ts`, snapshotting their `app-feed.json`s into `src/data/sister-sites.json` (committed; kept when offline). `src/lib/sister-sites.ts` matches article keywords/titles to biographies and books for the "من عالم الهلال" strip on article and tag pages, and the build writes `dist/sister-links.json` (sibling page → articles naming it), which the books and biographies sites read at build for their "مقالات على الهلال" section.
 
 ### Data Types (src/types/index.ts)
 

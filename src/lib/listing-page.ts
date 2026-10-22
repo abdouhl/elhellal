@@ -17,6 +17,7 @@ import type { FeedCard } from './feed';
 import { tileLoading } from '../utils/tileLoading';
 import { fnv1a } from './hash';
 import { jsonForScript } from './article-page';
+import { sisterTiles, type SisterLink } from './sister-sites';
 
 export const LISTING_SHELL_SLUG = '__shell__';
 
@@ -59,6 +60,16 @@ export interface TagRecord extends ListingBase {
     kind: 'tag';
     slug: string;
     label: string;
+    /** Distinct authors of the tag's articles */
+    writerCount?: number;
+    /** [screen_name, display name] of the authors with the most articles here */
+    writers?: Array<[string, string]>;
+    /** [category slug, category title] the tag's articles fall into most */
+    categories?: Array<[string, string]>;
+    /** Newest article's date, formatted like ArticleRecord.dateAr */
+    latestDateAr?: string;
+    /** Sibling-site pages about the person or book the tag names */
+    sister?: SisterLink[];
 }
 
 export interface AuthorRecord extends ListingBase {
@@ -145,15 +156,32 @@ export function listingTemplateData(r: ListingRecord): TemplateData {
     };
 
     if (r.kind === 'tag') {
+        const writers = (r.writers ?? []).map(([screenName, name], i, all) => ({
+            href: `/authors/${encodeURIComponent(screenName)}/`,
+            name,
+            sep: i === 0 ? '' : i === all.length - 1 ? ' و' : '، ',
+        }));
+        const categories = (r.categories ?? []).map(([category, title], i, all) => ({
+            href: `/${category}/`,
+            title,
+            sep: i === 0 ? '' : i === all.length - 1 ? ' و' : '، ',
+        }));
         return {
             ...common,
             label: r.label,
+            articlesPhrase: articlesPhrase(r.total),
+            writersPhrase: writersPhrase(r.writerCount ?? 0),
+            latestDateAr: r.latestDateAr,
+            writers,
+            categories,
+            categoriesLead: categories.length === 1 ? 'وتجد أغلبها في قسم' : 'وتجد أغلبها في أقسام',
+            sister: sisterTiles(r.sister),
             canonicalUrl: `${SITE}/tags/${encodeURIComponent(r.slug)}/`,
             itemListLd: jsonForScript(itemListLd(r, `${r.label} Articles`)),
             breadcrumbLd: jsonForScript(
                 breadcrumbLd([
                     { name: 'الرئيسية', url: SITE },
-                    { name: 'الوسوم', url: `${SITE}/tags` },
+                    { name: 'الوسوم', url: `${SITE}/tags/` },
                     { name: r.label },
                 ])
             ),
@@ -185,9 +213,24 @@ export function listingTemplateData(r: ListingRecord): TemplateData {
         breadcrumbLd: jsonForScript(
             breadcrumbLd([
                 { name: 'الرئيسية', url: SITE },
-                { name: 'الكتّاب', url: `${SITE}/authors` },
+                { name: 'الكتّاب', url: `${SITE}/authors/` },
                 { name: authorLabel },
             ])
         ),
     };
+}
+
+/** "مقالة واحدة" / "مقالتين" / "7 مقالات" / "25 مقالة" */
+function articlesPhrase(count: number): string {
+    if (count === 1) return 'مقالة واحدة';
+    if (count === 2) return 'مقالتين';
+    return count <= 10 ? `${count} مقالات` : `${count} مقالة`;
+}
+
+/** "بقلم كاتب واحد" / "بقلم كاتبَين" / "بأقلام 7 كتّاب" / "بأقلام 25 كاتبًا" */
+function writersPhrase(count: number): string {
+    if (count <= 0) return '';
+    if (count === 1) return 'بقلم كاتب واحد';
+    if (count === 2) return 'بقلم كاتبَين';
+    return count <= 10 ? `بأقلام ${count} كتّاب` : `بأقلام ${count} كاتبًا`;
 }

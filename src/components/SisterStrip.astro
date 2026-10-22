@@ -1,0 +1,139 @@
+---
+// "من عالم الهلال": a row of links to the sibling sites (biographies, book
+// summaries, quotes, quiz) — what an article or tag names first, then a book,
+// a quote and a question (src/lib/sister-sites.ts). Article and tag pages
+// render it as a Worker shell from the `sister` array token.
+import { shellMarkers } from "../lib/shell-template";
+
+export interface SisterTile {
+  kind: string;
+  site: string;
+  title: string;
+  meta: string;
+  image: string;
+  url: string;
+}
+
+interface Props {
+  tiles: SisterTile[];
+  /** Render as a Worker shell (src/lib/shell-template.ts) filled from `sister`. */
+  shell?: boolean;
+  heading?: string;
+}
+
+const { tiles, shell = false, heading = "من عالم الهلال" } = Astro.props;
+const { open, close, eachOpen, eachClose } = shellMarkers(shell);
+const items: SisterTile[] = shell
+  ? [{ kind: "{{.kind}}", site: "{{.site}}", title: "{{.title}}", meta: "{{.meta}}", image: "{{.image}}", url: "{{.url}}" }]
+  : tiles;
+---
+
+{(shell || tiles.length > 0) && (
+  <Fragment>
+    <Fragment set:html={open("sister")} />
+    <section class="sister-strip" aria-label={heading}>
+      <h2 class="sister-heading">{heading}</h2>
+      <div class="sister-grid">
+        <Fragment set:html={eachOpen("sister")} />
+        {items.map((t) => (
+          <a href={t.url} class="sister-card" data-site={t.site}>
+            {(shell || t.image) && (
+              <Fragment>
+                <Fragment set:html={open(".image")} />
+                <img src={t.image} alt="" class="sister-img" width="56" height="56" loading="lazy" decoding="async" onerror="this.remove()" />
+                <Fragment set:html={close(".image")} />
+              </Fragment>
+            )}
+            <span class="sister-body">
+              <span class="sister-kind">{t.kind}</span>
+              <strong class="sister-title">{t.title}</strong>
+              <span class="sister-meta">{t.meta}</span>
+            </span>
+          </a>
+        ))}
+        <Fragment set:html={eachClose("sister")} />
+      </div>
+    </section>
+    <Fragment set:html={close("sister")} />
+  </Fragment>
+)}
+
+<style>
+  .sister-strip {
+    margin-top: var(--spacing-09);
+  }
+  .sister-heading {
+    font-size: var(--desktop-caption);
+    font-family: var(--monospace);
+    letter-spacing: 0.06em;
+    color: var(--content-secondary);
+    margin: 0 0 var(--spacing-05) 0;
+  }
+  .sister-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: var(--spacing-04);
+  }
+  .sister-card {
+    --accent: DarkOrange;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 12px;
+    border-radius: 10px;
+    background: #111;
+    box-shadow: 0 0 0 0.5px rgba(255,255,255,0.08);
+    border-inline-start: 3px solid var(--accent);
+    text-decoration: none;
+    min-width: 0;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .sister-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.15), 0 6px 20px rgba(0,0,0,0.4);
+  }
+  .sister-card[data-site="biographies"] { --accent: #c9a227; }
+  .sister-card[data-site="books"] { --accent: #2e9d6a; }
+  .sister-card[data-site="quotes"] { --accent: #8a63d2; }
+  .sister-card[data-site="quiz"] { --accent: #2f80ed; }
+  .sister-img {
+    flex: none;
+    width: 56px;
+    height: 56px;
+    object-fit: cover;
+    border-radius: 8px;
+    background: #1a1a1a;
+  }
+  .sister-card[data-site="biographies"] .sister-img,
+  .sister-card[data-site="quotes"] .sister-img {
+    border-radius: 50%;
+  }
+  .sister-body {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+  }
+  .sister-kind {
+    font-family: var(--monospace);
+    font-size: 11px;
+    color: var(--accent);
+  }
+  .sister-title {
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.4;
+    color: #f0f0f0;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .sister-meta {
+    font-size: 12px;
+    color: rgba(255,255,255,0.55);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+</style>

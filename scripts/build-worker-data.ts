@@ -18,6 +18,8 @@
  *     (workers/push/) builds notifications from (see src/lib/push-digest.ts).
  *  7. Stamps the build id into dist/sw.js, so each deploy installs a new
  *     service worker with a fresh precache.
+ *  8. Writes dist/sister-links.json: which articles mention each sibling-site
+ *     page (src/lib/sister-sites.ts), for those sites to link back here.
  */
 
 import fs from 'fs';
@@ -56,11 +58,17 @@ import {
 import { fnv1a } from '../src/lib/hash.ts';
 import { loadArticles } from '../src/lib/articles-data.ts';
 import { slugifyTag } from '../src/utils/tag-slug.ts';
-import { getQualifyingTags, getQualifyingTagSlugSet } from '../src/utils/tags.ts';
+import { getQualifyingTags, getQualifyingTagSlugSet, type TaggedArticle } from '../src/utils/tags.ts';
 import { categoryTiles, tagTiles } from '../src/utils/exploreTiles.ts';
 import { buildAuthorIndex } from '../src/utils/author-index.ts';
 import { personalBlogs } from '../src/data/personal-blogs.ts';
 import { buildPushDigest } from '../src/lib/push-digest.ts';
+import {
+    buildSisterIndex,
+    matchSisterLinks,
+    sisterStrip,
+    type SisterSnapshot,
+} from '../src/lib/sister-sites.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
@@ -75,16 +83,62 @@ const SHELLS = [
     { section: 'authors', slug: LISTING_SHELL_SLUG, out: 'author-shell.html' },
 ].map((s) => ({ ...s, src: path.join(DIST, s.section, s.slug, 'index.html') }));
 
-const RELATED_COUNT = 3;
+const RELATED_COUNT = 6;
+/** Tags this broad say little about what two articles share; they don't count for relatedness. */
+const RELATED_MAX_TAG_SIZE = 400;
 
-/** Up to RELATED_COUNT other articles of the category, picked deterministically per slug. */
-function pickRelated(articles: Article[], self: Article): Article[] {
+interface RelatedPick {
+    article: Article;
+    category: string;
+}
+
+/**
+ * Up to RELATED_COUNT articles for `self`: the ones sharing the most (and the
+ * most specific) tags first — from any category, so pages link across topics
+ * — topped up with deterministic picks from its own category.
+ */
+function pickRelated(
+    self: Article,
+    category: string,
+    categoryArticles: Article[],
+    tagArticles: Map<string, TaggedArticle[]>
+): RelatedPick[] {
+    const scores = new Map<string, { score: number; pick: RelatedPick }>();
+    for (const kw of new Set((self.keywords ?? []).map(slugifyTag))) {
+        const list = tagArticles.get(kw);
+        if (!list || list.length > RELATED_MAX_TAG_SIZE) continue;
+        const weight = 1 / Math.log2(list.length + 1);
+        for (const other of list) {
+            if (!other.slug || other.slug === self.slug) continue;
+            const entry = scores.get(other.slug) ?? { score: 0, pick: { article: other, category: other.category } };
+            entry.score += weight;
+            scores.set(other.slug, entry);
+        }
+    }
+    const tie = (slug: string) => fnv1a(`${self.slug}|${slug}`);
+    const result = [...scores.entries()]
+        .sort(([slugA, a], [slugB, b]) => b.score - a.score || tie(slugA) - tie(slugB))
+        .slice(0, RELATED_COUNT)
+        .map(([, { pick }]) => pick);
+
+    const taken = new Set(result.map((r) => r.article.slug));
+    for (const article of pickFromCategory(categoryArticles, self, RELATED_COUNT)) {
+        if (result.length >= RELATED_COUNT) break;
+        if (taken.has(article.slug)) continue;
+        taken.add(article.slug);
+        result.push({ article, category });
+    }
+    return result;
+}
+
+/** Up to `count` other articles of the category, picked deterministically per slug. */
+function pickFromCategory(articles: Article[], self: Article, count: number): Article[] {
     const others = articles.length - 1;
     if (others <= 0) return [];
     const picked = new Set<number>();
     const result: Article[] = [];
     let state = fnv1a(self.slug!) || 1;
-    for (let attempts = 0; result.length < Math.min(RELATED_COUNT, others) && attempts < 50; attempts++) {
+    for (let attempts = 0; result.length < Math.min(count, others) && attempts < 50; attempts++) {
         state = Math.imul(state ^ (state >>> 15), 0x2c1b3c6d) >>> 0; // xorshift-multiply step
         const index = state % articles.length;
         const candidate = articles[index]!;
@@ -123,10 +177,23 @@ function writeShards(dir: string, shards: object[]): number {
     return largest;
 }
 
-function buildArticleShards(categoryTitles: Record<string, string>) {
+function loadSisterIndex() {
+    const file = path.join(ROOT, 'src', 'data', 'sister-sites.json');
+    const snapshot = JSON.parse(fs.readFileSync(file, 'utf-8')) as SisterSnapshot;
+    return buildSisterIndex(snapshot);
+}
+
+/** Sibling page URL → the articles that name it (dist/sister-links.json). */
+type SisterBacklinks = Record<string, Array<{ title: string; url: string; author: string }>>;
+const SISTER_BACKLINKS_PER_PAGE = 12;
+
+function buildArticleShards(categoryTitles: Record<string, string>, sisters: ReturnType<typeof loadSisterIndex>) {
     const data = loadArticles();
     // A tag gets a page once it has MIN_TAG_ARTICLES keyword occurrences.
     const tagPages = getQualifyingTagSlugSet();
+    const tagArticles = new Map(getQualifyingTags().map((t) => [t.slug, t.articles]));
+    const backlinks: SisterBacklinks = {};
+    const authorNames = buildAuthorIndex();
 
     const shards: ArticleShard[] = Array.from({ length: SHARD_COUNT }, () => ({}));
     let count = 0;
@@ -165,18 +232,31 @@ function buildArticleShards(categoryTitles: Record<string, string>) {
                     const slug = slugifyTag(kw);
                     return [kw, tagPages.has(slug) ? slug : null];
                 }),
-                related: pickRelated(cat.content, a).map((r) => [
+                related: pickRelated(a, cat.category, cat.content, tagArticles).map(({ article: r, category }) => [
                     r.slug!,
                     r.title,
                     r.original_img_url,
                     r.screen_name,
+                    categoryTitles[category]!,
                 ]),
             };
+            const matched = matchSisterLinks(sisters, a.keywords, a.title);
+            record.sister = sisterStrip(sisters, matched, a.slug);
+            for (const link of matched) {
+                const list = (backlinks[link[4]] ??= []);
+                if (list.length < SISTER_BACKLINKS_PER_PAGE) {
+                    list.push({
+                        title: a.title,
+                        url: `https://elhellal.com/articles/${encodeURIComponent(a.slug)}/`,
+                        author: authorNames.get(a.screen_name)?.displayName || a.screen_name,
+                    });
+                }
+            }
             shards[shardOf(a.slug)]![a.slug] = record;
             count++;
         }
     }
-    return { shards, count, duplicates };
+    return { shards, count, duplicates, backlinks };
 }
 
 /** Newest first, like the static listing pages sorted (stable for equal dates). */
@@ -184,7 +264,11 @@ function byNewest<T extends { created_at: string }>(a: T, b: T): number {
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
 }
 
-function buildListingShards(categoryTitles: Record<string, string>) {
+const TAG_TOP_WRITERS = 3;
+const TAG_TOP_CATEGORIES = 3;
+
+function buildListingShards(categoryTitles: Record<string, string>, sisters: ReturnType<typeof loadSisterIndex>) {
+    const authorIndex = buildAuthorIndex();
     const listings: ListingShard[] = Array.from({ length: LISTING_SHARDS }, () => ({}));
     const feeds: Array<Record<string, FeedCard[]>> = Array.from({ length: LISTING_FEED_SHARDS }, () => ({}));
     let tagCount = 0;
@@ -216,11 +300,33 @@ function buildListingShards(categoryTitles: Record<string, string>) {
             .sort(byNewest)
             .filter((a) => a.slug && !seen.has(a.slug) && !!seen.add(a.slug))
             .map((a) => toFeedCard(a, a.category));
+
+        const writerCounts = new Map<string, number>();
+        const categoryCounts = new Map<string, number>();
+        for (const a of tag.articles) {
+            if (a.screen_name) writerCounts.set(a.screen_name, (writerCounts.get(a.screen_name) || 0) + 1);
+            categoryCounts.set(a.category, (categoryCounts.get(a.category) || 0) + 1);
+        }
+        const top = (counts: Map<string, number>, n: number) =>
+            [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, n).map(([k]) => k);
+        const newest = cards[0]?.date;
+        const sister = matchSisterLinks(sisters, [tag.label], '');
+
         add(
             {
                 kind: 'tag',
                 slug: tag.slug,
                 label: tag.label,
+                writerCount: writerCounts.size,
+                writers: top(writerCounts, TAG_TOP_WRITERS).map((screenName): [string, string] => [
+                    screenName,
+                    authorIndex.get(screenName)?.displayName || `@${screenName}`,
+                ]),
+                categories: top(categoryCounts, TAG_TOP_CATEGORIES)
+                    .filter((c) => categoryTitles[c])
+                    .map((c): [string, string] => [c, categoryTitles[c]!]),
+                ...(newest ? { latestDateAr: formatDateAr(newest) } : {}),
+                ...(sister.length ? { sister: sister.slice(0, 3) } : {}),
                 total: cards.length,
                 cards: cards.slice(0, LISTING_INITIAL),
                 // Tags that show up alongside this one
@@ -329,10 +435,11 @@ function main() {
         categoryTitles[cat.category] = cat.title || cat.category.charAt(0).toUpperCase() + cat.category.slice(1);
     }
 
-    const articles = buildArticleShards(categoryTitles);
+    const sisters = loadSisterIndex();
+    const articles = buildArticleShards(categoryTitles, sisters);
     const largestArticles = writeShards(path.join(DATA_DIR, 'articles'), articles.shards);
 
-    const listings = buildListingShards(categoryTitles);
+    const listings = buildListingShards(categoryTitles, sisters);
     const largestListings = writeShards(path.join(DATA_DIR, 'listings'), listings.listings);
     const largestFeeds = writeShards(path.join(DATA_DIR, 'feeds'), listings.feeds);
 
@@ -343,16 +450,20 @@ function main() {
     const digest = buildPushDigest(articles.shards.flatMap((shard) => Object.values(shard)), categoryTitles);
     fs.writeFileSync(path.join(DATA_DIR, 'push-digest.json'), JSON.stringify(digest));
     stampServiceWorker(buildId);
+    fs.writeFileSync(path.join(DIST, 'sister-links.json'), JSON.stringify({ v: 1, pages: articles.backlinks }));
 
     const articlePaths = articles.shards
         .flatMap((shard) => Object.values(shard))
         .sort((a, b) => b.created_at.localeCompare(a.created_at) || a.slug.localeCompare(b.slug))
         .map((r) => ({ path: `/articles/${encodeURIComponent(r.slug)}/`, lastmod: r.created_at }));
+    // lastmod: the newest article in the listing, i.e. when the page last changed.
     const listingPaths = listings.listings
         .flatMap((shard) => Object.values(shard))
-        .map((r) => `/${r.kind === 'tag' ? 'tags' : 'authors'}/${encodeURIComponent(listingName(r))}/`)
-        .sort()
-        .map((p) => ({ path: p }));
+        .map((r) => ({
+            path: `/${r.kind === 'tag' ? 'tags' : 'authors'}/${encodeURIComponent(listingName(r))}/`,
+            lastmod: r.cards[0]?.date,
+        }))
+        .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
     const sitemapCount = writeSitemaps('articles', articlePaths) + writeSitemaps('listings', listingPaths);
 
     const kb = (n: number) => `${(n / 1024).toFixed(0)} KB`;
@@ -366,6 +477,7 @@ function main() {
         `(largest ${kb(largestFeeds)}); ${sitemapCount} sitemaps`
     );
     console.log(`✅ Push digest: ${digest.articles.length} articles; sw.js stamped ${buildId}`);
+    console.log(`✅ Sister links: ${Object.keys(articles.backlinks).length} sibling pages named by articles`);
 }
 
 function stampServiceWorker(buildId: string) {
@@ -388,7 +500,7 @@ function escapeXml(text: string): string {
  * doesn't list them. Writes dist/sitemap-<name>-N.xml and adds them to the
  * sitemap-index.xml that @astrojs/sitemap generated.
  */
-function writeSitemaps(name: string, pages: Array<{ path: string; lastmod?: string }>): number {
+function writeSitemaps(name: string, pages: Array<{ path: string; lastmod?: string | undefined }>): number {
     const prefix = `sitemap-${name}-`;
     for (const old of fs.readdirSync(DIST).filter((f) => f.startsWith(prefix))) {
         fs.rmSync(path.join(DIST, old));

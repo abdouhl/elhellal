@@ -11,6 +11,9 @@ import { ARTICLE_SHELL_SLUG } from "../../lib/article-page";
 import { shellMarkers } from "../../lib/shell-template";
 import { VIEWS_API_BASE } from "../../config/views";
 import { HERO_SIZES, HERO_WIDTHS, RELATED_WIDTH, resizeImage, responsiveImage } from "../../lib/images";
+import SisterStrip, { type SisterTile } from "../../components/SisterStrip.astro";
+import { buildSisterIndex, sisterStrip, sisterTiles, type SisterSnapshot } from "../../lib/sister-sites";
+import sisterSnapshot from "../../data/sister-sites.json";
 
 // This page renders in two modes:
 // - Personal-blog posts (src/content/*) prerender as ordinary static pages.
@@ -39,7 +42,7 @@ const isShell = slug === ARTICLE_SHELL_SLUG;
 const { open, close, eachOpen, eachClose } = shellMarkers(isShell);
 const T = (name: string) => `{{${name}}}`;
 
-interface RelatedCard { href: string; image: string; title: string; author: string }
+interface RelatedCard { href: string; image: string; title: string; author: string; category: string }
 
 interface ArticleView {
   seoTitle: string;
@@ -79,6 +82,7 @@ interface ArticleView {
   redditShareUrl: string;
   related: RelatedCard[];
   relatedHeading: string;
+  sister: SisterTile[];
 }
 
 let isPersonalPost = false;
@@ -123,8 +127,9 @@ if (isShell) {
     xShareUrl: T("xShareUrl"),
     linkedinShareUrl: T("linkedinShareUrl"),
     redditShareUrl: T("redditShareUrl"),
-    related: [{ href: T(".href"), image: T(".image"), title: T(".title"), author: T(".author") }],
-    relatedHeading: `المزيد في ${T("categoryTitle")}`,
+    related: [{ href: T(".href"), image: T(".image"), title: T(".title"), author: T(".author"), category: T(".category") }],
+    relatedHeading: "مقالات ذات صلة",
+    sister: [],
   };
 } else {
   let found: any;
@@ -183,8 +188,10 @@ if (isShell) {
           image: resizeImage(p.data.large || p.data.thumb || getPlaceholderImage(), RELATED_WIDTH),
           title: p.data.title,
           author: person!.nameAr,
+          category: person!.nameAr,
         })),
         relatedHeading: `مقالات أخرى لـ ${person.nameAr}`,
+        sister: sisterTiles(sisterStrip(buildSisterIndex(sisterSnapshot as SisterSnapshot), [], found.slug)),
       };
       break;
     }
@@ -603,7 +610,7 @@ import InstallCard from "../../components/InstallCard.astro";
                     decoding="async"
                     onerror="this.src='/favicons/default.png'"
                   />
-                  <span class="related-tag">{v.categoryTitle}</span>
+                  <span class="related-tag">{t.category}</span>
                 </div>
                 <div class="related-body">
                   <strong class="related-title">{t.title}</strong>
@@ -623,6 +630,8 @@ import InstallCard from "../../components/InstallCard.astro";
         <Fragment set:html={close("related")} />
       </Fragment>
     )}
+
+    <SisterStrip shell={isShell} tiles={v.sister} />
 
     <div class="page-nav">
       <a href={v.fallbackPath} class="back-link">العودة إلى {v.categoryTitle} →</a>
