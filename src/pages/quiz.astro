@@ -1,0 +1,64 @@
+---
+// /quiz/ — the app's Quiz tab: the endless quiz from quiz.elhellal.com, framed
+// so the installed app keeps its header and tab bar (a link out would open a
+// browser sheet over the app). ../elhellal-quiz hides its own footer and
+// banners when framed.
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout
+    site="الهلال"
+    title="اختبار"
+    tagline="أسئلة لا تنتهي في الجغرافيا والعلوم والتاريخ والأدب"
+    pageTitle="اختبر معلوماتك — أسئلة لا تنتهي | الهلال"
+    pageDescription="اختبار عربي لا ينتهي: أسئلة في الجغرافيا والعلوم والتاريخ والأدب، وسؤال جديد كل يوم."
+    canonicalUrl="https://quiz.elhellal.com/"
+    ogUrl="https://elhellal.com/quiz/"
+>
+    <main id="main-content" class="quiz-frame-page">
+        <h1 class="visually-hidden">اختبر معلوماتك</h1>
+        <iframe
+            id="quiz-frame"
+            src="https://quiz.elhellal.com/?embed=app"
+            title="اختبر معلوماتك"
+            allow="clipboard-write; web-share"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
+            loading="eager"></iframe>
+    </main>
+</Layout>
+
+<script>
+    // The frame fills the screen between the header and the tab bar.
+    function fit() {
+        const frame = document.getElementById("quiz-frame");
+        if (!frame) return;
+        frame.style.setProperty("--quiz-top", `${Math.max(0, frame.getBoundingClientRect().top + scrollY)}px`);
+    }
+    document.addEventListener("astro:page-load", () => {
+        fit();
+        addEventListener("resize", fit);
+    });
+</script>
+
+<style>
+    .quiz-frame-page {
+        padding: 0;
+    }
+    .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+    }
+    #quiz-frame {
+        display: block;
+        width: 100%;
+        height: calc(100dvh - var(--quiz-top, 120px) - var(--tabbar-height, 0px) - env(safe-area-inset-bottom, 0px));
+        min-height: 480px;
+        border: 0;
+        background: #000;
+        color-scheme: dark;
+    }
+</style>
