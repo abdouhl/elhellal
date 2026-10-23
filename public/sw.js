@@ -22,7 +22,12 @@
  * which is never trimmed: the page sends the full list of their URLs
  * ({ type: 'sync-saved' }, src/scripts/pwa.ts) whenever bookmarks change.
  * The installed app likewise hands over the home page's top articles once a
- * day ({ type: 'sync-daily' }), replacing the previous day's "daily" cache.
+ * day ({ type: 'sync-daily' }), replacing the previous day's "daily" cache,
+ * and /today/ its five articles ({ type: 'sync-today' }, the "today" cache).
+ *
+ * Periodic background sync (Chromium's installed apps, src/scripts/reading.ts)
+ * refreshes the push digest /today/ deals from and, on a new day, badges the
+ * app icon with the five new articles waiting.
  *
  * scripts/build-worker-data.ts stamps the build id below into dist/sw.js, so
  * every deploy installs a new worker and refreshes the precache. Pages are
@@ -39,6 +44,10 @@ const IMAGES = 'images';
 const SAVED = 'saved';
 const DAILY = 'daily';
 const SISTERS = 'sisters';
+const TODAY = 'today';
+/** Small bits of state the pages hand over (the last day the app was used). */
+const META = 'meta';
+const DAILY_COUNT = 5;
 const LIMITS = { [PAGES]: 80, [DATA]: 150, [STATIC]: 200, [IMAGES]: 300 };
 const NETWORK_TIMEOUT_MS = 4000;
 
@@ -46,6 +55,9 @@ const PRECACHE_URLS = [
     '/',
     '/saved/',
     '/explore/',
+    '/today/',
+    '/me/',
+    '/random/',
     '/offline/',
     '/manifest.json',
     '/xarticles.svg',
@@ -252,6 +264,47 @@ self.addEventListener('message', (event) => {
     if (msg && msg.type === 'sync-daily' && Array.isArray(msg.urls)) {
         event.waitUntil(syncCache(DAILY, msg.urls.slice(0, 60)));
     }
+    if (msg && msg.type === 'sync-today' && Array.isArray(msg.urls)) {
+        event.waitUntil(syncCache(TODAY, msg.urls.slice(0, 20)));
+    }
+    if (msg && msg.type === 'last-visit' && Number.isInteger(msg.day)) {
+        event.waitUntil(
+            caches.open(META).then((cache) => cache.put('/__meta/last-visit', new Response(JSON.stringify({ day: msg.day }))))
+        );
+    }
+});
+
+// ─── Daily refresh (periodic background sync) ────────────────────────────────
+
+/** Days since the epoch on the device's calendar, like src/lib/reading.ts localDay(). */
+function localDay() {
+    const d = new Date();
+    return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86_400_000);
+}
+
+self.addEventListener('periodicsync', (event) => {
+    if (event.tag !== 'daily-refresh') return;
+    event.waitUntil(
+        (async () => {
+            const data = await caches.open(DATA);
+            await Promise.all(
+                ['/_data/push-digest.json', '/_data/random.json'].map(async (url) => {
+                    try {
+                        const res = await fetch(url, { cache: 'no-cache' });
+                        if (res.ok) await data.put(url, res);
+                    } catch {
+                        // offline: next time
+                    }
+                })
+            );
+            const meta = await (await caches.open(META)).match('/__meta/last-visit');
+            const last = meta ? (await meta.json()).day : null;
+            // A new day since the app was last open: a fresh five are waiting.
+            if (last !== null && last < localDay() && self.navigator.setAppBadge) {
+                await self.navigator.setAppBadge(DAILY_COUNT).catch(() => {});
+            }
+        })()
+    );
 });
 
 /** Makes cacheName hold exactly urls: drops the rest, fetches what's missing. */

@@ -40,7 +40,8 @@
     "created_at": "2025-04-20",
     "url": "https://1234257068.substack.com/p/5b1",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!azSY!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F21a067b3-741a-4fc8-ad18-890efeb554f2_1024x705.jpeg",
-    "slug": "السلطنة-وعربها"
+    "slug": "السلطنة-وعربها",
+    "minutes": 13
   },
   {
     "id_str": "2091800570573078178",
@@ -73,7 +74,8 @@
     "created_at": "2025-04-03",
     "url": "https://walidxtaha.substack.com/p/39d",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!Badh!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fbe5e2af3-489e-4408-beac-2acb554b4d50_2048x1152.jpeg",
-    "slug": "العيدية"
+    "slug": "العيدية",
+    "minutes": 5
   },
   {
     "id_str": "2689202601658215639",
@@ -94,7 +96,8 @@
     "url": "https://hashimtarek.substack.com/p/b38",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!wpfp!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F134f022e-ce81-4e4a-a208-e363847e1f7f_736x978.jpeg",
     "profile_image_url_https": "https://substackcdn.com/image/fetch/$s_!WIWs!,w_256,c_limit,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fdcf94796-f316-4561-b271-1e00c8fce673_1057x1057.png",
-    "slug": "اللهفة-الاستحواذية"
+    "slug": "اللهفة-الاستحواذية",
+    "minutes": 7
   },
   {
     "id_str": "7337363981951348922",
@@ -123,7 +126,8 @@
     "screen_name": "mzeidan",
     "created_at": "2025-04-21",
     "url": "https://mzeidan.substack.com/p/4a6",
-    "original_img_url": "https://substackcdn.com/image/fetch/$s_!TTZk!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F590c4cf9-4540-4617-b6f9-3289599e2cf2_770x513.jpeg"
+    "original_img_url": "https://substackcdn.com/image/fetch/$s_!TTZk!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F590c4cf9-4540-4617-b6f9-3289599e2cf2_770x513.jpeg",
+    "minutes": 3
   },
   {
     "id_str": "1241703258249298924",
@@ -143,7 +147,8 @@
     "created_at": "2025-04-19",
     "url": "https://abdallahaljurf.substack.com/p/new-post",
     "original_img_url": "https://substack-post-media.s3.amazonaws.com/public/images/46c0afe7-0ed3-47ca-b68e-06460a6f18a2_1292x336.png",
-    "slug": "سر-قيادي-يصنع-نجاحك-او-فشلك"
+    "slug": "سر-قيادي-يصنع-نجاحك-او-فشلك",
+    "minutes": 3
   },
   {
     "id_str": "3604262540756707773",
@@ -153,7 +158,8 @@
     "created_at": "2025-04-24",
     "url": "https://ahmedkanoreadings.substack.com/p/b38",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!JEYS!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F9a843daf-ea37-4938-be24-7f1cd19ad0f6_1440x560.png",
-    "slug": "علماء-التشريح-النازيون"
+    "slug": "علماء-التشريح-النازيون",
+    "minutes": 48
   },
   {
     "id_str": "8664085459151829267",
@@ -162,7 +168,8 @@
     "screen_name": "mzeidan",
     "created_at": "2025-04-06",
     "url": "https://mzeidan.substack.com/p/b7a",
-    "original_img_url": "https://substack-post-media.s3.amazonaws.com/public/images/1a9e00df-1cfe-4904-aa2d-fced33f73a2f_850x453.png"
+    "original_img_url": "https://substack-post-media.s3.amazonaws.com/public/images/1a9e00df-1cfe-4904-aa2d-fced33f73a2f_850x453.png",
+    "minutes": 2
   },
   {
     "id_str": "1439976133630375774",
@@ -192,7 +199,8 @@
     "created_at": "2025-04-20",
     "url": "https://1234257068.substack.com/p/9fe",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!RV6A!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F42c5c485-edd6-45f8-8e27-abad3ba86e84_1120x746.png",
-    "slug": "من-يكتب-المدينة-بيروت-بين-السلطة-والمخيال"
+    "slug": "من-يكتب-المدينة-بيروت-بين-السلطة-والمخيال",
+    "minutes": 13
   },
   {
     "id_str": "1338313884990187939",

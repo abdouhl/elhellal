@@ -20,6 +20,8 @@
  *     service worker with a fresh precache.
  *  8. Writes dist/sister-links.json: which articles mention each sibling-site
  *     page (src/lib/sister-sites.ts), for those sites to link back here.
+ *  9. Writes dist/_data/random.json, the pool /random/ draws "مقال عشوائي"
+ *     from: summarised articles, a fresh sample each build.
  */
 
 import fs from 'fs';
@@ -187,6 +189,24 @@ function loadSisterIndex() {
 type SisterBacklinks = Record<string, Array<{ title: string; url: string; author: string }>>;
 const SISTER_BACKLINKS_PER_PAGE = 12;
 
+/** Articles /random/ draws from (src/pages/random.astro). */
+const RANDOM_POOL_SIZE = 2000;
+
+/**
+ * [slug, category, minutes] of up to RANDOM_POOL_SIZE summarised articles
+ * (the ones whose page has something to read), sampled per build so the pool
+ * changes with each deploy without growing with the catalog.
+ */
+function buildRandomPool(shards: ArticleShard[], buildId: string): Array<[string, string, number]> {
+    return shards
+        .flatMap((shard) => Object.values(shard))
+        .filter((r) => r.tldr)
+        .map((r) => ({ r, key: fnv1a(`${buildId}|${r.slug}`) }))
+        .sort((a, b) => a.key - b.key)
+        .slice(0, RANDOM_POOL_SIZE)
+        .map(({ r }) => [r.slug, r.category, r.minutes ?? 0]);
+}
+
 function buildArticleShards(categoryTitles: Record<string, string>, sisters: ReturnType<typeof loadSisterIndex>) {
     const data = loadArticles();
     // A tag gets a page once it has MIN_TAG_ARTICLES keyword occurrences.
@@ -225,6 +245,7 @@ function buildArticleShards(categoryTitles: Record<string, string>, sisters: Ret
                 whyThisMatters: a.whyThisMatters,
                 whoShouldRead: a.whoShouldRead,
                 metaDescription: a.metaDescription,
+                minutes: a.minutes,
                 category: cat.category,
                 categoryTitle: categoryTitles[cat.category]!,
                 dateAr: formatDateAr(a.created_at),
@@ -451,6 +472,7 @@ function main() {
     fs.writeFileSync(path.join(DATA_DIR, 'push-digest.json'), JSON.stringify(digest));
     stampServiceWorker(buildId);
     fs.writeFileSync(path.join(DIST, 'sister-links.json'), JSON.stringify({ v: 1, pages: articles.backlinks }));
+    fs.writeFileSync(path.join(DATA_DIR, 'random.json'), JSON.stringify(buildRandomPool(articles.shards, buildId)));
 
     const articlePaths = articles.shards
         .flatMap((shard) => Object.values(shard))

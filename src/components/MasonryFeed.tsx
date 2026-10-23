@@ -6,6 +6,7 @@ import './CardsContainer.css';
 import './MasonryFeed.css';
 import { seededShuffle } from '../utils/sorting';
 import { isRecentlyAdded } from '../utils/dates';
+import { SHORT_READ_MINUTES } from '../lib/reading-time';
 import {
     compareAlpha,
     feedPageCount,
@@ -40,6 +41,9 @@ const SORT_TABS: Array<{ key: FeedSortTab; label: string }> = [
     { key: 'random', label: 'اكتشف' },
     { key: 'nameAsc', label: 'أبجدياً' },
 ];
+
+/** "قراءة سريعة": cards whose original post is known to be short. */
+const isShort = (c: FeedCard) => !!c.min && c.min <= SHORT_READ_MINUTES;
 
 type FeedItem =
     | { type: 'card'; key: string; order: number; card: FeedCard }
@@ -95,6 +99,7 @@ export default function MasonryFeed({ scope, total = 0, initialCards = [], cards
     const [seed, setSeed] = useState(42);
     const [searchQuery, setSearchQuery] = useState('');
     const [filterNew, setFilterNew] = useState(false);
+    const [filterShort, setFilterShort] = useState(false);
     // Big feeds start with just their server-rendered cards and grow on scroll.
     const [displayedCount, setDisplayedCount] = useState(
         cards === undefined && initialCards.length > 0 ? initialCards.length : ITEMS_PER_PAGE
@@ -149,11 +154,11 @@ export default function MasonryFeed({ scope, total = 0, initialCards = [], cards
         [order, scope]
     );
 
-    const runKey = `${order}|${pageOrder.join(',')}|${tokens.join(' ')}|${filterNew}`;
+    const runKey = `${order}|${pageOrder.join(',')}|${tokens.join(' ')}|${filterNew}|${filterShort}`;
     // The server-rendered first cards are page 0 of the default run, so it
     // starts pre-filled and only fetches when the reader scrolls past them.
     const initialRun = (): Run => {
-        const isDefault = order === 'newest' && pageOrder[0] === 0 && !searching && !filterNew;
+        const isDefault = order === 'newest' && pageOrder[0] === 0 && !searching && !filterNew && !filterShort;
         if (inline) return { key: runKey, items: [], nextPage: 0, done: false, loading: false };
         return isDefault && initialCards.length > 0
             ? { key: runKey, items: initialCards, nextPage: 0, done: pageCount === 0, loading: false }
@@ -177,8 +182,9 @@ export default function MasonryFeed({ scope, total = 0, initialCards = [], cards
         const base = order === 'alpha' ? [...cards].sort(compareAlpha) : cards;
         let list = base.filter((c) => matchesQuery(c, tokens));
         if (filterNew) list = list.filter((c) => isRecentlyAdded(c.date, NEW_DAYS));
+        if (filterShort) list = list.filter(isShort);
         return list;
-    }, [inline, cards, order, tokens, filterNew]);
+    }, [inline, cards, order, tokens, filterNew, filterShort]);
 
     // Paged feeds: read more feed files until there are enough matches to show.
     useEffect(() => {
@@ -210,6 +216,7 @@ export default function MasonryFeed({ scope, total = 0, initialCards = [], cards
                             if (fresh.length < rows.length) done = true;
                             rows = fresh;
                         }
+                        if (filterShort) rows = rows.filter(isShort);
                         items = items.concat(rows.filter((c) => matchesQuery(c, tokens)));
                     });
                     const nextPage = prev.nextPage + batch.length;
@@ -219,7 +226,7 @@ export default function MasonryFeed({ scope, total = 0, initialCards = [], cards
             .catch(() => {
                 setRun((prev) => (prev.key === key ? { ...prev, done: true, loading: false } : prev));
             });
-    }, [inline, current, displayedCount, pageOrder, searching, loadPage, sort, filterNew, seed, tokens]);
+    }, [inline, current, displayedCount, pageOrder, searching, loadPage, sort, filterNew, filterShort, seed, tokens]);
 
     const filteredCards = useMemo((): FeedCard[] => {
         const list = inlineItems ?? current.items;
@@ -272,7 +279,7 @@ export default function MasonryFeed({ scope, total = 0, initialCards = [], cards
     };
 
     // Unfiltered big feeds know their size up front; filtered ones count what's found so far.
-    const countLabel = !inline && !searching && !filterNew
+    const countLabel = !inline && !searching && !filterNew && !filterShort
         ? total
         : `${filteredCards.length}${complete ? '' : '+'}`;
     const stillLooking = !complete && filteredCards.length === 0;
@@ -292,6 +299,15 @@ export default function MasonryFeed({ scope, total = 0, initialCards = [], cards
                         {tab.label}
                     </button>
                 ))}
+                <button
+                    type="button"
+                    className={`feed-tab feed-filter ${filterShort ? 'is-active' : ''}`}
+                    aria-pressed={filterShort}
+                    title={`مقالات تُقرأ في ${SHORT_READ_MINUTES} دقائق أو أقل`}
+                    onClick={() => setFilterShort((v) => !v)}
+                >
+                    ⏱ قصيرة
+                </button>
                 <span className="feed-count">{countLabel} مقالة</span>
             </div>
 
@@ -323,6 +339,7 @@ export default function MasonryFeed({ scope, total = 0, initialCards = [], cards
                                             internalHref={item.card.internalHref}
                                             category={categoryTitles[item.card.category] || item.card.category}
                                             image={item.card.img}
+                                            minutes={item.card.min}
                                             authorHref={item.card.authorHref}
                                             authorLabel={item.card.authorName}
                                             priority={item.order === 0}

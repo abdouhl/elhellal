@@ -1168,7 +1168,7 @@ async function renderStats() {
 // ─── Push notifications (workers/push) ───
 const PUSH_FORM = { title: '', body: '', url: '/', image: '', category: '', audience: '', service: '' };
 const push = { stats: null, error: null, loading: false, days: 14, form: { ...PUSH_FORM }, reach: null };
-const EVENT_LABELS = { 'new-install': 'New installs', 'app-open': 'App opens', installed: 'Installed (Chrome)', 'install-accepted': 'Install accepted', 'install-dismissed': 'Install declined', 'banner-shown': 'Banner shown', 'banner-shown-ios': 'Banner shown (iOS)', 'banner-clicked': 'Banner tapped', 'banner-dismissed': 'Banner dismissed', 'cta-clicked': 'Install button', 'link-clicked': 'Install link', 'card-clicked': 'Install card', 'app-page': '/app/ views', 'quiz-answered': 'Quiz of the day answered', 'app-page-quotes': '/app/ from quotes', 'app-page-books': '/app/ from books', 'app-page-biographies': '/app/ from biographies', 'app-page-quiz': '/app/ from quiz', 'app-clicked': '/app/ button', 'guide-shown': 'Steps shown', 'inapp-shown': 'In-app browser', 'inapp-opened': 'Left in-app browser', 'new-sub': 'New subscribers', subscribed: 'Subscribed', unsubscribed: 'Unsubscribed', 'notify-dismissed': 'Notify banner dismissed', sent: 'Sent', click: 'Clicks', failed: 'Failed', gone: 'Expired' };
+const EVENT_LABELS = { 'new-install': 'New installs', 'app-open': 'App opens', installed: 'Installed (Chrome)', 'install-accepted': 'Install accepted', 'install-dismissed': 'Install declined', 'banner-shown': 'Banner shown', 'banner-shown-ios': 'Banner shown (iOS)', 'banner-clicked': 'Banner tapped', 'banner-dismissed': 'Banner dismissed', 'cta-clicked': 'Install button', 'link-clicked': 'Install link', 'card-clicked': 'Install card', 'app-page': '/app/ views', 'quiz-answered': 'Quiz of the day answered', 'app-page-quotes': '/app/ from quotes', 'app-page-books': '/app/ from books', 'app-page-biographies': '/app/ from biographies', 'app-page-quiz': '/app/ from quiz', 'app-clicked': '/app/ button', 'guide-shown': 'Steps shown', 'inapp-shown': 'In-app browser', 'inapp-opened': 'Left in-app browser', 'new-sub': 'New subscribers', subscribed: 'Subscribed', unsubscribed: 'Unsubscribed', 'notify-dismissed': 'Notify banner dismissed', sent: 'Sent', click: 'Clicks', failed: 'Failed', gone: 'Expired', read: 'Articles read (subscribers)', suggested: 'Links suggested' };
 const PLATFORM_LABELS = { ios: 'iPhone / iPad', android: 'Android', desktop: 'Desktop', other: 'Other' };
 const SERVICE_LABELS = { apple: 'Apple (Safari / iOS)', fcm: 'Chrome / Edge / Android', mozilla: 'Firefox', windows: 'Windows', other: 'Other' };
 
@@ -1282,6 +1282,15 @@ async function renderPush() {
     d.categories.length ? h('div', { class: 'list' }, h('table', {}, h('tr', {}, h('th', {}, 'Category'), h('th', { class: 'num' }, 'Subscribers')),
       d.categories.map((c) => h('tr', {}, h('td', {}, stats.categories.find((x) => x.category === c.category)?.title ?? c.category), h('td', { class: 'num' }, c.n)))))
       : h('div', { class: 'empty' }, 'Everyone follows all categories'),
+    h('h2', {}, 'Reading habit (subscribers)'),
+    d.reading ? h('div', { class: 'list' }, h('table', {},
+      h('tr', {}, h('th', { class: 'num' }, 'Read today/yesterday'), h('th', { class: 'num' }, 'On a 2+ day streak'), h('th', { class: 'num' }, 'Longest streak'), h('th', { class: 'num' }, 'Follow someone')),
+      h('tr', {}, h('td', { class: 'num' }, d.reading.active), h('td', { class: 'num' }, d.reading.streaking), h('td', { class: 'num' }, d.reading.longest), h('td', { class: 'num' }, d.reading.following))))
+      : h('div', { class: 'empty' }, 'No reading data yet'),
+    h('h2', {}, 'Suggested articles (share target)'),
+    d.suggestions.length ? h('div', { class: 'list' }, h('table', {}, h('tr', {}, h('th', {}, 'When'), h('th', {}, 'Link'), h('th', { class: 'num' }, 'Times')),
+      d.suggestions.map((x) => h('tr', {}, h('td', {}, new Date(x.created_at).toLocaleString()), h('td', { dir: 'auto' }, h('a', { href: x.url, target: '_blank', rel: 'noopener' }, x.title || x.url)), h('td', { class: 'num' }, x.n)))))
+      : h('div', { class: 'empty' }, 'No suggestions yet'),
     h('h2', {}, 'Sent from here'),
     d.broadcasts.length ? h('div', { class: 'list' }, h('table', {}, h('tr', {}, h('th', {}, 'When'), h('th', {}, 'Title'), h('th', {}, 'Target'), h('th', { class: 'num' }, 'Queued')),
       d.broadcasts.map((b) => h('tr', {}, h('td', {}, new Date(b.created_at).toLocaleString()), h('td', { dir: 'auto', title: b.body }, b.title), h('td', {}, b.target), h('td', { class: 'num' }, b.queued)))))

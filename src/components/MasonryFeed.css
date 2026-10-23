@@ -36,6 +36,20 @@
   border-bottom-color: DarkOrange;
 }
 
+.feed-filter {
+  margin-inline-start: 8px;
+  align-self: center;
+  padding: 5px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.feed-filter.is-active {
+  border-color: DarkOrange;
+  background: rgba(255, 140, 0, 0.12);
+}
+
 .feed-count {
   margin-inline-start: auto;
   font-family: var(--monospace);

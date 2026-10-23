@@ -43,6 +43,7 @@
     "linkedin-schedule": "bun run scripts/linkedin-schedule.ts",
     "update-metadata": "bun run scripts/update-metadata.ts",
     "fetch-author-names": "bun run scripts/fetch-author-names.ts",
+    "backfill-reading-time": "bun run scripts/backfill-reading-time.ts",
     "discover-substack": "bun run scripts/discover-substack.ts",
     "generate-pins": "bun run scripts/generate-pinterest-pin.ts",
     "tiktok-slides": "bun run scripts/generate-tiktok-slideshow.ts",

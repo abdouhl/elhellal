@@ -1,0 +1,493 @@
+---
+// /me/ — "قراءاتي": the reader's own reading life, from this device's history
+// (src/lib/reading.ts): streak and its last 12 weeks, totals, favourite
+// categories, achievements, who and what they follow, and this week's recap
+// as a picture to share. Nothing here leaves the device.
+import Layout from "../layouts/Layout.astro";
+import { getCategoryTitles } from "../lib/feed-data";
+import { BADGES } from "../lib/reading";
+
+const categoryTitles = getCategoryTitles();
+---
+
+<Layout
+    site="الهلال"
+    title="قراءاتي"
+    tagline="سلسلتك وإحصاءاتك وإنجازاتك"
+    pageTitle="قراءاتي"
+    pageDescription="سلسلة قراءتك، وما قرأت، وإنجازاتك على الهلال."
+    noindex
+>
+    <main id="main-content" class="me">
+        <h1>قراءاتي</h1>
+
+        <section class="me-streak">
+            <div class="me-flame" data-flame>🔥</div>
+            <div>
+                <p class="me-big"><span data-current>0</span> <small data-current-word>يوم</small></p>
+                <p class="me-sub" data-streak-text></p>
+            </div>
+        </section>
+
+        <div class="me-cal" data-cal aria-label="أيام القراءة في آخر 12 أسبوعاً"></div>
+
+        <section class="me-stats">
+            <div><strong data-stat="reads">0</strong><span>مقالاً قرأت</span></div>
+            <div><strong data-stat="minutes">0</strong><span>دقيقة</span></div>
+            <div><strong data-stat="authors">0</strong><span>كاتباً</span></div>
+            <div><strong data-stat="best">0</strong><span>أطول سلسلة</span></div>
+        </section>
+
+        <section class="me-section" id="recap">
+            <h2>أسبوعك</h2>
+            <p class="me-recap" data-recap></p>
+            <button type="button" class="me-btn" data-share-recap>شارك أسبوعك</button>
+        </section>
+
+        <section class="me-section" data-cats-section hidden>
+            <h2>أكثر ما تقرأ</h2>
+            <ul class="me-bars" data-cats></ul>
+        </section>
+
+        <section class="me-section" id="badges">
+            <h2>الإنجازات <small data-badge-count></small></h2>
+            <ul class="me-badges">
+                {BADGES.map((b) => (
+                    <li data-badge={b.id}>
+                        <span class="me-badge-icon">{b.icon}</span>
+                        <strong>{b.title}</strong>
+                        <small>{b.text}</small>
+                    </li>
+                ))}
+            </ul>
+        </section>
+
+        <section class="me-section" id="follows">
+            <h2>تتابع</h2>
+            <p class="me-muted" data-follows-empty>لا تتابع أحداً بعد. اضغط «+ تابِع» بجانب اسم كاتب أو في صفحة وسم ليظهر جديده في رئيستك وورد يومك.</p>
+            <ul class="me-follows" data-follows></ul>
+        </section>
+
+        <section class="me-section">
+            <h2>الإعدادات</h2>
+            <label class="me-toggle"><input type="checkbox" data-streak-toggle /> إظهار السلسلة وتذكيرها</label>
+            <p class="me-muted">سجلّ قراءتك محفوظ على هذا الجهاز فقط. <a href="/notifications/">الإشعارات</a></p>
+        </section>
+    </main>
+</Layout>
+
+<script type="application/json" id="me-categories" set:html={JSON.stringify(categoryTitles)} />
+
+<script>
+    import { BADGES, localDay, readState, stats, streak, updateState, type ReadingState } from "../lib/reading";
+    import { reportFollows, reportRead } from "../scripts/reading";
+
+    const DAY_MS = 86_400_000;
+
+    function word(n: number): string {
+        if (n === 1) return "يوم";
+        if (n === 2) return "يومان";
+        return n >= 3 && n <= 10 ? "أيام" : "يوماً";
+    }
+
+    /** An Arabic count: [one, two, 3–10, 11+] ("دقيقة", "دقيقتين", "5 دقائق", "12 دقيقة"). */
+    function count(n: number, [one, two, few, many]: [string, string, string, string]): string {
+        if (n === 0) return `0 ${many}`;
+        if (n === 1) return one;
+        if (n === 2) return two;
+        return `${n} ${n <= 10 ? few : many}`;
+    }
+
+    function categories(): Record<string, string> {
+        try {
+            return JSON.parse(document.getElementById("me-categories")?.textContent || "{}");
+        } catch {
+            return {};
+        }
+    }
+
+    function renderCalendar(state: ReadingState, today: number) {
+        const cal = document.querySelector<HTMLElement>("[data-cal]")!;
+        const weeks = 12;
+        // Columns are weeks ending this Saturday; rows are Sunday..Saturday.
+        const weekday = new Date(today * DAY_MS).getUTCDay();
+        const last = today + (6 - weekday);
+        const cells: HTMLElement[] = [];
+        for (let d = last - weeks * 7 + 1; d <= last; d++) {
+            const cell = document.createElement("span");
+            const n = state.days[d] ?? 0;
+            cell.dataset.level = String(d > today ? -1 : Math.min(3, n));
+            cell.title = `${new Date(d * DAY_MS).toLocaleDateString("ar", { day: "numeric", month: "long", timeZone: "UTC" })}: ${n}`;
+            cells.push(cell);
+        }
+        cal.replaceChildren(...cells);
+    }
+
+    function recapText(state: ReadingState, today: number, titles: Record<string, string>): string {
+        const week = stats(state, today - 6);
+        if (!week.reads) return "لم تقرأ شيئاً في الأيام السبعة الأخيرة بعد. مقال واحد يبدأ أسبوعاً جديداً.";
+        const top = week.categories[0];
+        const reads = count(week.reads, ["مقالاً واحداً", "مقالين", "مقالات", "مقالاً"]);
+        const minutes = count(week.minutes, ["دقيقة", "دقيقتين", "دقائق", "دقيقة"]);
+        const days = count(week.activeDays, ["يوم واحد", "يومين", "أيام", "يوماً"]);
+        return `في آخر 7 أيام قرأت ${reads} في ${minutes}، على مدى ${days}${top ? `. أكثر ما قرأت: ${titles[top[0]] ?? top[0]}` : ""}.`;
+    }
+
+    /** This week's recap as a square picture (for stories and chats). */
+    async function recapImage(state: ReadingState, today: number, titles: Record<string, string>): Promise<Blob | null> {
+        const week = stats(state, today - 6);
+        const s = streak(state, today);
+        const c = document.createElement("canvas");
+        c.width = c.height = 1080;
+        const g = c.getContext("2d");
+        if (!g) return null;
+        const bg = g.createLinearGradient(0, 0, 1080, 1080);
+        bg.addColorStop(0, "#18123a");
+        bg.addColorStop(1, "#3a1d05");
+        g.fillStyle = bg;
+        g.fillRect(0, 0, 1080, 1080);
+        g.direction = "rtl";
+        g.textAlign = "center";
+        g.fillStyle = "#ff8c00";
+        g.font = "bold 64px system-ui, sans-serif";
+        g.fillText("أسبوعي على الهلال", 540, 170);
+        const rows: Array<[string, string]> = [
+            [String(week.reads), "مقالاً"],
+            [String(week.minutes), "دقيقة قراءة"],
+            [`🔥 ${s.current}`, "أيام متتالية"],
+        ];
+        rows.forEach(([big, small], i) => {
+            const y = 360 + i * 200;
+            g.fillStyle = "#ffffff";
+            g.font = "bold 120px system-ui, sans-serif";
+            g.fillText(big, 540, y);
+            g.fillStyle = "#c9c3e6";
+            g.font = "44px system-ui, sans-serif";
+            g.fillText(small, 540, y + 60);
+        });
+        const top = week.categories[0];
+        if (top) {
+            g.fillStyle = "#ffffff";
+            g.font = "40px system-ui, sans-serif";
+            g.fillText(`أكثر ما قرأت: ${titles[top[0]] ?? top[0]}`, 540, 960);
+        }
+        g.fillStyle = "#ff8c00";
+        g.font = "bold 36px system-ui, sans-serif";
+        g.fillText("elhellal.com", 540, 1030);
+        return new Promise((resolve) => c.toBlob(resolve, "image/png"));
+    }
+
+    function render() {
+        if (location.pathname !== "/me/") return;
+        const titles = categories();
+        const today = localDay();
+        const state = readState();
+        const s = streak(state, today);
+        const all = stats(state);
+
+        document.querySelector("[data-current]")!.textContent = String(s.current);
+        document.querySelector("[data-current-word]")!.textContent = word(s.current);
+        document.querySelector<HTMLElement>("[data-flame]")!.classList.toggle("is-out", !s.today);
+        document.querySelector("[data-streak-text]")!.textContent = s.today
+            ? s.frozen
+                ? "قرأت اليوم. وسامحناك في يوم فاتك هذا الأسبوع."
+                : "قرأت اليوم. عُد غداً لتكبر السلسلة."
+            : s.current
+              ? "لم تقرأ اليوم بعد. مقال واحد يحفظ سلسلتك."
+              : "اقرأ مقالاً اليوم لتبدأ سلسلة جديدة.";
+        renderCalendar(state, today);
+
+        const values: Record<string, number> = { reads: all.reads, minutes: all.minutes, authors: all.authors, best: state.best };
+        for (const el of document.querySelectorAll<HTMLElement>("[data-stat]")) el.textContent = String(values[el.dataset.stat!] ?? 0);
+
+        document.querySelector("[data-recap]")!.textContent = recapText(state, today, titles);
+        const share = document.querySelector<HTMLButtonElement>("[data-share-recap]")!;
+        share.hidden = stats(state, today - 6).reads === 0;
+        share.onclick = async () => {
+            const blob = await recapImage(state, today, titles);
+            if (!blob) return;
+            const file = new File([blob], "elhellal-week.png", { type: "image/png" });
+            const text = `${recapText(state, today, titles)} https://elhellal.com/`;
+            if (navigator.canShare?.({ files: [file] })) {
+                await navigator.share({ files: [file], text }).catch(() => {});
+            } else {
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(blob);
+                a.download = file.name;
+                a.click();
+                setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+            }
+        };
+
+        const bars = document.querySelector("[data-cats]")!;
+        const top = all.categories.slice(0, 6);
+        const max = top[0]?.[1] ?? 1;
+        bars.replaceChildren(
+            ...top.map(([cat, n]) => {
+                const li = document.createElement("li");
+                li.innerHTML = `<a><span></span><b></b></a><i></i>`;
+                li.querySelector("a")!.href = `/${cat}/`;
+                li.querySelector("span")!.textContent = titles[cat] ?? cat;
+                li.querySelector("b")!.textContent = String(n);
+                li.querySelector<HTMLElement>("i")!.style.setProperty("--w", String(n / max));
+                return li;
+            })
+        );
+        document.querySelector<HTMLElement>("[data-cats-section]")!.hidden = top.length === 0;
+
+        let earned = 0;
+        for (const li of document.querySelectorAll<HTMLElement>("[data-badge]")) {
+            const day = state.badges[li.dataset.badge!];
+            li.classList.toggle("is-earned", day !== undefined);
+            if (day !== undefined) {
+                earned++;
+                li.title = `حصلت عليه في ${new Date(day * DAY_MS).toLocaleDateString("ar", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })}`;
+            }
+        }
+        document.querySelector("[data-badge-count]")!.textContent = `${earned} من ${BADGES.length}`;
+
+        const follows = document.querySelector("[data-follows]")!;
+        follows.replaceChildren(
+            ...state.follows.map((f) => {
+                const li = document.createElement("li");
+                li.innerHTML = `<a></a><button type="button" aria-label="إلغاء المتابعة">✕</button>`;
+                const a = li.querySelector("a")!;
+                a.href = `/${f.kind === "author" ? "authors" : "tags"}/${encodeURIComponent(f.id)}/`;
+                a.textContent = f.kind === "tag" ? `#${f.label}` : f.label;
+                li.querySelector("button")!.onclick = () => {
+                    const next = updateState((st) => (st.follows = st.follows.filter((x) => !(x.kind === f.kind && x.id === f.id))));
+                    reportFollows(next);
+                    render();
+                };
+                return li;
+            })
+        );
+        document.querySelector<HTMLElement>("[data-follows-empty]")!.hidden = state.follows.length > 0;
+
+        const toggle = document.querySelector<HTMLInputElement>("[data-streak-toggle]")!;
+        toggle.checked = !state.streakOff;
+        toggle.onchange = () => {
+            // Off also stops the streak reminders (the Worker gets a streak of 0).
+            reportRead(updateState((st) => (st.streakOff = !toggle.checked)));
+            render();
+        };
+    }
+
+    document.addEventListener("astro:page-load", render);
+</script>
+
+<!-- Global: most of this page's markup is built by its script, which scoped styles don't reach. -->
+<style is:global>
+    .me {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: var(--spacing-06, 24px) 16px var(--spacing-10, 48px);
+        color: var(--content-primary);
+    }
+    .me h1 {
+        margin: 0 0 20px;
+        font-size: clamp(26px, 6vw, 34px);
+    }
+    .me-streak {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+    .me-flame {
+        font-size: 64px;
+        line-height: 1;
+    }
+    .me-flame.is-out {
+        filter: grayscale(1);
+        opacity: 0.5;
+    }
+    .me-big {
+        margin: 0;
+        font-size: 44px;
+        font-weight: 800;
+        color: DarkOrange;
+    }
+    .me-big small {
+        font-size: 18px;
+        color: var(--content-primary);
+    }
+    .me-sub,
+    .me-muted {
+        margin: 4px 0 0;
+        color: var(--content-secondary);
+        font-size: 14px;
+    }
+    .me-muted[hidden],
+    .me-section[hidden],
+    .me-btn[hidden] {
+        display: none;
+    }
+    .me-cal {
+        display: grid;
+        grid-template-rows: repeat(7, 1fr);
+        grid-auto-flow: column;
+        gap: 4px;
+        margin: 20px 0;
+        max-width: 100%;
+        overflow-x: auto;
+    }
+    .me-cal span {
+        width: 16px;
+        height: 16px;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.07);
+    }
+    .me-cal span[data-level="1"] {
+        background: rgba(255, 140, 0, 0.45);
+    }
+    .me-cal span[data-level="2"] {
+        background: rgba(255, 140, 0, 0.7);
+    }
+    .me-cal span[data-level="3"] {
+        background: DarkOrange;
+    }
+    .me-cal span[data-level="-1"] {
+        background: transparent;
+    }
+    .me-stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+    }
+    .me-stats div {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 12px 6px;
+        border: 0.5px solid var(--border-muted);
+        border-radius: 12px;
+        text-align: center;
+    }
+    .me-stats strong {
+        font-size: 24px;
+    }
+    .me-stats span {
+        color: var(--content-secondary);
+        font-size: 12px;
+    }
+    @media (max-width: 420px) {
+        .me-stats {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+    .me-section {
+        margin-top: 32px;
+    }
+    .me-section h2 {
+        margin: 0 0 12px;
+        font-size: 18px;
+    }
+    .me-section h2 small {
+        color: var(--content-secondary);
+        font-weight: 400;
+        font-size: 14px;
+    }
+    .me-recap {
+        margin: 0 0 12px;
+        line-height: 1.7;
+    }
+    .me-btn {
+        padding: 9px 20px;
+        border: 0;
+        border-radius: 999px;
+        background: DarkOrange;
+        color: #111;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+    }
+    .me-bars {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 10px;
+    }
+    .me-bars li {
+        display: grid;
+        gap: 4px;
+    }
+    .me-bars a {
+        display: flex;
+        justify-content: space-between;
+        color: var(--content-primary);
+        text-decoration: none;
+        font-size: 14px;
+    }
+    .me-bars i {
+        display: block;
+        height: 8px;
+        width: calc(var(--w) * 100%);
+        min-width: 8px;
+        border-radius: 4px;
+        background: DarkOrange;
+    }
+    .me-badges {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 10px;
+    }
+    .me-badges li {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 14px 8px;
+        border: 0.5px solid var(--border-muted);
+        border-radius: 14px;
+        text-align: center;
+        opacity: 0.35;
+        filter: grayscale(1);
+    }
+    .me-badges li.is-earned {
+        opacity: 1;
+        filter: none;
+        border-color: rgba(255, 140, 0, 0.5);
+    }
+    .me-badge-icon {
+        font-size: 32px;
+    }
+    .me-badges small {
+        color: var(--content-secondary);
+        font-size: 12px;
+    }
+    .me-follows {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .me-follows li {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 8px 6px 14px;
+        border: 0.5px solid var(--border-muted);
+        border-radius: 999px;
+    }
+    .me-follows a {
+        color: var(--content-primary);
+        text-decoration: none;
+    }
+    .me-follows button {
+        border: 0;
+        background: none;
+        color: var(--content-secondary);
+        cursor: pointer;
+    }
+    .me-toggle {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+</style>

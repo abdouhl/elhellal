@@ -11,6 +11,12 @@
  *                                 opened today (once a day per device; `installs`)
  *   POST /api/push/quiz           { endpoint, day } → this subscriber answered the
  *                                 Explore tab's question of the day (its streak)
+ *   POST /api/push/read           { endpoint, day, streak, week } → this subscriber
+ *                                 read an article today (src/scripts/reading.ts):
+ *                                 their reading streak and last 7 days' numbers
+ *   POST /api/push/follows        { endpoint, follows: ['author:x', 'tag:y'] }
+ *   POST /api/push/suggest        { url, title } → a link suggested for the
+ *                                 directory (the app's share target, /share/)
  *
  * The cron trigger (every 5 minutes) sends:
  *   1. digests: each subscription is due at SEND_HOUR_UTC daily, or on
@@ -23,8 +29,14 @@
  *      quote of the day (the one the app's Explore tab shows, from
  *      quotes.elhellal.com/app-feed.json); with no new articles a daily
  *      subscriber still gets the quote alone, a weekly one nothing.
- *   2. streak reminders: at REMIND_HOUR_UTC, subscribers whose quiz streak
- *      (2+ days) ends yesterday get one nudge to keep it.
+ *      Followed authors and tags count as wanted, whatever the categories,
+ *      and lead the notification.
+ *   2. nudges, one a day at most per subscriber (nudged_day):
+ *      - the weekly recap, Fridays at RECAP_HOUR_UTC, to readers active in
+ *        the last two days: their last 7 days' reads, minutes and top topic
+ *      - streak reminders at REMIND_HOUR_UTC: a reading streak (2+ days)
+ *        that ends yesterday gets a short article to keep it alive; failing
+ *        that, a quiz streak gets the question of the day
  *   3. the outbox: one-off messages the admin panel queues (scripts/admin.ts).
  * At most PUSH_BATCH messages per run: the free plan allows 50 subrequests and
  * 10 ms of CPU per invocation, so big sends are spread over several runs
@@ -46,6 +58,7 @@ interface Env {
     PUSH_BATCH?: string;
     SEND_HOUR_UTC?: string;
     REMIND_HOUR_UTC?: string;
+    RECAP_HOUR_UTC?: string;
     /** The quotes site's Worker, for the quote of the day. */
     QUOTES?: Fetcher;
 }
@@ -74,6 +87,8 @@ interface SubscriptionRow {
     failures: number;
     quiz_day: number;
     quiz_streak: number;
+    /** ',author:x,tag:y,' */
+    follows: string;
 }
 
 interface Job {
@@ -89,6 +104,9 @@ const ALLOWED_ORIGINS = ['https://elhellal.com', 'https://www.elhellal.com'];
 const PUSH_HOSTS =
     /^(fcm\.googleapis\.com|android\.googleapis\.com|updates\.push\.services\.mozilla\.com|push\.services\.mozilla\.com|web\.push\.apple\.com|[\w-]+\.notify\.windows\.com)$/;
 const CATEGORY_RE = /^[a-z0-9-]{1,40}$/;
+/** 'author:<screen_name>' or 'tag:<slug>' (tag slugs are often Arabic) */
+const FOLLOW_RE = /^(author|tag):[^\s,]{1,80}$/u;
+const MAX_FOLLOWS = 100;
 const INSTALL_ID_RE = /^[\w-]{16,64}$/;
 const PLATFORMS = new Set(['ios', 'android', 'desktop', 'other']);
 const EVENTS = new Set([
@@ -373,13 +391,17 @@ export function digestMessage(
     digest: PushDigest,
     /** slug → when this Worker first saw it (ms) */
     seen: Map<string, number>,
-    sub: Pick<SubscriptionRow, 'categories' | 'frequency' | 'since'>,
+    sub: Pick<SubscriptionRow, 'categories' | 'frequency' | 'since'> & { follows?: string },
     quote: FeedQuote | null = null
 ): Record<string, unknown> | null {
     const wanted = sub.categories === '*' ? null : new Set(sub.categories.split(',').filter(Boolean));
-    const fresh: DigestArticle[] = digest.articles.filter(
-        (a) => (seen.get(a.s) ?? 0) > sub.since && (!wanted || wanted.has(a.c))
-    );
+    const follows = new Set((sub.follows ?? '').split(',').filter(Boolean));
+    const followed = (a: DigestArticle) =>
+        follows.size > 0 && ((!!a.a && follows.has(`author:${a.a}`)) || (a.g ?? []).some((g) => follows.has(`tag:${g}`)));
+    // Followed authors and tags first (stable: newest first within each group).
+    const fresh: DigestArticle[] = digest.articles
+        .filter((a) => (seen.get(a.s) ?? 0) > sub.since && (!wanted || wanted.has(a.c) || followed(a)))
+        .sort((x, y) => Number(followed(y)) - Number(followed(x)));
     if (fresh.length === 0) {
         if (!quote || sub.frequency !== 'daily') return null;
         return {
@@ -398,7 +420,7 @@ export function digestMessage(
     const utm = `utm_source=push&utm_medium=${sub.frequency}`;
     const listing = categories.length === 1 ? `/${categories[0]}/?${utm}` : `/?${utm}`;
     const where = categories.length === 1 && digest.categories[categories[0]!] ? ` في ${digest.categories[categories[0]!]}` : '';
-    const lines = [top.p ?? digest.categories[top.c] ?? ''];
+    const lines = [followed(top) && top.a ? `⭐ @${top.a} · ${top.p ?? ''}` : top.p ?? digest.categories[top.c] ?? ''];
     if (fresh.length > 1) lines.push(`📚 ${moreArticles(fresh.length - 1)}${where}`);
     else if (quote) lines.push(`❝ ${clip(quote.text, 80)} — ${quote.title}`);
     return {
@@ -480,6 +502,95 @@ async function handleQuiz(request: Request, env: Env) {
     return { ok: true, recorded: result.meta.changes > 0 };
 }
 
+function daysWord(n: number): string {
+    if (n === 2) return 'يومان';
+    return n <= 10 ? `${n} أيام` : `${n} يوماً`;
+}
+
+/** Evening nudge before a reading streak breaks: one short article to keep it. */
+export function readingReminder(streak: number, article: DigestArticle | null): Record<string, unknown> {
+    const minutes = article?.m ? ` (${article.m} د)` : '';
+    return {
+        title: `🔥 ${daysWord(streak)} متتالية`,
+        body: article ? `مقال واحد يحفظ سلسلتك: «${clip(article.t, 70)}»${minutes}` : 'لم تقرأ اليوم بعد. مقال واحد يحفظ سلسلتك.',
+        url: article ? `/articles/${encodeURIComponent(article.s)}/?utm_source=push&utm_medium=streak` : '/today/?utm_source=push&utm_medium=streak',
+        image: article?.i,
+        tag: 'reading-streak',
+        actions: [{ action: 'today', title: 'ورد اليوم', url: '/today/?utm_source=push&utm_medium=streak' }],
+    };
+}
+
+/** The shortest recent article in the subscriber's topics: what a streak reminder offers. */
+export function quickRead(digest: PushDigest, categories: string): DigestArticle | null {
+    const wanted = categories === '*' ? null : new Set(categories.split(',').filter(Boolean));
+    const pool = digest.articles.slice(0, 120).filter((a) => !wanted || wanted.has(a.c));
+    return pool.filter((a) => a.m).sort((a, b) => a.m! - b.m!)[0] ?? pool[0] ?? null;
+}
+
+export function weeklyRecap(
+    row: { week_reads: number; week_minutes: number; week_top: string; read_streak: number },
+    categories: Record<string, string>
+): Record<string, unknown> {
+    const parts = [`📖 ${row.week_reads} مقالات`, `⏱ ${row.week_minutes} دقيقة`];
+    if (row.week_top && categories[row.week_top]) parts.push(`أكثر ما قرأت: ${categories[row.week_top]}`);
+    return {
+        title: 'أسبوعك على الهلال',
+        body: `${parts.join(' · ')}${row.read_streak >= 2 ? `\n🔥 سلسلتك: ${daysWord(row.read_streak)}` : ''}`,
+        url: '/me/?utm_source=push&utm_medium=recap#recap',
+        tag: 'recap',
+    };
+}
+
+/** Records today's read: the streak as the app counts it, and the last 7 days' numbers. */
+async function handleRead(request: Request, env: Env) {
+    const body = await readBody(request);
+    const endpoint = validEndpoint(body.endpoint);
+    const day = body.day;
+    if (typeof day !== 'number' || !Number.isInteger(day) || Math.abs(day - dayNumber(Date.now())) > 1) throw new HttpError(400, 'invalid day');
+    const int = (v: unknown, max: number) => (typeof v === 'number' && Number.isInteger(v) && v >= 0 ? Math.min(v, max) : 0);
+    const week = (body.week ?? {}) as Record<string, unknown>;
+    const top = typeof week.top === 'string' && CATEGORY_RE.test(week.top) ? week.top : '';
+    const result = await env.DB.prepare(
+        `UPDATE subscriptions SET read_day = MAX(read_day, ?1), read_streak = ?2, week_reads = ?3, week_minutes = ?4, week_top = ?5
+         WHERE endpoint = ?6`
+    ).bind(day, int(body.streak, 5000), int(week.reads, 1000), int(week.minutes, 100_000), top, endpoint).run();
+    await countEvent(env, 'read');
+    return { ok: true, recorded: result.meta.changes > 0 };
+}
+
+async function handleFollows(request: Request, env: Env) {
+    const body = await readBody(request);
+    const endpoint = validEndpoint(body.endpoint);
+    const list = body.follows;
+    if (!Array.isArray(list) || list.length > MAX_FOLLOWS || !list.every((f) => typeof f === 'string' && FOLLOW_RE.test(f))) {
+        throw new HttpError(400, 'invalid follows');
+    }
+    const follows = list.length ? `,${[...new Set(list as string[])].sort().join(',')},` : '';
+    const result = await env.DB.prepare('UPDATE subscriptions SET follows = ? WHERE endpoint = ?').bind(follows, endpoint).run();
+    return { ok: true, recorded: result.meta.changes > 0 };
+}
+
+async function handleSuggest(request: Request, env: Env) {
+    const body = await readBody(request);
+    let url: URL;
+    try {
+        url = new URL(String(body.url ?? ''));
+    } catch {
+        throw new HttpError(400, 'invalid url');
+    }
+    if (!/^https?:$/.test(url.protocol) || url.href.length > 500) throw new HttpError(400, 'invalid url');
+    url.hash = '';
+    // Share sheets add tracking parameters; the same post should count once.
+    for (const key of [...url.searchParams.keys()]) if (/^(utm_|r$|s$|triedRedirect$)/.test(key)) url.searchParams.delete(key);
+    const title = typeof body.title === 'string' ? body.title.trim().slice(0, 200) : '';
+    await env.DB.prepare(
+        `INSERT INTO suggestions (url, title, created_at) VALUES (?1, ?2, ?3)
+         ON CONFLICT (url) DO UPDATE SET n = n + 1, title = CASE WHEN title = '' THEN ?2 ELSE title END`
+    ).bind(url.href, title, Date.now()).run();
+    await countEvent(env, 'suggested');
+    return { ok: true };
+}
+
 async function run(env: Env) {
     const now = Date.now();
     const batch = Math.max(1, Math.min(45, Number(env.PUSH_BATCH) || 40));
@@ -505,18 +616,45 @@ async function run(env: Env) {
     }
 
     const day = dayNumber(now);
-    if (new Date(now).getUTCHours() === hourVar(env.REMIND_HOUR_UTC, 19) && jobs.length < batch) {
-        const lapsing = (
-            await env.DB.prepare(
-                `SELECT endpoint, p256dh, auth, quiz_streak FROM subscriptions
-                 WHERE quiz_day = ?1 - 1 AND quiz_streak >= 2 AND quiz_reminded < ?1 LIMIT ?2`
-            ).bind(day, batch - jobs.length).all<PushTarget & { quiz_streak: number }>()
-        ).results;
-        if (lapsing.length) {
-            // Claimed first, like the digests: one reminder a day at most.
-            await env.DB.batch(lapsing.map((s) => env.DB.prepare('UPDATE subscriptions SET quiz_reminded = ? WHERE endpoint = ?').bind(day, s.endpoint)));
-            for (const s of lapsing) jobs.push({ target: s, payload: streakReminder(s.quiz_streak), topic: 'quiz' });
-        }
+    const utcHour = new Date(now).getUTCHours();
+    // One nudge a day at most: claimed (nudged_day) before sending, like the digests.
+    const nudge = async <T extends PushTarget>(
+        sql: string,
+        message: (row: T, digest: PushDigest | null) => Record<string, unknown>,
+        topic: string
+    ) => {
+        if (jobs.length >= batch) return;
+        const rows = (await env.DB.prepare(sql).bind(day, batch - jobs.length).all<T>()).results;
+        if (!rows.length) return;
+        await env.DB.batch(rows.map((r) => env.DB.prepare('UPDATE subscriptions SET nudged_day = ?1, quiz_reminded = ?1 WHERE endpoint = ?2').bind(day, r.endpoint)));
+        // The digest only when someone is due: a subrequest per run otherwise.
+        digestForNudges ??= await fetchDigest(env);
+        for (const r of rows) jobs.push({ target: r, payload: message(r, digestForNudges), topic });
+    };
+    let digestForNudges: PushDigest | null | undefined;
+
+    if (new Date(now).getUTCDay() === 5 && utcHour === hourVar(env.RECAP_HOUR_UTC, 9)) {
+        await nudge<PushTarget & { week_reads: number; week_minutes: number; week_top: string; read_streak: number }>(
+            `SELECT endpoint, p256dh, auth, week_reads, week_minutes, week_top, read_streak FROM subscriptions
+             WHERE read_day >= ?1 - 1 AND week_reads > 0 AND nudged_day < ?1 LIMIT ?2`,
+            (r, digest) => weeklyRecap(r, digest?.categories ?? {}),
+            'recap'
+        );
+    }
+
+    if (utcHour === hourVar(env.REMIND_HOUR_UTC, 19)) {
+        await nudge<PushTarget & { read_streak: number; categories: string }>(
+            `SELECT endpoint, p256dh, auth, read_streak, categories FROM subscriptions
+             WHERE read_day = ?1 - 1 AND read_streak >= 2 AND nudged_day < ?1 LIMIT ?2`,
+            (r, digest) => readingReminder(r.read_streak, digest ? quickRead(digest, r.categories) : null),
+            'streak'
+        );
+        await nudge<PushTarget & { quiz_streak: number }>(
+            `SELECT endpoint, p256dh, auth, quiz_streak FROM subscriptions
+             WHERE quiz_day = ?1 - 1 AND quiz_streak >= 2 AND quiz_reminded < ?1 AND nudged_day < ?1 LIMIT ?2`,
+            (r) => streakReminder(r.quiz_streak),
+            'quiz'
+        );
     }
 
     const room = batch - jobs.length;
@@ -601,6 +739,12 @@ export default {
                     return json(await handlePing(request, env), 200, origin);
                 case 'POST /api/push/quiz':
                     return json(await handleQuiz(request, env), 200, origin);
+                case 'POST /api/push/read':
+                    return json(await handleRead(request, env), 200, origin);
+                case 'POST /api/push/follows':
+                    return json(await handleFollows(request, env), 200, origin);
+                case 'POST /api/push/suggest':
+                    return json(await handleSuggest(request, env), 200, origin);
                 default:
                     return json({ error: 'not found' }, 404, origin);
             }

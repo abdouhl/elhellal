@@ -317,6 +317,7 @@ const {
                                 </svg>
                             </a>
                         </div>
+                        <a href="/me/" class="streak-chip" id="streak-chip" hidden>🔥<span></span></a>
                         <button
                             class="new-filter-toggle"
                             id="new-filter-toggle"
@@ -397,6 +398,10 @@ const {
                 <a href="/rss.xml" class="nu-u-link--subtle">RSS</a>
                 <span class="footer-separator" aria-hidden="true">·</span>
                 <a href="/notifications/" class="nu-u-link--subtle">الإشعارات</a>
+                <span class="footer-separator" aria-hidden="true">·</span>
+                <a href="/me/" class="nu-u-link--subtle">قراءاتي</a>
+                <span class="footer-separator" aria-hidden="true">·</span>
+                <a href="/random/" class="nu-u-link--subtle">مقال عشوائي</a>
                 <span class="footer-separator" aria-hidden="true" hidden>·</span>
                 <a href="/app/" class="nu-u-link--subtle" id="pwa-install-link" data-install-trigger="footer" hidden>تثبيت التطبيق</a>
             </nav>
@@ -423,9 +428,9 @@ const {
                 <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z" /></svg>
                 <span>المحفوظة</span>
             </a>
-            <a href="/quiz/" data-tab="/quiz/">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M9.5 9.2a2.6 2.6 0 0 1 5 1c0 1.8-2.5 2.3-2.5 3.8M12 17.2h.01" /></svg>
-                <span>اختبار</span>
+            <a href="/today/" data-tab="/today/">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2.5 1.5-4 2.5-5 .2 1.8 1 2.8 2 3.2C11.3 8.6 11 6 12 3z" /></svg>
+                <span>اليوم</span>
             </a>
             <button type="button" id="app-more" aria-expanded="false" aria-controls="site-footer">
                 <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>

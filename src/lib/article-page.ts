@@ -11,6 +11,7 @@
 import type { TemplateData } from './shell-template';
 import { fnv1a } from './hash';
 import { HERO_WIDTHS, isImageUrl, RELATED_WIDTH, resizeImage, responsiveImage } from './images';
+import { minutesLabel } from './reading-time';
 import { sisterTiles, type SisterLink } from './sister-sites';
 
 export const ARTICLE_SHELL_SLUG = '__shell__';
@@ -41,6 +42,8 @@ export interface ArticleRecord {
     whyThisMatters?: string;
     whoShouldRead?: string;
     metaDescription?: string;
+    /** Reading time of the original post (src/lib/reading-time.ts) */
+    minutes?: number | undefined;
     // Precomputed at build time so the Worker does no Intl work or lookups:
     category: string;
     categoryTitle: string;
@@ -143,6 +146,8 @@ export function articleTemplateData(r: ArticleRecord): TemplateData {
         screen_name: r.screen_name,
         created_at: r.created_at,
         dateAr: r.dateAr,
+        readMinutes: r.minutes ? `${minutesLabel(r.minutes)} قراءة` : '',
+        category: r.category,
         categoryHref,
         categoryTitle: r.categoryTitle,
         fallbackPath: r.category === 'all' ? '/' : categoryHref,

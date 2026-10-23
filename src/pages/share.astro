@@ -1,0 +1,124 @@
+---
+// /share/ — the installed app's share target (manifest.json share_target):
+// sharing a link to الهلال from another app lands here. An elhellal.com link
+// opens in the app; anything else (a Substack post, a blog) can be suggested
+// for the directory, which the push Worker queues for the admin panel
+// (POST /api/push/suggest).
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout
+    site="الهلال"
+    title="مشاركة"
+    tagline="اقترح مقالاً للهلال"
+    pageTitle="اقترح مقالاً"
+    pageDescription="اقترح مقالاً عربياً ليُضاف إلى الهلال."
+    noindex
+>
+    <main id="main-content" class="share-page">
+        <h1>اقترح مقالاً</h1>
+        <p class="share-muted" data-none hidden>لم يصل رابط. شارك رابط مقال من تطبيق آخر إلى الهلال، أو الصقه هنا:</p>
+        <form class="share-form" data-form>
+            <input type="url" name="url" required placeholder="https://…substack.com/p/…" dir="ltr" />
+            <input type="text" name="title" placeholder="عنوان المقال (اختياري)" />
+            <button type="submit" class="share-btn">أرسل الاقتراح</button>
+        </form>
+        <p class="share-status" data-status role="status"></p>
+        <p class="share-muted">نراجع كل اقتراح يدوياً، ونضيف المقالات العربية الجيدة إلى الدليل.</p>
+    </main>
+</Layout>
+
+<script>
+    function firstUrl(...values: Array<string | null>): string {
+        for (const v of values) {
+            const m = v?.match(/https?:\/\/\S+/);
+            if (m) return m[0];
+        }
+        return "";
+    }
+
+    function setup() {
+        if (location.pathname !== "/share/") return;
+        const params = new URLSearchParams(location.search);
+        const url = firstUrl(params.get("url"), params.get("text"), params.get("title"));
+        const form = document.querySelector<HTMLFormElement>("[data-form]")!;
+        const status = document.querySelector<HTMLElement>("[data-status]")!;
+
+        // Our own pages open in the app.
+        try {
+            const u = new URL(url);
+            if (u.hostname === "elhellal.com" || u.hostname === "www.elhellal.com") {
+                location.replace(u.pathname + u.search);
+                return;
+            }
+        } catch {}
+
+        form.url.value = url;
+        form.title.value = params.get("title") ?? "";
+        document.querySelector<HTMLElement>("[data-none]")!.hidden = !!url;
+
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            const button = form.querySelector("button")!;
+            button.disabled = true;
+            status.textContent = "جارٍ الإرسال…";
+            try {
+                const res = await fetch("/api/push/suggest", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ url: form.url.value.trim(), title: form.title.value.trim() }),
+                });
+                status.textContent = res.ok ? "شكراً! وصل اقتراحك." : "تعذّر الإرسال. تأكد من الرابط وحاول مجدداً.";
+                if (res.ok) form.reset();
+            } catch {
+                status.textContent = "لا اتصال الآن. حاول مجدداً حين تتصل.";
+            } finally {
+                button.disabled = false;
+            }
+        };
+    }
+
+    document.addEventListener("astro:page-load", setup);
+</script>
+
+<style>
+    .share-page {
+        max-width: 560px;
+        margin: 0 auto;
+        padding: var(--spacing-06, 24px) 16px var(--spacing-10, 48px);
+        color: var(--content-primary);
+    }
+    .share-page h1 {
+        margin: 0 0 16px;
+    }
+    .share-form {
+        display: grid;
+        gap: 10px;
+    }
+    .share-form input {
+        padding: 12px 14px;
+        border: 0.5px solid var(--border-muted);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--content-primary);
+        font: inherit;
+    }
+    .share-btn {
+        padding: 12px;
+        border: 0;
+        border-radius: 999px;
+        background: DarkOrange;
+        color: #111;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+    }
+    .share-muted,
+    .share-status {
+        color: var(--content-secondary);
+        font-size: 14px;
+    }
+    .share-muted[hidden] {
+        display: none;
+    }
+</style>

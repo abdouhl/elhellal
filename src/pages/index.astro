@@ -45,6 +45,17 @@ const categoryTitles = getCategoryTitles();
   <ItemListSchema items={allTools} listName="Articles Directory - All Articles" />
   <main id="main-content">
     <FeedChrome />
+    <!-- Today's five, continue reading, from who you follow: src/scripts/reading.ts -->
+    <section class="habit-today" data-habit-today hidden>
+      <a href="/today/">
+        <span class="habit-today-body">
+          <span class="habit-today-head"><h2>ورد اليوم</h2><span data-streak hidden></span></span>
+          <p data-text></p>
+          <span class="habit-dots" data-dots></span>
+        </span>
+        <span data-cta>ابدأ</span>
+      </a>
+    </section>
     <ExploreTiles
       tiles={categoryTiles()}
       heading="استكشف التصنيفات"
@@ -54,6 +65,14 @@ const categoryTitles = getCategoryTitles();
     <!-- The installed app's "recently read" (src/scripts/pwa.ts). -->
     <section class="app-recent" data-app-recent aria-labelledby="app-recent-heading" hidden>
       <h2 id="app-recent-heading">قرأتها مؤخراً</h2>
+      <ul></ul>
+    </section>
+    <section class="habit-row" data-habit-continue aria-labelledby="habit-continue-heading" hidden>
+      <h2 id="habit-continue-heading">أكمل القراءة</h2>
+      <ul></ul>
+    </section>
+    <section class="habit-row" data-habit-following aria-labelledby="habit-following-heading" hidden>
+      <h2 id="habit-following-heading">جديد من تتابعهم</h2>
       <ul></ul>
     </section>
     <MostRead client:idle categoryTitles={categoryTitles} />

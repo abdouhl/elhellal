@@ -48,6 +48,7 @@ import type { ArticlesConfig, Article } from '../src/types/index.ts';
 import { personalBlogs } from '../src/data/personal-blogs.ts';
 import { fetchAuthorName, loadAuthorNames, saveAuthorNames } from './lib/author-names.ts';
 import { readArticles, writeArticles } from '../src/lib/articles-store.ts';
+import { countWords, minutesForWords } from '../src/lib/reading-time.ts';
 import { blockedAuthors, blockedIds } from './lib/moderation.ts';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -268,6 +269,8 @@ interface ArchiveEntry {
     cover_image: string;
     type: 'newsletter' | 'podcast' | 'thread';
     audience: 'everyone' | 'only_paid' | 'founding';
+    /** Words in the whole post, paywalled or not */
+    wordcount?: number;
 }
 
 interface ImportItem {
@@ -278,6 +281,8 @@ interface ImportItem {
     link: string;
     date: string;
     image: string;
+    /** Substack's word count of the whole post, when the source reports one */
+    words?: number;
 }
 
 /** Paginates https://{user}.substack.com/api/v1/archive until an empty page comes back
@@ -388,6 +393,7 @@ async function getAllSubstackPosts(substackUser: string, allExistingIds: Set<str
             link: entry.canonical_url,
             date: (entry.post_date || '').split('T')[0] || new Date().toISOString().split('T')[0]!,
             image: entry.cover_image || '',
+            ...(entry.wordcount ? { words: entry.wordcount } : {}),
         });
     }
 
@@ -585,6 +591,11 @@ async function processItem(
         data.articles.push(targetCat);
     }
 
+    // Substack's own count covers paywalled posts too; otherwise count the
+    // text, unless it's only an excerpt (it would read as a 1-minute post).
+    const minutes = item.words
+        ? minutesForWords(item.words)
+        : item.fullContent.length >= 600 ? minutesForWords(countWords(item.fullContent)) : undefined;
     const article: Article = {
         id_str: item.id,
         title: item.title,
@@ -599,6 +610,7 @@ async function processItem(
         ...(summary.whoShouldRead    && { whoShouldRead: summary.whoShouldRead }),
         ...(summary.metaDescription  && { metaDescription: summary.metaDescription }),
         ...(summary.keywords?.length && { keywords: summary.keywords }),
+        ...(minutes && { minutes }),
     };
 
     targetCat.content.push(article);

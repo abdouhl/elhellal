@@ -1,0 +1,434 @@
+---
+// /today/ — "ورد اليوم": five recent articles dealt for this reader each day
+// (src/lib/reading.ts dealToday), one card at a time, ending on the quote and
+// question of the day. Built in the browser from dist/_data/push-digest.json
+// (the push digest: the last two weeks of articles), so the page itself is
+// static and the service worker can keep it, the digest and the day's five
+// articles for offline reading.
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout
+    site="الهلال"
+    title="ورد اليوم"
+    tagline="خمسة مقالات جديدة كل يوم"
+    pageTitle="ورد اليوم — خمسة مقالات مختارة كل يوم"
+    pageDescription="كل يوم خمسة مقالات عربية جديدة من مواضيع مختلفة، مختارة لك، مع اقتباس اليوم وسؤال اليوم."
+    canonicalUrl="https://elhellal.com/today/"
+    ogUrl="https://elhellal.com/today/"
+    noindex
+>
+    <main id="main-content" class="today">
+        <header class="today-head">
+            <div>
+                <h1>ورد اليوم</h1>
+                <p class="today-date" data-date></p>
+            </div>
+            <a href="/me/" class="today-streak" data-streak hidden></a>
+        </header>
+        <div class="today-dots" data-dots aria-hidden="true"></div>
+
+        <p class="today-empty" data-empty hidden>تعذّر تحميل مقالات اليوم. تحقق من اتصالك وأعد المحاولة.</p>
+
+        <ol class="today-stack" data-stack aria-label="مقالات اليوم"></ol>
+
+        <div class="today-nav">
+            <button type="button" data-prev aria-label="السابق">→</button>
+            <span data-count></span>
+            <button type="button" data-next aria-label="التالي">←</button>
+        </div>
+
+        <p class="today-hint">
+            <a href="/random/">🎲 مقال عشوائي</a>
+            <span data-shake hidden> · أو هزّ هاتفك</span>
+        </p>
+    </main>
+</Layout>
+
+<script>
+    import { DAILY_COUNT, dealToday, localDay, readSlugs, readState, streak, todayProgress, updateState, type Candidate, type TodayPick } from "../lib/reading";
+    import { minutesLabel } from "../lib/reading-time";
+    import { shardOf } from "../lib/article-page";
+    import type { PushDigest } from "../lib/push-digest";
+
+    type Quote = { text?: string; title: string; url: string; image?: string };
+
+    function articleUrl(slug: string) {
+        return `/articles/${encodeURIComponent(slug)}/`;
+    }
+
+    async function loadDigest(): Promise<PushDigest | null> {
+        try {
+            const res = await fetch("/_data/push-digest.json");
+            return res.ok ? ((await res.json()) as PushDigest) : null;
+        } catch {
+            return null;
+        }
+    }
+
+    async function loadQuote(): Promise<Quote | null> {
+        try {
+            const res = await fetch("https://quotes.elhellal.com/app-feed.json", { mode: "cors" });
+            const items = ((await res.json()) as { items?: Quote[] }).items ?? [];
+            return items.length ? items[localDay() % items.length] : null;
+        } catch {
+            return null;
+        }
+    }
+
+    /** The day's picks: dealt once, then fixed until midnight. */
+    async function picks(): Promise<{ picks: TodayPick[]; categories: Record<string, string> }> {
+        const day = localDay();
+        const digest = await loadDigest();
+        const categories = digest?.categories ?? {};
+        const state = readState();
+        if (state.today?.day === day && state.today.picks.length) return { picks: state.today.picks, categories };
+        if (!digest) return { picks: [], categories };
+        const candidates: Candidate[] = digest.articles.map((a) => ({ s: a.s, t: a.t, c: a.c, i: a.i, p: a.p, a: a.a, m: a.m, g: a.g, d: a.d }));
+        const dealt = dealToday(state, candidates, day);
+        updateState((st) => (st.today = { day, picks: dealt }));
+        return { picks: dealt, categories };
+    }
+
+    /** The service worker keeps today's five (pages and data) for offline reading. */
+    async function keepOffline(list: TodayPick[]) {
+        const reg = await navigator.serviceWorker?.getRegistration();
+        const urls = ["/today/", "/_data/push-digest.json"];
+        for (const p of list) urls.push(articleUrl(p.s), `/_data/articles/${shardOf(p.s)}.json`);
+        reg?.active?.postMessage({ type: "sync-today", urls });
+    }
+
+    function card(p: TodayPick, i: number, total: number, categories: Record<string, string>, read: boolean): HTMLLIElement {
+        const li = document.createElement("li");
+        li.className = "today-card";
+        if (read) li.dataset.read = "";
+        li.innerHTML = `
+            <a class="today-card-link">
+                <span class="today-cover"><img alt="" width="640" height="360" /></span>
+                <span class="today-meta"><span data-n></span><span data-cat></span><span data-min></span></span>
+                <strong data-title></strong>
+                <span class="today-preview" data-preview></span>
+                <small data-author></small>
+                <span class="today-read" data-cta></span>
+            </a>`;
+        li.querySelector<HTMLAnchorElement>("a")!.href = articleUrl(p.s);
+        li.querySelector("[data-n]")!.textContent = `${i + 1}/${total}`;
+        li.querySelector("[data-cat]")!.textContent = categories[p.c] ?? "";
+        li.querySelector("[data-min]")!.textContent = p.m ? `⏱ ${minutesLabel(p.m)}` : "";
+        li.querySelector("[data-title]")!.textContent = p.t;
+        li.querySelector("[data-preview]")!.textContent = p.p ?? "";
+        li.querySelector("[data-author]")!.textContent = p.a ? `@${p.a}` : "";
+        li.querySelector("[data-cta]")!.textContent = read ? "✓ قرأته" : "اقرأ";
+        const img = li.querySelector("img")!;
+        if (p.i) {
+            img.src = p.i;
+            img.onerror = () => img.remove();
+        } else img.remove();
+        return li;
+    }
+
+    function endCard(quote: Quote | null, done: number, total: number): HTMLLIElement {
+        const li = document.createElement("li");
+        li.className = "today-card today-end";
+        const finished = done >= total;
+        li.innerHTML = `
+            <div class="today-end-body">
+                <span class="today-end-icon">${finished ? "✅" : "🌙"}</span>
+                <h2></h2>
+                <p data-next></p>
+                <a class="today-quote" data-quote hidden><blockquote></blockquote><small></small></a>
+                <a class="today-read" href="/explore/#quiz">سؤال اليوم ←</a>
+            </div>`;
+        li.querySelector("h2")!.textContent = finished ? "أنهيت ورد اليوم" : `قرأت ${done} من ${total}`;
+        const next = li.querySelector("[data-next]")!;
+        const midnight = new Date();
+        midnight.setHours(24, 0, 0, 0);
+        const hours = Math.max(1, Math.round((midnight.getTime() - Date.now()) / 3_600_000));
+        next.textContent = finished ? `خمسة مقالات جديدة بعد ${hours} ساعة تقريباً.` : "ارجع إلى ما فاتك، أو اختم يومك باقتباس وسؤال.";
+        if (quote?.text) {
+            const q = li.querySelector<HTMLAnchorElement>("[data-quote]")!;
+            q.href = quote.url;
+            q.querySelector("blockquote")!.textContent = `❝ ${quote.text}`;
+            q.querySelector("small")!.textContent = `— ${quote.title}`;
+            q.hidden = false;
+        }
+        return li;
+    }
+
+    async function render() {
+        if (location.pathname !== "/today/") return;
+        const stack = document.querySelector<HTMLOListElement>("[data-stack]")!;
+        const dotsEl = document.querySelector<HTMLElement>("[data-dots]")!;
+        const countEl = document.querySelector<HTMLElement>("[data-count]")!;
+        document.querySelector("[data-date]")!.textContent = new Date().toLocaleDateString("ar", { weekday: "long", day: "numeric", month: "long" });
+
+        const [{ picks: list, categories }, quote] = await Promise.all([picks(), loadQuote()]);
+        if (!list.length) {
+            document.querySelector<HTMLElement>("[data-empty]")!.hidden = false;
+            return;
+        }
+        const state = readState();
+        const read = readSlugs(state);
+        const day = localDay();
+        const progress = todayProgress(state, day);
+        stack.replaceChildren(...list.map((p, i) => card(p, i, list.length, categories, read.has(p.s))), endCard(quote, progress.done, progress.total));
+
+        const s = streak(state, day);
+        const streakEl = document.querySelector<HTMLElement>("[data-streak]")!;
+        streakEl.hidden = state.streakOff || s.current === 0;
+        streakEl.textContent = `🔥 ${s.current}`;
+
+        const cards = [...stack.children] as HTMLElement[];
+        dotsEl.replaceChildren(
+            ...list.map((p) => {
+                const dot = document.createElement("span");
+                if (read.has(p.s)) dot.className = "is-done";
+                return dot;
+            })
+        );
+        const current = () => Math.round(Math.abs(stack.scrollLeft) / stack.clientWidth);
+        const show = () => {
+            const i = current();
+            countEl.textContent = i < list.length ? `${i + 1} من ${list.length}` : "الختام";
+            [...dotsEl.children].forEach((d, j) => d.classList.toggle("is-current", j === i));
+        };
+        const go = (i: number) => cards[Math.max(0, Math.min(cards.length - 1, i))]?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "start" });
+        stack.addEventListener("scroll", show, { passive: true });
+        document.querySelector("[data-next]")!.addEventListener("click", () => go(current() + 1));
+        document.querySelector("[data-prev]")!.addEventListener("click", () => go(current() - 1));
+
+        // Back from an article: land on the first one still unread.
+        const firstUnread = list.findIndex((p) => !read.has(p.s));
+        if (firstUnread > 0) requestAnimationFrame(() => cards[firstUnread]!.scrollIntoView({ block: "nearest", inline: "start" }));
+        else if (firstUnread === -1) requestAnimationFrame(() => cards[cards.length - 1]!.scrollIntoView({ block: "nearest", inline: "start" }));
+        show();
+
+        const motion = window.DeviceMotionEvent as unknown as { requestPermission?: unknown } | undefined;
+        document.querySelector<HTMLElement>("[data-shake]")!.hidden = !(motion && typeof motion.requestPermission !== "function" && document.documentElement.hasAttribute("data-standalone") && /Android/.test(navigator.userAgent));
+        keepOffline(list).catch(() => {});
+    }
+
+    document.addEventListener("astro:page-load", () => {
+        render().catch(() => {});
+    });
+</script>
+
+<!-- Global: most of this page's markup is built by its script, which scoped styles don't reach. -->
+<style is:global>
+    .today {
+        max-width: 640px;
+        margin: 0 auto;
+        padding: var(--spacing-06, 24px) 16px var(--spacing-10, 48px);
+        color: var(--content-primary);
+    }
+    .today-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+    }
+    .today-head h1 {
+        margin: 0;
+        font-size: clamp(26px, 6vw, 34px);
+    }
+    .today-date {
+        margin: 4px 0 0;
+        color: var(--content-secondary);
+        font-size: 14px;
+    }
+    .today-streak {
+        padding: 6px 14px;
+        border-radius: 999px;
+        background: rgba(255, 140, 0, 0.14);
+        color: DarkOrange;
+        font-family: var(--monospace);
+        font-weight: 700;
+        text-decoration: none;
+    }
+    .today-streak[hidden],
+    .today-empty[hidden],
+    [data-shake][hidden] {
+        display: none;
+    }
+    .today-dots {
+        display: flex;
+        gap: 6px;
+        margin: 16px 0;
+    }
+    .today-dots span {
+        flex: 1;
+        height: 5px;
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.15);
+    }
+    .today-dots span.is-done {
+        background: DarkOrange;
+    }
+    .today-dots span.is-current {
+        outline: 1px solid rgba(255, 255, 255, 0.6);
+        outline-offset: 2px;
+    }
+    .today-empty {
+        color: var(--content-secondary);
+    }
+    .today-stack {
+        display: flex;
+        gap: 16px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+    }
+    .today-stack::-webkit-scrollbar {
+        display: none;
+    }
+    .today-card {
+        flex: 0 0 100%;
+        scroll-snap-align: start;
+        scroll-snap-stop: always;
+    }
+    .today-card-link,
+    .today-end-body {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-height: 100%;
+        padding: 14px;
+        box-sizing: border-box;
+        border: 0.5px solid var(--border-muted);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--content-primary);
+        text-decoration: none;
+    }
+    .today-card[data-read] .today-card-link {
+        border-color: rgba(255, 140, 0, 0.4);
+    }
+    .today-cover {
+        display: block;
+        aspect-ratio: 16 / 9;
+        overflow: hidden;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.06);
+    }
+    .today-cover img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    .today-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        color: var(--content-secondary);
+        font-size: 13px;
+    }
+    .today-meta [data-n] {
+        color: DarkOrange;
+        font-family: var(--monospace);
+        font-weight: 700;
+    }
+    .today-card strong {
+        font-size: 20px;
+        line-height: 1.45;
+    }
+    .today-preview {
+        display: -webkit-box;
+        overflow: hidden;
+        color: var(--content-secondary);
+        font-size: 15px;
+        line-height: 1.7;
+        -webkit-line-clamp: 4;
+        -webkit-box-orient: vertical;
+    }
+    .today-card small {
+        color: var(--content-secondary);
+        direction: ltr;
+        text-align: end;
+    }
+    .today-read {
+        align-self: flex-start;
+        margin-top: auto;
+        padding: 9px 22px;
+        border-radius: 999px;
+        background: DarkOrange;
+        color: #111;
+        font-weight: 700;
+        text-decoration: none;
+    }
+    .today-card[data-read] .today-read {
+        background: transparent;
+        border: 1px solid DarkOrange;
+        color: DarkOrange;
+    }
+    .today-end-body {
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        min-height: 420px;
+    }
+    .today-end-icon {
+        font-size: 48px;
+    }
+    .today-end h2 {
+        margin: 0;
+    }
+    .today-end p {
+        margin: 0;
+        color: var(--content-secondary);
+    }
+    .today-end .today-read {
+        align-self: center;
+        margin-top: 8px;
+    }
+    .today-quote {
+        display: block;
+        max-width: 420px;
+        padding: 14px 16px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--content-primary);
+        text-decoration: none;
+    }
+    .today-quote[hidden] {
+        display: none;
+    }
+    .today-quote blockquote {
+        margin: 0 0 6px;
+        font-size: 16px;
+        line-height: 1.7;
+    }
+    .today-quote small {
+        color: var(--content-secondary);
+    }
+    .today-nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 14px;
+        color: var(--content-secondary);
+        font-size: 14px;
+    }
+    .today-nav button {
+        width: 44px;
+        height: 44px;
+        border: 0.5px solid var(--border-muted);
+        border-radius: 50%;
+        background: transparent;
+        color: var(--content-primary);
+        font-size: 18px;
+        cursor: pointer;
+    }
+    .today-hint {
+        margin-top: 20px;
+        text-align: center;
+        color: var(--content-secondary);
+        font-size: 14px;
+    }
+    .today-hint a {
+        color: DarkOrange;
+    }
+</style>

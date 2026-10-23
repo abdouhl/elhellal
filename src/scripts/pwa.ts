@@ -22,6 +22,7 @@ import { getBookmarks } from '../utils/bookmarks';
 import { currentSubscription, pushSupport, subscribe } from '../lib/push-client';
 import { hideBanner, isIos, isStandalone, onInstallPageLoad, setupInstall, trackPwaEvent } from './pwa-install';
 import { readInstallState, readRecent, rememberRecent, updateInstallState } from './pwa-store';
+import './reading';
 
 /** Top articles on the home page the installed app keeps for offline reading. */
 const DAILY_ARTICLES = 12;

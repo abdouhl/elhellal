@@ -1,0 +1,242 @@
+/* The reading habit's UI on shared pages (src/scripts/reading.ts): toasts,
+   follow buttons, the header streak chip, the home page's rows. */
+
+.reading-toast {
+    position: fixed;
+    z-index: 2000;
+    inset-inline: 16px;
+    bottom: calc(16px + var(--tabbar-height, 0px) + env(safe-area-inset-bottom, 0px));
+    max-width: 420px;
+    margin-inline: auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border: 0.5px solid rgba(255, 140, 0, 0.35);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--background, #111) 88%, DarkOrange);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    color: var(--content-primary, #f0f0f0);
+    text-decoration: none;
+    transform: translateY(20px);
+    opacity: 0;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+}
+.reading-toast.is-in {
+    transform: none;
+    opacity: 1;
+}
+.reading-toast-icon {
+    font-size: 28px;
+    line-height: 1;
+}
+.reading-toast strong,
+.reading-toast small {
+    display: block;
+}
+.reading-toast small {
+    margin-top: 2px;
+    color: var(--content-secondary, #aaa);
+    font-size: 13px;
+}
+@media (prefers-reduced-motion: reduce) {
+    .reading-toast {
+        transition: opacity 0.2s;
+        transform: none;
+    }
+}
+
+.follow-btn {
+    display: inline-flex;
+    align-items: center;
+    margin-top: 8px;
+    padding: 6px 14px;
+    border: 1px solid DarkOrange;
+    border-radius: 999px;
+    background: transparent;
+    color: DarkOrange;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+.follow-btn[aria-pressed='true'] {
+    background: DarkOrange;
+    color: #111;
+}
+.follow-btn-compact {
+    margin: 0 8px 0 0;
+    padding: 1px 10px;
+    font-size: 12px;
+    vertical-align: middle;
+}
+
+.streak-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    margin-inline-end: 6px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: rgba(255, 140, 0, 0.14);
+    color: DarkOrange;
+    font-family: var(--monospace);
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+}
+.streak-chip[hidden] {
+    display: none;
+}
+/* Today isn't read yet: the flame is out until it is. */
+.streak-chip.is-pending {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--content-secondary, #aaa);
+    filter: grayscale(1);
+}
+
+/* Related articles already read (reading.ts moves them last). */
+.related-card[data-read] {
+    opacity: 0.55;
+}
+.related-card[data-read] .related-title::before {
+    content: '✓ ';
+    color: DarkOrange;
+}
+
+/* ── Home: today's five, continue reading, following ─────────────────────── */
+
+.habit-today[hidden],
+.habit-row[hidden] {
+    display: none;
+}
+.habit-today {
+    max-width: 1200px;
+    margin: var(--spacing-06, 24px) auto 0;
+    padding-inline: 16px;
+}
+.habit-today a {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 18px;
+    border: 0.5px solid rgba(255, 140, 0, 0.35);
+    border-radius: 16px;
+    background: linear-gradient(135deg, rgba(255, 140, 0, 0.16), rgba(255, 140, 0, 0.03));
+    color: var(--content-primary, #f0f0f0);
+    text-decoration: none;
+}
+.habit-today-body {
+    flex: 1;
+    min-width: 0;
+}
+.habit-today-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.habit-today h2 {
+    margin: 0;
+    font-size: 18px;
+}
+.habit-today [data-streak] {
+    color: DarkOrange;
+    font-family: var(--monospace);
+    font-weight: 700;
+}
+.habit-today p {
+    margin: 4px 0 8px;
+    color: var(--content-secondary, #aaa);
+    font-size: 14px;
+}
+.habit-dots {
+    display: flex;
+    gap: 6px;
+}
+.habit-dots span {
+    width: 22px;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.15);
+}
+.habit-dots span.is-done {
+    background: DarkOrange;
+}
+.habit-today [data-cta] {
+    flex: none;
+    padding: 8px 18px;
+    border-radius: 999px;
+    background: DarkOrange;
+    color: #111;
+    font-weight: 700;
+}
+
+.habit-row {
+    max-width: 1200px;
+    margin: var(--spacing-06, 24px) auto 0;
+    padding-inline: 16px;
+}
+.habit-row h2 {
+    margin: 0 0 var(--spacing-03, 12px);
+    font-size: 16px;
+    color: var(--content-secondary, #aaa);
+}
+.habit-row ul {
+    list-style: none;
+    margin: 0;
+    padding: 0 0 6px;
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+}
+.habit-row li {
+    flex: none;
+    width: 200px;
+    scroll-snap-align: start;
+}
+.habit-card {
+    display: block;
+    color: var(--content-primary, #f0f0f0);
+    text-decoration: none;
+}
+.habit-card-cover {
+    position: relative;
+    display: block;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.06);
+}
+.habit-card-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.habit-progress {
+    position: absolute;
+    inset-inline-start: 0;
+    bottom: 0;
+    height: 4px;
+    width: calc(var(--p) * 100%);
+    background: DarkOrange;
+}
+.habit-card strong {
+    display: -webkit-box;
+    margin-top: 6px;
+    overflow: hidden;
+    font-size: 14px;
+    line-height: 1.4;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+.habit-card small {
+    display: block;
+    margin-top: 2px;
+    color: var(--content-secondary, #aaa);
+    font-size: 12px;
+    direction: ltr;
+    text-align: end;
+}

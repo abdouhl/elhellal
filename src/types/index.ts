@@ -45,6 +45,8 @@ export interface Article {
     whoShouldRead?: string;
     metaDescription?: string;
     keywords?: string[];
+    /** Estimated reading time of the original post, in minutes (src/lib/reading-time.ts) */
+    minutes?: number;
 
     // Personal-blog feed entries (src/content/{omar,layla,youssef}) link straight
     // to their full article instead of /authors/{screen_name} + /articles/{slug}.

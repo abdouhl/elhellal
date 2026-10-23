@@ -56,6 +56,7 @@ import { fileURLToPath } from 'url';
 import type { ArticlesConfig, Article } from '../src/types/index.ts';
 import { externalBlogs } from '../src/data/external-blogs.ts';
 import { readArticles, writeArticles } from '../src/lib/articles-store.ts';
+import { countWords, minutesForWords } from '../src/lib/reading-time.ts';
 import { blockedIds } from './lib/moderation.ts';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -591,6 +592,8 @@ async function processItem(
         data.articles.push(targetCat);
     }
 
+    // A feed that ships only an excerpt (paywalled posts) would read as a 1-minute post.
+    const minutes = item.fullContent.length >= 600 ? minutesForWords(countWords(item.fullContent)) : undefined;
     const article: Article = {
         id_str: item.id,
         title: item.title,
@@ -605,6 +608,7 @@ async function processItem(
         ...(summary.whoShouldRead    && { whoShouldRead: summary.whoShouldRead }),
         ...(summary.metaDescription  && { metaDescription: summary.metaDescription }),
         ...(summary.keywords?.length && { keywords: summary.keywords }),
+        ...(minutes && { minutes }),
     };
 
     targetCat.content.push(article);

@@ -42,6 +42,8 @@ export interface FeedCard {
     authorHref?: string | undefined;
     authorName?: string | undefined;
     internalHref?: string | undefined;
+    /** Reading time in minutes, when known */
+    min?: number | undefined;
 }
 
 interface CardSource {
@@ -55,6 +57,7 @@ interface CardSource {
     authorHref?: string | undefined;
     authorName?: string | undefined;
     internalHref?: string | undefined;
+    minutes?: number | undefined;
 }
 
 export function toFeedCard(a: CardSource, category: string): FeedCard {
@@ -66,6 +69,7 @@ export function toFeedCard(a: CardSource, category: string): FeedCard {
     if (a.authorHref) card.authorHref = a.authorHref;
     if (a.authorName) card.authorName = a.authorName;
     if (a.internalHref) card.internalHref = a.internalHref;
+    if (a.minutes) card.min = a.minutes;
     return card;
 }
 

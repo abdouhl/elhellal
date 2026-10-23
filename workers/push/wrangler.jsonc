@@ -36,8 +36,10 @@
 		"PUSH_BATCH": "40",
 		// Digests go out at 17:00 UTC (18:00 Algeria, 20:00 Riyadh).
 		"SEND_HOUR_UTC": "17",
-		// Quiz streak reminders at 19:00 UTC (20:00 Algeria, 22:00 Riyadh).
-		"REMIND_HOUR_UTC": "19"
+		// Reading and quiz streak reminders at 19:00 UTC (20:00 Algeria, 22:00 Riyadh).
+		"REMIND_HOUR_UTC": "19",
+		// The weekly recap, Fridays at 09:00 UTC (10:00 Algeria, 12:00 Riyadh).
+		"RECAP_HOUR_UTC": "9"
 	},
 	"observability": {
 		"enabled": true

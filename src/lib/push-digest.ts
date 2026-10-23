@@ -16,6 +16,8 @@ const DIGEST_MAX = 400;
 const DIGEST_IMAGE_WIDTH = 720;
 /** Notifications show two or three lines of body; the rest would be cut anyway. */
 const DIGEST_PREVIEW_MAX = 140;
+/** Tags per article: enough to match followed tags without doubling the file. */
+const DIGEST_TAGS_MAX = 5;
 
 export interface DigestArticle {
     /** slug */
@@ -30,6 +32,12 @@ export interface DigestArticle {
     i?: string;
     /** preview text, clipped to DIGEST_PREVIEW_MAX */
     p?: string;
+    /** author (screen_name): followed authors (src/lib/reading.ts) */
+    a?: string;
+    /** slugs of its tags that have a page: followed tags */
+    g?: string[];
+    /** reading time in minutes */
+    m?: number;
 }
 
 export interface PushDigest {
@@ -56,6 +64,7 @@ export function buildPushDigest(
                 ? resizeImage(r.original_img_url, DIGEST_IMAGE_WIDTH)
                 : undefined;
             const preview = clip(r.preview_text?.replace(/\s+/g, ' ').trim() ?? '', DIGEST_PREVIEW_MAX);
+            const tags = (r.keywords ?? []).flatMap(([, tag]) => (tag ? [tag] : [])).slice(0, DIGEST_TAGS_MAX);
             return {
                 s: r.slug,
                 t: r.title,
@@ -63,6 +72,9 @@ export function buildPushDigest(
                 d: r.created_at,
                 ...(image ? { i: image } : {}),
                 ...(preview ? { p: preview } : {}),
+                ...(r.screen_name ? { a: r.screen_name } : {}),
+                ...(tags.length ? { g: tags } : {}),
+                ...(r.minutes ? { m: r.minutes } : {}),
             };
         });
     return { generatedAt: now.toISOString(), categories, articles };

@@ -4,6 +4,7 @@ import { isRecentlyAdded } from '../utils/dates';
 import { getPlaceholderImage } from '../utils/placeholderImage';
 import authorNames from '../data/author-names.json';
 import { CARD_SIZES, CARD_WIDTHS, isImageUrl, responsiveImage } from '../lib/images';
+import { minutesLabel } from '../lib/reading-time';
 
 interface CardProps {
     href: string;
@@ -26,6 +27,8 @@ interface CardProps {
     authorLabel?: string | undefined;
     /** Overrides the default href/slug-derived link */
     internalHref?: string | undefined;
+    /** Reading time of the original post, in minutes */
+    minutes?: number | undefined;
 }
 
 export default function Card({
@@ -43,6 +46,7 @@ export default function Card({
     authorHref,
     authorLabel,
     internalHref,
+    minutes,
 }: CardProps) {
     //const linkUrl = internalHref || (slug ? `/articles/${slug}` : href);
     const linkUrl = internalHref || (slug ? `/articles/${encodeURIComponent(slug)}/` : href);
@@ -72,6 +76,11 @@ export default function Card({
                     )}
                     {category && (
                         <span className="tag">{category}</span>
+                    )}
+                    {minutes && (
+                        <span className="tag tag-minutes" title={`${minutesLabel(minutes)} قراءة`}>
+                            {minutes} د
+                        </span>
                     )}
                 </p>
             </div>

@@ -61,6 +61,10 @@ interface ArticleView {
   screen_name?: string | undefined;
   created_at: string;
   dateAr: string;
+  /** "5 دقائق قراءة", or empty when the reading time isn't known */
+  readMinutes?: string | undefined;
+  /** Category key (personal posts: the author's collection), for the reader's history */
+  category: string;
   categoryHref: string;
   categoryTitle: string;
   fallbackPath: string;
@@ -108,6 +112,8 @@ if (isShell) {
     screen_name: T("screen_name"),
     created_at: T("created_at"),
     dateAr: T("dateAr"),
+    readMinutes: T("readMinutes"),
+    category: T("category"),
     categoryHref: T("categoryHref"),
     categoryTitle: T("categoryTitle"),
     fallbackPath: T("fallbackPath"),
@@ -169,6 +175,7 @@ if (isShell) {
         screen_name: person.slug,
         created_at: found.data.pubDate.toISOString().slice(0, 10),
         dateAr: found.data.pubDate.toLocaleDateString("ar", { year: "numeric", month: "long", day: "numeric" }),
+        category: person.slug,
         categoryHref: authorHref,
         categoryTitle: person.nameAr,
         fallbackPath: authorHref,
@@ -275,7 +282,16 @@ import InstallCard from "../../components/InstallCard.astro";
     <div class="article-layout">
 
       <!-- LEFT: Main article card -->
-      <article class="article-card" itemscope itemtype="https://schema.org/Article">
+      <!-- data-read-*: the reader's history and streak (src/scripts/reading.ts) -->
+      <article
+        class="article-card"
+        itemscope
+        itemtype="https://schema.org/Article"
+        data-read-slug={v.slug}
+        data-read-category={v.category}
+        data-read-author={v.screen_name}
+        data-read-image={v.coverSrc}
+      >
 
         <!-- Cover image (omitted entirely when the article has no thumb — no placeholder here) -->
         {(isShell || v.original_img_url) && (
@@ -346,6 +362,14 @@ import InstallCard from "../../components/InstallCard.astro";
                     {v.authorDisplayName}
                   </a>
                   <Fragment set:html={close("screen_name")} />
+                </Fragment>
+              )}
+              {(isShell || v.readMinutes) && (
+                <Fragment>
+                  <Fragment set:html={open("readMinutes")} />
+                  <span class="meta-dot">·</span>
+                  <span class="meta-minutes">{v.readMinutes}</span>
+                  <Fragment set:html={close("readMinutes")} />
                 </Fragment>
               )}
             </div>

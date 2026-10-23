@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { dayNumber, digestMessage, nextSlot, streakReminder } from './index';
+import { dayNumber, digestMessage, nextSlot, quickRead, readingReminder, streakReminder, weeklyRecap } from './index';
 import type { PushDigest } from '../../../src/lib/push-digest';
 
 const at = (iso: string) => Date.parse(iso);
@@ -90,5 +90,57 @@ describe('quiz streaks', () => {
     it('names the streak in the reminder', () => {
         expect(streakReminder(5).title).toBe('🔥 5 أيام متتالية');
         expect(streakReminder(5).url).toBe('/explore/?utm_source=push&utm_medium=quiz#quiz');
+    });
+});
+
+describe('digestMessage with follows', () => {
+    const digest: PushDigest = {
+        generatedAt: '2026-10-10T00:00:00Z',
+        categories: { history: 'التاريخ', ai: 'الذكاء الاصطناعي' },
+        articles: [
+            { s: 'c', t: 'ثالث', c: 'ai', d: '2026-10-10', p: 'ملخص' },
+            { s: 'b', t: 'ثاني', c: 'history', d: '2026-10-09', a: 'writer', p: 'عن التاريخ' },
+            { s: 'a', t: 'أول', c: 'history', d: '2026-10-08', g: ['ابن-خلدون'] },
+        ],
+    };
+    const seen = new Map([['c', 300], ['b', 300], ['a', 300]]);
+
+    it('adds followed authors and tags outside the chosen categories, and leads with them', () => {
+        const m = digestMessage(digest, seen, { categories: ',ai,', frequency: 'daily', since: 0, follows: ',author:writer,tag:ابن-خلدون,' })!;
+        expect(m.title).toBe('ثاني');
+        expect(m.body).toContain('⭐ @writer');
+        expect(m.count).toBe(3);
+    });
+    it('leaves the categories alone without follows', () => {
+        const m = digestMessage(digest, seen, { categories: ',ai,', frequency: 'daily', since: 0, follows: '' })!;
+        expect(m.title).toBe('ثالث');
+        expect(m.count).toBe(1);
+    });
+});
+
+describe('nudges', () => {
+    const digest: PushDigest = {
+        generatedAt: '2026-10-10T00:00:00Z',
+        categories: { history: 'التاريخ', ai: 'الذكاء الاصطناعي' },
+        articles: [
+            { s: 'long', t: 'طويل', c: 'ai', d: '2026-10-10', m: 14 },
+            { s: 'short', t: 'قصير', c: 'ai', d: '2026-10-09', m: 3 },
+            { s: 'other', t: 'آخر', c: 'history', d: '2026-10-09', m: 1 },
+        ],
+    };
+
+    it('offers the shortest recent article in the subscriber’s topics', () => {
+        expect(quickRead(digest, ',ai,')!.s).toBe('short');
+        expect(quickRead(digest, '*')!.s).toBe('other');
+    });
+    it('links the streak reminder to that article', () => {
+        const m = readingReminder(5, quickRead(digest, ',ai,'));
+        expect(m.title).toBe('🔥 5 أيام متتالية');
+        expect(m.url).toBe('/articles/short/?utm_source=push&utm_medium=streak');
+        expect(m.body).toContain('«قصير»');
+    });
+    it('sums up the week, naming the top category', () => {
+        const m = weeklyRecap({ week_reads: 9, week_minutes: 47, week_top: 'ai', read_streak: 4 }, digest.categories);
+        expect(m.body).toBe('📖 9 مقالات · ⏱ 47 دقيقة · أكثر ما قرأت: الذكاء الاصطناعي\n🔥 سلسلتك: 4 أيام');
     });
 });

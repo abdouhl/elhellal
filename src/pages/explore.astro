@@ -43,7 +43,10 @@ const sites = [
             </div>
             <p class="ex-quiz-q" data-title></p>
             <div class="ex-quiz-options" data-options></div>
-            <a class="ex-more" data-link data-after hidden>أكمل الاختبار ←</a>
+            <div class="ex-quiz-after" data-after hidden>
+                <button type="button" class="ex-share" data-share>شارك نتيجتك</button>
+                <a class="ex-more" data-link>أكمل الاختبار ←</a>
+            </div>
         </section>
 
         <section class="ex-row" data-feed="books" hidden>
@@ -94,8 +97,11 @@ const sites = [
     const STRIP = 8;
     const QUIZ_KEY = "explore-quiz";
 
-    /** The quiz card's memory: the last day answered, what was picked, and the run of days in a row. */
-    type QuizState = { day?: number; picked?: number; streak?: number };
+    /**
+     * The quiz card's memory: the last day answered, what was picked, the run
+     * of days in a row, and the last week's results ([day, right]) for sharing.
+     */
+    type QuizState = { day?: number; picked?: number; streak?: number; log?: Array<[number, boolean]> };
 
     /** Today's position in a feed: the same for everyone on a given local day. */
     function today(): number {
@@ -167,7 +173,8 @@ const sites = [
                 b.textContent = option;
                 b.addEventListener("click", () => {
                     const streak = saved.day === today() - 1 ? (saved.streak ?? 1) + 1 : 1;
-                    saved = { day: today(), picked: i, streak };
+                    const log = [...(saved.log ?? []).filter(([d]) => d > today() - 7 && d !== today()), [today(), i === item.answer] as [number, boolean]];
+                    saved = { day: today(), picked: i, streak, log };
                     try {
                         localStorage.setItem(QUIZ_KEY, JSON.stringify(saved));
                     } catch {}
@@ -181,6 +188,26 @@ const sites = [
         after.hidden = true;
         if (saved.day === today() && typeof saved.picked === "number") reveal(saved.picked);
         showStreak();
+        section.querySelector<HTMLButtonElement>("[data-share]")!.onclick = (e) => shareResult(e.currentTarget as HTMLButtonElement, saved);
+    }
+
+    /** Wordle-style: the last seven days as squares, so friends can't see the answer. */
+    async function shareResult(button: HTMLButtonElement, saved: QuizState) {
+        const results = new Map(saved.log ?? []);
+        const grid = Array.from({ length: 7 }, (_, i) => {
+            const r = results.get(today() - 6 + i);
+            return r === undefined ? "⬜" : r ? "🟩" : "🟥";
+        }).join("");
+        const streak = saved.streak && saved.streak > 1 ? `\n🔥 ${saved.streak} أيام متتالية` : "";
+        const text = `الهلال · سؤال اليوم\n${grid}${streak}`;
+        const url = "https://elhellal.com/explore/#quiz";
+        try {
+            if (navigator.share) await navigator.share({ text, url });
+            else {
+                await navigator.clipboard.writeText(`${text}\n${url}`);
+                button.textContent = "نُسخت النتيجة ✓";
+            }
+        } catch {}
     }
 
     /** With notifications on, the push Worker keeps the streak too, to remind before it breaks. */
@@ -295,6 +322,29 @@ const sites = [
     }
     .ex-save[aria-pressed="true"] path {
         fill: currentColor;
+    }
+    .ex-quiz-after {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 12px;
+    }
+    .ex-quiz-after[hidden] {
+        display: none;
+    }
+    .ex-quiz-after .ex-more {
+        margin: 0;
+    }
+    .ex-share {
+        padding: 7px 16px;
+        border: 1px solid DarkOrange;
+        border-radius: 999px;
+        background: transparent;
+        color: DarkOrange;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
     }
     .ex-streak {
         font-size: 14px;

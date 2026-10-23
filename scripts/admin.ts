@@ -2522,7 +2522,7 @@ async function pushStats(params: URLSearchParams) {
     const sinceMs = `(unixepoch(${since}) * 1000)`;
     const dayOf = (col: string) => `date(${col} / 1000, 'unixepoch')`;
     const ago = (n: number) => `(unixepoch('now') - ${n * 86400}) * 1000`;
-    const [totals, categoryRows, events, outbox, broadcasts, services, allTime, installs, platforms, newDays] = await pushD1(
+    const [totals, categoryRows, events, outbox, broadcasts, services, allTime, installs, platforms, newDays, reading, suggestions] = await pushD1(
         [
             "SELECT COUNT(*) AS total, COALESCE(SUM(frequency = 'daily'), 0) AS daily, COALESCE(SUM(frequency = 'weekly'), 0) AS weekly, COALESCE(SUM(categories = '*'), 0) AS everything, COALESCE(SUM(app), 0) AS app FROM subscriptions",
             "SELECT categories FROM subscriptions WHERE categories != '*'",
@@ -2536,6 +2536,10 @@ async function pushStats(params: URLSearchParams) {
             // Per-day series not kept as counters: new installs and new subscriptions.
             `SELECT ${dayOf('first_seen')} AS day, 'new-install' AS name, COUNT(*) AS n FROM installs WHERE first_seen >= ${sinceMs} GROUP BY 1
              UNION ALL SELECT ${dayOf('created_at')}, 'new-sub', COUNT(*) FROM subscriptions WHERE created_at >= ${sinceMs} GROUP BY 1`,
+            // The reading habit (migrations/0004_reading.sql): streaks, follows, recaps.
+            `SELECT COALESCE(SUM(read_day >= unixepoch('now') / 86400 - 1), 0) AS active, COALESCE(SUM(read_streak >= 2), 0) AS streaking,
+                COALESCE(MAX(read_streak), 0) AS longest, COALESCE(SUM(follows != ''), 0) AS following FROM subscriptions`,
+            'SELECT url, title, n, created_at FROM suggestions ORDER BY created_at DESC LIMIT 50',
         ].join('; ')
     );
     const byCategory = new Map<string, number>();
@@ -2554,6 +2558,8 @@ async function pushStats(params: URLSearchParams) {
         pending: outbox?.[0]?.pending ?? 0,
         batch: PUSH_BATCH,
         broadcasts,
+        reading: reading?.[0],
+        suggestions: suggestions ?? [],
     };
 }
 

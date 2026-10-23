@@ -1,0 +1,91 @@
+---
+// /random/ — "مقال عشوائي": sends the reader to a random summarised article
+// they haven't read, from dist/_data/random.json (scripts/build-worker-data.ts).
+// Half the draws lean toward the categories the reader reads most. Linked
+// from the footer, /today/, the app's shortcuts, and shaking the phone
+// (src/scripts/reading.ts).
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout
+    site="الهلال"
+    title="مقال عشوائي"
+    tagline="دع الصدفة تختار لك"
+    pageTitle="مقال عشوائي"
+    pageDescription="افتح مقالاً عربياً عشوائياً من الهلال."
+    noindex
+>
+    <main id="main-content" class="random-page">
+        <p class="random-dice" aria-hidden="true">🎲</p>
+        <p data-status>نختار لك مقالاً…</p>
+        <p><a href="/" data-fallback hidden>إلى الرئيسية</a></p>
+    </main>
+</Layout>
+
+<script>
+    import { affinity, localDay, readState, updateState, awardBadges } from "../lib/reading";
+    import { getBookmarks } from "../utils/bookmarks";
+
+    type Entry = [slug: string, category: string, minutes: number];
+
+    async function go() {
+        if (location.pathname !== "/random/") return;
+        let pool: Entry[] = [];
+        try {
+            pool = await (await fetch("/_data/random.json")).json();
+        } catch {}
+        const state = readState();
+        const seen = new Set(state.reads.map((r) => r.s));
+        let candidates = pool.filter(([slug]) => !seen.has(slug));
+        if (!candidates.length) candidates = pool;
+        if (!candidates.length) {
+            document.querySelector("[data-status]")!.textContent = "تعذّر الوصول إلى المقالات الآن.";
+            document.querySelector<HTMLElement>("[data-fallback]")!.hidden = false;
+            return;
+        }
+        // Half the time, from one of the reader's three favourite categories.
+        const favourites = [...affinity(state).category].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([c]) => c);
+        if (favourites.length && Math.random() < 0.5) {
+            const leaning = candidates.filter(([, c]) => favourites.includes(c));
+            if (leaning.length) candidates = leaning;
+        }
+        const [slug] = candidates[Math.floor(Math.random() * candidates.length)]!;
+        updateState((st) => {
+            st.randoms++;
+            awardBadges(st, { saved: getBookmarks().length, quizStreak: 0 }, localDay());
+        });
+        location.replace(`/articles/${encodeURIComponent(slug)}/?utm_source=random`);
+    }
+
+    document.addEventListener("astro:page-load", () => {
+        go().catch(() => {});
+    });
+</script>
+
+<style>
+    .random-page {
+        max-width: 480px;
+        margin: 0 auto;
+        padding: 80px 16px;
+        text-align: center;
+        color: var(--content-secondary);
+    }
+    .random-dice {
+        font-size: 56px;
+        margin: 0;
+        animation: spin 0.8s ease-in-out infinite;
+    }
+    [data-fallback][hidden] {
+        display: none;
+    }
+    @keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .random-dice {
+            animation: none;
+        }
+    }
+</style>
