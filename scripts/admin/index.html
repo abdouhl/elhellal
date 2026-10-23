@@ -1216,7 +1216,7 @@ async function renderPush() {
 
   paint('push',
     h('div', { class: 'toolbar' },
-      h('span', { class: 'meta' }, 'Installs are counted when the installed app is opened (once a day per device, iOS included). Digests go out at 17:00 UTC (daily) and Fridays (weekly).'),
+      h('span', { class: 'meta' }, 'Installs are counted when the installed app is opened (once a day per device, iOS included). Digests go out at 17:00 UTC (daily) and Fridays (weekly); daily subscribers also get an evening read at 19:00 UTC, and those who opted into more a morning article (06:00), the quote (11:00) and the quiz question (14:00).'),
       h('select', { onchange: (e) => { push.days = Number(e.target.value); push.stats = null; renderPush(); } },
         [7, 14, 30, 90, 365].map((n) => h('option', { value: n, selected: n === push.days }, `Last ${n} days`))),
       refresh),
@@ -1244,7 +1244,7 @@ async function renderPush() {
     h('h2', {}, 'Notifications'),
     h('div', { class: 'toolbar', style: 'align-items:stretch' },
       tile('Subscribers', (t.total ?? 0).toLocaleString(), `${t.app ?? 0} from the app · ${(t.total ?? 0) - (t.app ?? 0)} from a browser`),
-      tile('Frequency', `${t.daily ?? 0} / ${t.weekly ?? 0}`, `daily / weekly · ${t.everything ?? 0} follow everything`),
+      tile('Frequency', `${t.daily ?? 0} / ${t.weekly ?? 0}`, `daily / weekly · ${t.extra ?? 0} want more · ${t.everything ?? 0} follow everything`),
       tile(`Sent, ${span}`, sent.toLocaleString(), `${(all.sent ?? 0).toLocaleString()} all time`),
       tile('Click rate', pct(sum('click'), sent), `${sum('click')} clicks in ${span}`),
       tile('Churn', `+${sum('new-sub')} / −${sum('unsubscribed') + sum('gone')}`, `subscribed / left in ${span}`),

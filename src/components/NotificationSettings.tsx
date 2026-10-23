@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
     currentSubscription,
     fetchPrefs,
@@ -20,7 +20,7 @@ interface NotificationSettingsProps {
 
 type Status = 'loading' | PushSupport | 'denied' | 'off' | 'on';
 
-const DEFAULT_PREFS: PushPrefs = { categories: '*', frequency: 'daily' };
+const DEFAULT_PREFS: PushPrefs = { categories: '*', frequency: 'daily', extra: false };
 
 const ERRORS: Record<string, string> = {
     denied: 'رُفض الإذن بالإشعارات. اسمح بها لهذا الموقع من إعدادات المتصفح ثم أعد المحاولة.',
@@ -129,13 +129,13 @@ export default function NotificationSettings({ categories }: NotificationSetting
     };
     const setFrequency = (frequency: Frequency) => update({ ...prefs, frequency });
 
-    if (status === 'loading') return <div className="notif-card" aria-busy="true" />;
+    if (status === 'loading') return <div className="notif" aria-busy="true" />;
 
     if (status === 'ios-install') {
         return (
-            <div className="notif-card">
-                <p className="notif-lead">على iPhone وiPad تعمل الإشعارات بعد تثبيت الهلال على الشاشة الرئيسية:</p>
-                <ol className="notif-steps">
+            <div className="notif">
+                <Hero title="ثبّت الهلال أولاً" text="على iPhone وiPad تعمل الإشعارات بعد تثبيت الهلال على الشاشة الرئيسية." />
+                <ol className="notif-list notif-steps">
                     <li>اضغط زر المشاركة في Safari.</li>
                     <li>اختر «إضافة إلى الشاشة الرئيسية».</li>
                     <li>افتح الهلال من الشاشة الرئيسية وارجع إلى هذه الصفحة.</li>
@@ -150,66 +150,91 @@ export default function NotificationSettings({ categories }: NotificationSetting
 
     if (status === 'unsupported') {
         return (
-            <div className="notif-card">
-                <p className="notif-lead">متصفحك لا يدعم الإشعارات. جرّب أحدث إصدار من Chrome أو Edge أو Firefox أو Safari.</p>
+            <div className="notif">
+                <Hero title="الإشعارات غير مدعومة" text="متصفحك لا يدعم الإشعارات. جرّب أحدث إصدار من Chrome أو Edge أو Firefox أو Safari." />
             </div>
         );
     }
 
-    return (
-        <div className="notif-card">
-            <div className="notif-head">
-                <p className="notif-lead">
-                    {status === 'on'
-                        ? 'الإشعارات مفعّلة على هذا الجهاز.'
-                        : 'احصل على أفضل المقالات الجديدة في المواضيع التي تهمك، دون إزعاج: إشعار واحد في اليوم أو في الأسبوع.'}
-                </p>
-                {status === 'on' ? (
-                    <button type="button" className="notif-button notif-button--ghost" onClick={disable} disabled={busy}>
-                        إيقاف الإشعارات
-                    </button>
-                ) : (
-                    <button type="button" className="notif-button" onClick={enable} disabled={busy || status === 'denied'}>
-                        تفعيل الإشعارات
-                    </button>
-                )}
-            </div>
+    const on = status === 'on';
 
-            {status === 'denied' && <p className="notif-message">{ERRORS.denied}</p>}
+    return (
+        <div className="notif">
+            <Hero
+                on={on}
+                title={on ? 'الإشعارات مفعّلة' : 'لا تفوّت الأفضل'}
+                text={
+                    on
+                        ? 'تصلك أفضل المقالات الجديدة على هذا الجهاز.'
+                        : 'أفضل المقالات الجديدة في المواضيع التي تهمك، دون إزعاج: إشعاران في اليوم، أو واحد في الأسبوع.'
+                }
+            >
+                <Switch
+                    checked={on}
+                    label={on ? 'إيقاف الإشعارات' : 'تفعيل الإشعارات'}
+                    disabled={busy || status === 'denied'}
+                    onChange={on ? disable : enable}
+                />
+            </Hero>
+
+            {status === 'denied' && <p className="notif-message is-alert">{ERRORS.denied}</p>}
             {message && status !== 'denied' && (
                 <p className="notif-message" role="status">
                     {message}
                 </p>
             )}
 
-            <fieldset className="notif-group">
-                <legend>كم مرة؟</legend>
-                <label className="notif-option">
-                    <input
-                        type="radio"
-                        name="frequency"
-                        checked={prefs.frequency === 'daily'}
-                        onChange={() => setFrequency('daily')}
-                    />
-                    يومياً، مساءً: الجديد واقتباس اليوم
-                </label>
-                <label className="notif-option">
-                    <input
-                        type="radio"
-                        name="frequency"
-                        checked={prefs.frequency === 'weekly'}
-                        onChange={() => setFrequency('weekly')}
-                    />
-                    أسبوعياً، كل جمعة
-                </label>
-            </fieldset>
+            <section className="notif-section">
+                <h2>كم مرة؟</h2>
+                <div className="notif-list" role="radiogroup" aria-label="كم مرة؟">
+                    <label className="notif-row">
+                        <span className="notif-row-text">
+                            <strong>يومياً</strong>
+                            <small>الجديد مساءً، وقراءة قصيرة قبل النوم</small>
+                        </span>
+                        <input
+                            type="radio"
+                            name="frequency"
+                            className="notif-radio"
+                            checked={prefs.frequency === 'daily'}
+                            onChange={() => setFrequency('daily')}
+                        />
+                    </label>
+                    <label className="notif-row">
+                        <span className="notif-row-text">
+                            <strong>أسبوعياً</strong>
+                            <small>كل جمعة، أفضل ما أُضيف في الأسبوع</small>
+                        </span>
+                        <input
+                            type="radio"
+                            name="frequency"
+                            className="notif-radio"
+                            checked={prefs.frequency === 'weekly'}
+                            onChange={() => setFrequency('weekly')}
+                        />
+                    </label>
+                </div>
+                <div className={`notif-list ${prefs.frequency !== 'daily' ? 'is-disabled' : ''}`}>
+                    <label className="notif-row">
+                        <span className="notif-row-text">
+                            <strong>إشعارات أكثر</strong>
+                            <small>حتى 5 يومياً: مقال الصباح، اقتباس الظهيرة، سؤال اليوم</small>
+                        </span>
+                        <Switch
+                            checked={prefs.frequency === 'daily' && prefs.extra === true}
+                            label="إشعارات أكثر"
+                            disabled={prefs.frequency !== 'daily'}
+                            onChange={() => update({ ...prefs, extra: !prefs.extra })}
+                        />
+                    </label>
+                </div>
+                <p className="notif-note">
+                    وإن كانت لك سلسلة في «سؤال اليوم» (تبويب استكشف) ولم تجب بعد، نذكّرك بها مرة واحدة ليلاً.
+                </p>
+            </section>
 
-            <p className="notif-message">
-                وإن كانت لك سلسلة في «سؤال اليوم» (تبويب استكشف) ولم تجب بعد، نذكّرك بها مرة واحدة ليلاً.
-            </p>
-
-            <fieldset className="notif-group">
-                <legend>أي المواضيع؟</legend>
+            <section className="notif-section">
+                <h2>أي المواضيع؟</h2>
                 <div className="notif-chips">
                     <button
                         type="button"
@@ -231,13 +256,47 @@ export default function NotificationSettings({ categories }: NotificationSetting
                         </button>
                     ))}
                 </div>
-            </fieldset>
+            </section>
 
-            {status === 'on' && (
-                <button type="button" className="notif-link" onClick={test} disabled={busy}>
+            {on && (
+                <button type="button" className="notif-button notif-button--ghost" onClick={test} disabled={busy}>
                     أرسل إشعاراً تجريبياً
                 </button>
             )}
         </div>
+    );
+}
+
+function Hero({ on, title, text, children }: { on?: boolean; title: string; text: string; children?: ReactNode }) {
+    return (
+        <section className={`notif-hero ${on ? 'is-on' : ''}`}>
+            <span className="notif-hero-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+                </svg>
+            </span>
+            <span className="notif-hero-text">
+                <strong>{title}</strong>
+                <small>{text}</small>
+            </span>
+            {children}
+        </section>
+    );
+}
+
+function Switch({ checked, label, disabled, onChange }: { checked: boolean; label: string; disabled?: boolean; onChange: () => void }) {
+    return (
+        <button
+            type="button"
+            role="switch"
+            className="notif-switch"
+            aria-checked={checked}
+            aria-label={label}
+            disabled={disabled}
+            onClick={(e) => {
+                e.preventDefault();
+                onChange();
+            }}
+        />
     );
 }

@@ -9,8 +9,8 @@
  *  - "follow" buttons for authors and tags (article, author and tag pages),
  *    mirrored to the push Worker so digests include what's followed
  *  - related articles reordered toward the reader, read ones last
- *  - the home page's "today's five" card, "continue reading" and "from who
- *    you follow" rows
+ *  - the home page's "today's five" card, "continue reading", "recently
+ *    read" (installed app only) and "from who you follow" rows
  *  - the header's 🔥 streak chip
  *  - the installed app's icon badge: today's unread picks while it's closed;
  *    on Android, the service worker refreshes it daily (periodic sync)
@@ -40,6 +40,7 @@ import {
 } from '../lib/reading';
 import { listingKey, listingShardOf, type ListingRecord } from '../lib/listing-page';
 import type { FeedCard } from '../lib/feed';
+import { PLACEHOLDER_IMAGE } from '../lib/images';
 import { getBookmarks } from '../utils/bookmarks';
 import { isStandalone } from './pwa-install';
 import '../styles/reading.css';
@@ -354,11 +355,8 @@ function rowItem(href: string, title: string, image?: string, note?: string, pro
     const small = li.querySelector('small')!;
     if (note) small.textContent = note;
     else small.remove();
-    const img = li.querySelector('img')!;
-    if (image) {
-        img.src = image;
-        img.onerror = () => img.remove();
-    } else img.remove();
+    // A missing or broken cover shows the placeholder (pwa.ts), never an empty frame.
+    li.querySelector('img')!.src = image || PLACEHOLDER_IMAGE;
     if (progress !== undefined) {
         const bar = document.createElement('span');
         bar.className = 'habit-progress';
@@ -407,6 +405,21 @@ function renderContinue(state: ReadingState) {
     const items = unfinished(state).slice(0, 8);
     list.replaceChildren(...items.map((r) => rowItem(`/articles/${encodeURIComponent(r.s)}/`, r.t, r.i, undefined, r.p)));
     section.hidden = items.length === 0;
+}
+
+/** The installed app's "قرأتها مؤخراً": the last articles read, newest first. */
+function renderRecent(state: ReadingState) {
+    const section = document.querySelector<HTMLElement>('[data-habit-recent]');
+    const list = section?.querySelector('ul');
+    if (!section || !list) return;
+    const items = state.reads
+        .filter((r) => r.done)
+        .sort((a, b) => b.at - a.at)
+        .slice(0, 10);
+    list.replaceChildren(
+        ...items.map((r) => rowItem(`/articles/${encodeURIComponent(r.s)}/`, r.t, r.i, r.a ? `@${r.a}` : undefined))
+    );
+    section.hidden = !isStandalone() || items.length === 0;
 }
 
 const FOLLOW_CACHE = 'elhellal_following_feed';
@@ -462,6 +475,7 @@ async function renderHome() {
     const state = readState();
     renderTodayCard(state);
     renderContinue(state);
+    renderRecent(state);
     renderFollowing(state).catch(() => {});
 }
 

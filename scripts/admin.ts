@@ -2524,7 +2524,7 @@ async function pushStats(params: URLSearchParams) {
     const ago = (n: number) => `(unixepoch('now') - ${n * 86400}) * 1000`;
     const [totals, categoryRows, events, outbox, broadcasts, services, allTime, installs, platforms, newDays, reading, suggestions] = await pushD1(
         [
-            "SELECT COUNT(*) AS total, COALESCE(SUM(frequency = 'daily'), 0) AS daily, COALESCE(SUM(frequency = 'weekly'), 0) AS weekly, COALESCE(SUM(categories = '*'), 0) AS everything, COALESCE(SUM(app), 0) AS app FROM subscriptions",
+            "SELECT COUNT(*) AS total, COALESCE(SUM(frequency = 'daily'), 0) AS daily, COALESCE(SUM(frequency = 'weekly'), 0) AS weekly, COALESCE(SUM(categories = '*'), 0) AS everything, COALESCE(SUM(app), 0) AS app, COALESCE(SUM(extra = 1 AND frequency = 'daily'), 0) AS extra FROM subscriptions",
             "SELECT categories FROM subscriptions WHERE categories != '*'",
             `SELECT day, name, n FROM events WHERE day >= ${since} ORDER BY day DESC`,
             'SELECT COUNT(*) AS pending FROM outbox',

@@ -632,7 +632,7 @@ import InstallCard from "../../components/InstallCard.astro";
                     height="225"
                     loading="lazy"
                     decoding="async"
-                    onerror="this.src='/favicons/default.png'"
+                    onerror="this.onerror=null;this.removeAttribute('srcset');this.src='/thumbs/placeholder.webp'"
                   />
                   <span class="related-tag">{t.category}</span>
                 </div>

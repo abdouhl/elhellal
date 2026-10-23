@@ -25,7 +25,9 @@
 	// …and the quotes site's, for the quote of the day closing each digest.
 	"services": [
 		{ "binding": "SITE", "service": "elhellal" },
-		{ "binding": "QUOTES", "service": "elhellal-quotes" }
+		{ "binding": "QUOTES", "service": "elhellal-quotes" },
+		// …and the quiz site's, for the question of the day ("more notifications").
+		{ "binding": "QUIZ", "service": "elhellal-quiz" }
 	],
 	"triggers": { "crons": ["*/5 * * * *"] },
 	"vars": {
@@ -39,7 +41,12 @@
 		// Reading and quiz streak reminders at 19:00 UTC (20:00 Algeria, 22:00 Riyadh).
 		"REMIND_HOUR_UTC": "19",
 		// The weekly recap, Fridays at 09:00 UTC (10:00 Algeria, 12:00 Riyadh).
-		"RECAP_HOUR_UTC": "9"
+		"RECAP_HOUR_UTC": "9",
+		// "More notifications" (opt-in): a morning article, the quote of the day
+		// and the quiz question (07:00, 12:00 and 15:00 Algeria).
+		"MORNING_HOUR_UTC": "6",
+		"QUOTE_HOUR_UTC": "11",
+		"QUIZ_HOUR_UTC": "14"
 	},
 	"observability": {
 		"enabled": true

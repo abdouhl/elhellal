@@ -48,6 +48,7 @@ import Layout from "../layouts/Layout.astro";
 <script>
     import { DAILY_COUNT, dealToday, localDay, readSlugs, readState, streak, todayProgress, updateState, type Candidate, type TodayPick } from "../lib/reading";
     import { minutesLabel } from "../lib/reading-time";
+    import { PLACEHOLDER_IMAGE } from "../lib/images";
     import { shardOf } from "../lib/article-page";
     import type { PushDigest } from "../lib/push-digest";
 
@@ -119,11 +120,7 @@ import Layout from "../layouts/Layout.astro";
         li.querySelector("[data-preview]")!.textContent = p.p ?? "";
         li.querySelector("[data-author]")!.textContent = p.a ? `@${p.a}` : "";
         li.querySelector("[data-cta]")!.textContent = read ? "✓ قرأته" : "اقرأ";
-        const img = li.querySelector("img")!;
-        if (p.i) {
-            img.src = p.i;
-            img.onerror = () => img.remove();
-        } else img.remove();
+        li.querySelector("img")!.src = p.i || PLACEHOLDER_IMAGE;
         return li;
     }
 

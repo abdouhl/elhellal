@@ -10,7 +10,7 @@
 
 import type { TemplateData } from './shell-template';
 import { fnv1a } from './hash';
-import { HERO_WIDTHS, isImageUrl, RELATED_WIDTH, resizeImage, responsiveImage } from './images';
+import { HERO_WIDTHS, isImageUrl, PLACEHOLDER_IMAGE, RELATED_WIDTH, resizeImage, responsiveImage } from './images';
 import { minutesLabel } from './reading-time';
 import { sisterTiles, type SisterLink } from './sister-sites';
 
@@ -172,7 +172,7 @@ export function articleTemplateData(r: ArticleRecord): TemplateData {
         redditShareUrl: `https://www.reddit.com/submit?url=${encodedCanonicalUrl}&title=${encodedShareText}`,
         related: r.related.map(([slug, title, image, screenName, categoryTitle]) => ({
             href: `/articles/${encodeURIComponent(slug)}/`,
-            image: isImageUrl(image) ? resizeImage(image, RELATED_WIDTH) : `/favicons/${slug}.png`,
+            image: isImageUrl(image) ? resizeImage(image, RELATED_WIDTH) : PLACEHOLDER_IMAGE,
             title,
             author: screenName ? `@${screenName}` : '',
             category: categoryTitle ?? r.categoryTitle,

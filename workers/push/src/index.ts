@@ -36,8 +36,15 @@
  *        the last two days: their last 7 days' reads, minutes and top topic
  *      - streak reminders at REMIND_HOUR_UTC: a reading streak (2+ days)
  *        that ends yesterday gets a short article to keep it alive; failing
- *        that, a quiz streak gets the question of the day
- *   3. the outbox: one-off messages the admin panel queues (scripts/admin.ts).
+ *        that, a quiz streak gets the question of the day; failing both, a
+ *        daily subscriber gets a short read for the evening. So a daily
+ *        subscriber gets two notifications a day, a weekly one about one a week.
+ *   3. "more notifications" (opt-in, daily subscribers; extra_day/extra_sent):
+ *      a morning article at MORNING_HOUR_UTC, the quote of the day at
+ *      QUOTE_HOUR_UTC and the quiz question at QUIZ_HOUR_UTC (unless already
+ *      answered): five a day with the digest and the evening nudge. Their
+ *      digest then skips the quote-only fallback.
+ *   4. the outbox: one-off messages the admin panel queues (scripts/admin.ts).
  * At most PUSH_BATCH messages per run: the free plan allows 50 subrequests and
  * 10 ms of CPU per invocation, so big sends are spread over several runs
  * (40 per 5 minutes ≈ 11k a day).
@@ -61,6 +68,18 @@ interface Env {
     RECAP_HOUR_UTC?: string;
     /** The quotes site's Worker, for the quote of the day. */
     QUOTES?: Fetcher;
+    /** The quiz site's Worker, for the question of the day. */
+    QUIZ?: Fetcher;
+    MORNING_HOUR_UTC?: string;
+    QUOTE_HOUR_UTC?: string;
+    QUIZ_HOUR_UTC?: string;
+}
+
+/** One item of the quiz site's /app-feed.json (../elhellal-quiz). */
+export interface FeedQuiz {
+    /** the question */
+    title: string;
+    options?: string[];
 }
 
 /** One item of a sister site's /app-feed.json (../elhellal-quotes/src/pages/app-feed.json.ts). */
@@ -89,7 +108,14 @@ interface SubscriptionRow {
     quiz_streak: number;
     /** ',author:x,tag:y,' */
     follows: string;
+    /** 1: "more notifications" (up to five a day) */
+    extra: number;
 }
+
+/** Bits of extra_sent: the extra slots already sent on extra_day. */
+const EXTRA_MORNING = 1;
+const EXTRA_QUOTE = 2;
+const EXTRA_QUIZ = 4;
 
 interface Job {
     target: PushTarget;
@@ -204,10 +230,11 @@ function parseFrequency(value: unknown): Frequency {
     throw new HttpError(400, 'invalid frequency');
 }
 
-function preferences(row: Pick<SubscriptionRow, 'categories' | 'frequency'>) {
+function preferences(row: Pick<SubscriptionRow, 'categories' | 'frequency' | 'extra'>) {
     return {
         categories: row.categories === '*' ? '*' : row.categories.split(',').filter(Boolean),
         frequency: row.frequency,
+        extra: row.extra === 1,
     };
 }
 
@@ -229,21 +256,22 @@ async function handleSubscribe(request: Request, env: Env, ctx: ExecutionContext
 
     // Moved by the push service (pushsubscriptionchange): keep the old preferences.
     const oldEndpoint = typeof body.oldEndpoint === 'string' ? body.oldEndpoint : null;
-    const previous = await env.DB.prepare('SELECT categories, frequency, since FROM subscriptions WHERE endpoint IN (?, ?)')
+    const previous = await env.DB.prepare('SELECT categories, frequency, since, extra FROM subscriptions WHERE endpoint IN (?, ?)')
         .bind(endpoint, oldEndpoint ?? endpoint)
-        .first<Pick<SubscriptionRow, 'categories' | 'frequency' | 'since'>>();
+        .first<Pick<SubscriptionRow, 'categories' | 'frequency' | 'since' | 'extra'>>();
     const categories = body.categories === undefined && previous ? previous.categories : parseCategories(body.categories);
     const frequency = body.frequency === undefined && previous ? previous.frequency : parseFrequency(body.frequency);
+    const extra = body.extra === undefined ? previous?.extra ?? 0 : body.extra === true ? 1 : 0;
 
     const now = Date.now();
     const app = body.app === true ? 1 : 0;
     const statements = [
         env.DB.prepare(
-            `INSERT INTO subscriptions (endpoint, p256dh, auth, categories, frequency, since, next_due_at, created_at, app)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+            `INSERT INTO subscriptions (endpoint, p256dh, auth, categories, frequency, since, next_due_at, created_at, app, extra)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
              ON CONFLICT (endpoint) DO UPDATE SET p256dh = ?2, auth = ?3, categories = ?4, frequency = ?5,
-                 next_due_at = CASE WHEN frequency = ?5 THEN next_due_at ELSE ?7 END, failures = 0, app = MAX(app, ?9)`
-        ).bind(endpoint, p256dh, auth, categories, frequency, previous?.since ?? now, nextSlot(now, frequency, sendHour(env)), now, app),
+                 next_due_at = CASE WHEN frequency = ?5 THEN next_due_at ELSE ?7 END, failures = 0, app = MAX(app, ?9), extra = ?10`
+        ).bind(endpoint, p256dh, auth, categories, frequency, previous?.since ?? now, nextSlot(now, frequency, sendHour(env)), now, app, extra),
     ];
     if (oldEndpoint && oldEndpoint !== endpoint) {
         statements.push(env.DB.prepare('DELETE FROM subscriptions WHERE endpoint = ?').bind(oldEndpoint));
@@ -265,7 +293,7 @@ async function handleSubscribe(request: Request, env: Env, ctx: ExecutionContext
             ])
         );
     }
-    return { ok: true, ...preferences({ categories, frequency }) };
+    return { ok: true, ...preferences({ categories, frequency, extra }) };
 }
 
 async function handleUnsubscribe(request: Request, env: Env) {
@@ -299,9 +327,9 @@ async function handleTest(request: Request, env: Env) {
 
 async function handleSubscription(url: URL, env: Env) {
     const endpoint = validEndpoint(url.searchParams.get('endpoint'));
-    const row = await env.DB.prepare('SELECT categories, frequency FROM subscriptions WHERE endpoint = ?')
+    const row = await env.DB.prepare('SELECT categories, frequency, extra FROM subscriptions WHERE endpoint = ?')
         .bind(endpoint)
-        .first<Pick<SubscriptionRow, 'categories' | 'frequency'>>();
+        .first<Pick<SubscriptionRow, 'categories' | 'frequency' | 'extra'>>();
     return row ? { subscribed: true, ...preferences(row) } : { subscribed: false };
 }
 
@@ -463,17 +491,21 @@ async function fetchDigest(env: Env): Promise<PushDigest | null> {
     }
 }
 
-/** Today's quote, the same one the app's Explore tab shows (src/pages/explore.astro). */
-async function fetchQuote(env: Env, now: number): Promise<FeedQuote | null> {
-    const url = 'https://quotes.elhellal.com/app-feed.json';
+/** Today's item of a sister site's feed, the same one the app's Explore tab shows (src/pages/explore.astro). */
+async function fetchFeedItem<T>(site: string, service: Fetcher | undefined, now: number): Promise<T | null> {
+    const url = `https://${site}.elhellal.com/app-feed.json`;
     try {
-        const res = env.QUOTES ? await env.QUOTES.fetch(url) : await fetch(url);
+        const res = service ? await service.fetch(url) : await fetch(url);
         if (!res.ok) return null;
-        const items = ((await res.json()) as { items?: FeedQuote[] }).items ?? [];
+        const items = ((await res.json()) as { items?: T[] }).items ?? [];
         return items.length ? items[dayNumber(now) % items.length]! : null;
     } catch {
         return null;
     }
+}
+
+function fetchQuote(env: Env, now: number): Promise<FeedQuote | null> {
+    return fetchFeedItem<FeedQuote>('quotes', env.QUOTES, now);
 }
 
 export function streakReminder(streak: number): Record<string, unknown> {
@@ -525,6 +557,64 @@ export function quickRead(digest: PushDigest, categories: string): DigestArticle
     const wanted = categories === '*' ? null : new Set(categories.split(',').filter(Boolean));
     const pool = digest.articles.slice(0, 120).filter((a) => !wanted || wanted.has(a.c));
     return pool.filter((a) => a.m).sort((a, b) => a.m! - b.m!)[0] ?? pool[0] ?? null;
+}
+
+/** The evening nudge without a streak to keep: a short read before bed. */
+export function eveningRead(article: DigestArticle): Record<string, unknown> {
+    const minutes = article.m ? ` · ${article.m} د` : '';
+    return {
+        title: article.t,
+        body: `🌙 قراءة قصيرة لهذا المساء${minutes}${article.p ? `\n${article.p}` : ''}`,
+        url: `/articles/${encodeURIComponent(article.s)}/?utm_source=push&utm_medium=evening`,
+        image: article.i,
+        tag: 'evening',
+        actions: [{ action: 'today', title: 'ورد اليوم', url: '/today/?utm_source=push&utm_medium=evening' }],
+    };
+}
+
+/**
+ * The morning article: one of the recent articles in the subscriber's topics,
+ * a different one each day, with a cover when there is one, and not the
+ * evening's short read.
+ */
+export function morningPick(digest: PushDigest, categories: string, day: number): DigestArticle | null {
+    const wanted = categories === '*' ? null : new Set(categories.split(',').filter(Boolean));
+    const evening = quickRead(digest, categories)?.s;
+    const pool = digest.articles.slice(0, 120).filter((a) => (!wanted || wanted.has(a.c)) && a.s !== evening);
+    const covered = pool.filter((a) => a.i).slice(0, 30);
+    const from = covered.length ? covered : pool.slice(0, 30);
+    return from.length ? from[day % from.length]! : null;
+}
+
+export function morningRead(article: DigestArticle): Record<string, unknown> {
+    const minutes = article.m ? ` · ${article.m} د` : '';
+    return {
+        title: article.t,
+        body: `☀️ مقال الصباح${minutes}${article.p ? `\n${article.p}` : ''}`,
+        url: `/articles/${encodeURIComponent(article.s)}/?utm_source=push&utm_medium=morning`,
+        image: article.i,
+        tag: 'morning',
+        actions: [{ action: 'today', title: 'ورد اليوم', url: '/today/?utm_source=push&utm_medium=morning' }],
+    };
+}
+
+export function quoteMessage(quote: FeedQuote): Record<string, unknown> {
+    return {
+        title: 'اقتباس اليوم',
+        body: `❝ ${clip(quote.text, 160)}\n— ${quote.title}`,
+        url: '/explore/?utm_source=push&utm_medium=quote',
+        tag: 'quote',
+    };
+}
+
+export function quizMessage(quiz: FeedQuiz): Record<string, unknown> {
+    const options = (quiz.options ?? []).join(' · ');
+    return {
+        title: '❓ سؤال اليوم',
+        body: `${clip(quiz.title, 120)}${options ? `\n${clip(options, 100)}` : ''}`,
+        url: '/explore/?utm_source=push&utm_medium=quiz#quiz',
+        tag: 'quiz',
+    };
 }
 
 export function weeklyRecap(
@@ -597,6 +687,17 @@ async function run(env: Env) {
     const hour = sendHour(env);
     const jobs: Job[] = [];
 
+    // Feeds are fetched only when someone needs them: a subrequest each otherwise.
+    const once = <T>(load: () => Promise<T>) => {
+        let value: Promise<T> | undefined;
+        return () => (value ??= load());
+    };
+    const feeds = {
+        digest: once(() => fetchDigest(env)),
+        quote: once(() => fetchQuote(env, now)),
+        quiz: once(() => fetchFeedItem<FeedQuiz>('quiz', env.QUIZ, now)),
+    };
+
     const due = (
         await env.DB.prepare('SELECT * FROM subscriptions WHERE next_due_at <= ? ORDER BY next_due_at LIMIT ?').bind(now, batch).all<SubscriptionRow>()
     ).results;
@@ -605,11 +706,12 @@ async function run(env: Env) {
         await env.DB.batch(
             due.map((s) => env.DB.prepare('UPDATE subscriptions SET next_due_at = ? WHERE endpoint = ?').bind(nextSlot(now, s.frequency, hour), s.endpoint))
         );
-        const [digest, quote] = await Promise.all([fetchDigest(env), fetchQuote(env, now)]);
+        const [digest, quote] = await Promise.all([feeds.digest(), feeds.quote()]);
         if (digest) {
             const seen = await markSeen(env, digest, now);
             for (const sub of due) {
-                const payload = digestMessage(digest, seen, sub, quote);
+                // "More notifications" subscribers had the quote at noon: no quote-only digest.
+                const payload = digestMessage(digest, seen, sub, sub.extra ? null : quote);
                 if (payload) jobs.push({ target: sub, payload, topic: 'digest', digest: true });
             }
         }
@@ -617,44 +719,100 @@ async function run(env: Env) {
 
     const day = dayNumber(now);
     const utcHour = new Date(now).getUTCHours();
-    // One nudge a day at most: claimed (nudged_day) before sending, like the digests.
-    const nudge = async <T extends PushTarget>(
+    /** Sends `message` to the rows `sql` selects (?1 = day, ?2 = limit), claimed by `claim` first, like the digests. */
+    const send = async <T extends PushTarget>(
         sql: string,
-        message: (row: T, digest: PushDigest | null) => Record<string, unknown>,
+        claim: string,
+        message: (row: T) => Promise<Record<string, unknown> | null>,
         topic: string
     ) => {
         if (jobs.length >= batch) return;
         const rows = (await env.DB.prepare(sql).bind(day, batch - jobs.length).all<T>()).results;
         if (!rows.length) return;
-        await env.DB.batch(rows.map((r) => env.DB.prepare('UPDATE subscriptions SET nudged_day = ?1, quiz_reminded = ?1 WHERE endpoint = ?2').bind(day, r.endpoint)));
-        // The digest only when someone is due: a subrequest per run otherwise.
-        digestForNudges ??= await fetchDigest(env);
-        for (const r of rows) jobs.push({ target: r, payload: message(r, digestForNudges), topic });
+        await env.DB.batch(rows.map((r) => env.DB.prepare(claim).bind(day, r.endpoint)));
+        for (const r of rows) {
+            const payload = await message(r);
+            if (payload) jobs.push({ target: r, payload, topic });
+        }
     };
-    let digestForNudges: PushDigest | null | undefined;
+    // One nudge a day at most (nudged_day).
+    const NUDGED = 'UPDATE subscriptions SET nudged_day = ?1, quiz_reminded = ?1 WHERE endpoint = ?2';
 
     if (new Date(now).getUTCDay() === 5 && utcHour === hourVar(env.RECAP_HOUR_UTC, 9)) {
-        await nudge<PushTarget & { week_reads: number; week_minutes: number; week_top: string; read_streak: number }>(
+        await send<PushTarget & { week_reads: number; week_minutes: number; week_top: string; read_streak: number }>(
             `SELECT endpoint, p256dh, auth, week_reads, week_minutes, week_top, read_streak FROM subscriptions
              WHERE read_day >= ?1 - 1 AND week_reads > 0 AND nudged_day < ?1 LIMIT ?2`,
-            (r, digest) => weeklyRecap(r, digest?.categories ?? {}),
+            NUDGED,
+            async (r) => weeklyRecap(r, (await feeds.digest())?.categories ?? {}),
             'recap'
         );
     }
 
     if (utcHour === hourVar(env.REMIND_HOUR_UTC, 19)) {
-        await nudge<PushTarget & { read_streak: number; categories: string }>(
+        await send<PushTarget & { read_streak: number; categories: string }>(
             `SELECT endpoint, p256dh, auth, read_streak, categories FROM subscriptions
              WHERE read_day = ?1 - 1 AND read_streak >= 2 AND nudged_day < ?1 LIMIT ?2`,
-            (r, digest) => readingReminder(r.read_streak, digest ? quickRead(digest, r.categories) : null),
+            NUDGED,
+            async (r) => {
+                const digest = await feeds.digest();
+                return readingReminder(r.read_streak, digest ? quickRead(digest, r.categories) : null);
+            },
             'streak'
         );
-        await nudge<PushTarget & { quiz_streak: number }>(
+        await send<PushTarget & { quiz_streak: number }>(
             `SELECT endpoint, p256dh, auth, quiz_streak FROM subscriptions
              WHERE quiz_day = ?1 - 1 AND quiz_streak >= 2 AND quiz_reminded < ?1 AND nudged_day < ?1 LIMIT ?2`,
-            (r) => streakReminder(r.quiz_streak),
+            NUDGED,
+            async (r) => streakReminder(r.quiz_streak),
             'quiz'
         );
+        // No streak to keep: daily subscribers still get their second notification.
+        await send<PushTarget & { categories: string }>(
+            `SELECT endpoint, p256dh, auth, categories FROM subscriptions
+             WHERE frequency = 'daily' AND nudged_day < ?1 LIMIT ?2`,
+            NUDGED,
+            async (r) => {
+                const digest = await feeds.digest();
+                const article = digest ? quickRead(digest, r.categories) : null;
+                return article ? eveningRead(article) : null;
+            },
+            'evening'
+        );
+    }
+
+    // "More notifications": each extra slot once a day (a bit of extra_sent).
+    const extra = <T extends PushTarget>(bit: number, where: string, message: (row: T) => Promise<Record<string, unknown> | null>, topic: string) =>
+        send<T>(
+            `SELECT endpoint, p256dh, auth, categories FROM subscriptions
+             WHERE extra = 1 AND frequency = 'daily' AND NOT (extra_day = ?1 AND extra_sent & ${bit}) ${where} LIMIT ?2`,
+            `UPDATE subscriptions SET extra_sent = CASE WHEN extra_day = ?1 THEN extra_sent | ${bit} ELSE ${bit} END, extra_day = ?1 WHERE endpoint = ?2`,
+            message,
+            topic
+        );
+    if (utcHour === hourVar(env.MORNING_HOUR_UTC, 6)) {
+        await extra<PushTarget & { categories: string }>(
+            EXTRA_MORNING,
+            '',
+            async (r) => {
+                const digest = await feeds.digest();
+                const article = digest ? morningPick(digest, r.categories, day) : null;
+                return article ? morningRead(article) : null;
+            },
+            'morning'
+        );
+    }
+    if (utcHour === hourVar(env.QUOTE_HOUR_UTC, 11)) {
+        await extra(EXTRA_QUOTE, '', async () => {
+            const quote = await feeds.quote();
+            return quote ? quoteMessage(quote) : null;
+        }, 'quote');
+    }
+    if (utcHour === hourVar(env.QUIZ_HOUR_UTC, 14)) {
+        // Not to those who already answered today's question.
+        await extra(EXTRA_QUIZ, 'AND quiz_day < ?1', async () => {
+            const quiz = await feeds.quiz();
+            return quiz ? quizMessage(quiz) : null;
+        }, 'quiz');
     }
 
     const room = batch - jobs.length;

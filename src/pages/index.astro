@@ -45,7 +45,7 @@ const categoryTitles = getCategoryTitles();
   <ItemListSchema items={allTools} listName="Articles Directory - All Articles" />
   <main id="main-content">
     <FeedChrome />
-    <!-- Today's five, continue reading, from who you follow: src/scripts/reading.ts -->
+    <!-- Today's five, continue reading, recently read, from who you follow: src/scripts/reading.ts -->
     <section class="habit-today" data-habit-today hidden>
       <a href="/today/">
         <span class="habit-today-body">
@@ -62,13 +62,12 @@ const categoryTitles = getCategoryTitles();
       moreLabel="المزيد من التصنيفات"
       lessLabel="تصنيفات أقل"
     />
-    <!-- The installed app's "recently read" (src/scripts/pwa.ts). -->
-    <section class="app-recent" data-app-recent aria-labelledby="app-recent-heading" hidden>
-      <h2 id="app-recent-heading">قرأتها مؤخراً</h2>
-      <ul></ul>
-    </section>
     <section class="habit-row" data-habit-continue aria-labelledby="habit-continue-heading" hidden>
       <h2 id="habit-continue-heading">أكمل القراءة</h2>
+      <ul></ul>
+    </section>
+    <section class="habit-row" data-habit-recent aria-labelledby="habit-recent-heading" hidden>
+      <h2 id="habit-recent-heading">قرأتها مؤخراً</h2>
       <ul></ul>
     </section>
     <section class="habit-row" data-habit-following aria-labelledby="habit-following-heading" hidden>
@@ -86,44 +85,3 @@ const categoryTitles = getCategoryTitles();
     />
   </main>
 </Layout>
-
-<style>
-  .app-recent {
-    max-width: 1200px;
-    margin: var(--spacing-06) auto 0;
-    padding-inline: 16px;
-  }
-  .app-recent[hidden] {
-    display: none;
-  }
-  .app-recent h2 {
-    margin: 0 0 var(--spacing-03);
-    font-size: 16px;
-    color: var(--content-secondary);
-  }
-  .app-recent ul {
-    list-style: none;
-    margin: 0;
-    padding: 0 0 4px;
-    display: flex;
-    gap: 8px;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-  .app-recent li {
-    flex: none;
-    max-width: 70vw;
-  }
-  .app-recent a {
-    display: block;
-    padding: 8px 14px;
-    border: 0.5px solid var(--border-muted);
-    border-radius: 999px;
-    color: var(--content-primary);
-    text-decoration: none;
-    font-size: 14px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-</style>

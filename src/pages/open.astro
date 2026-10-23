@@ -1,0 +1,138 @@
+---
+// The installed app opens the sibling sites (quotes, books, biographies, quiz)
+// here, inside its own shell, instead of handing them to the browser
+// (src/scripts/pwa.ts sends their links to /open/?u=<url>). Outside the app
+// this page just forwards to the site.
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout
+    site="الهلال"
+    title="عالم الهلال"
+    tagline="الاقتباسات وملخصات الكتب والسير الذاتية والاختبار"
+    pageTitle="عالم الهلال"
+    noindex
+>
+    <main id="main-content" class="app-frame-page">
+        <div class="app-frame-loading" data-frame-loading>
+            <span class="app-frame-spinner" aria-hidden="true"></span>
+        </div>
+        <iframe
+            id="app-frame"
+            title=""
+            allow="autoplay; clipboard-write; fullscreen; web-share"
+            allowfullscreen
+            referrerpolicy="strict-origin-when-cross-origin"
+        ></iframe>
+        <p class="app-frame-error" data-frame-error hidden>
+            تعذّر فتح الصفحة. <a data-frame-link>افتحها في المتصفح</a>
+        </p>
+    </main>
+</Layout>
+
+<script>
+    const SITES: Record<string, string> = {
+        "quotes.elhellal.com": "الاقتباسات",
+        "books.elhellal.com": "ملخصات الكتب",
+        "biographies.elhellal.com": "السير الذاتية",
+        "quiz.elhellal.com": "اختبر معلوماتك",
+    };
+
+    function target(): URL | null {
+        try {
+            const u = new URL(new URLSearchParams(location.search).get("u") || "");
+            return u.protocol === "https:" && u.hostname in SITES ? u : null;
+        } catch {
+            return null;
+        }
+    }
+
+    function onOpenPage() {
+        if (location.pathname !== "/open/") return;
+        const url = target();
+        if (!url) return location.replace("/");
+        if (!document.documentElement.hasAttribute("data-standalone")) return location.replace(url.href);
+
+        const name = SITES[url.hostname]!;
+        document.title = `${name} | الهلال`;
+        const brand = document.querySelector(".brand-name");
+        if (brand) brand.textContent = name;
+
+        // The frame fills the space between the app's header and its tab bar.
+        const header = document.querySelector(".site-header");
+        const page = document.querySelector<HTMLElement>(".app-frame-page")!;
+        page.style.setProperty("--frame-top", `${header?.getBoundingClientRect().bottom ?? 0}px`);
+
+        const frame = document.getElementById("app-frame") as HTMLIFrameElement;
+        const loading = document.querySelector<HTMLElement>("[data-frame-loading]")!;
+        frame.title = name;
+        const slow = setTimeout(() => {
+            const error = document.querySelector<HTMLElement>("[data-frame-error]")!;
+            error.querySelector<HTMLAnchorElement>("[data-frame-link]")!.href = url.href;
+            if (!navigator.onLine) error.hidden = false;
+        }, 8000);
+        frame.addEventListener(
+            "load",
+            () => {
+                clearTimeout(slow);
+                loading.hidden = true;
+            },
+            { once: true }
+        );
+        frame.src = url.href;
+    }
+
+    document.addEventListener("astro:page-load", onOpenPage);
+</script>
+
+<style>
+    .app-frame-page {
+        position: fixed;
+        inset-inline: 0;
+        top: var(--frame-top, 0px);
+        bottom: calc(var(--tabbar-height, 0px) + env(safe-area-inset-bottom, 0px));
+        background: var(--background);
+    }
+    #app-frame {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border: 0;
+        background: transparent;
+    }
+    .app-frame-loading {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        pointer-events: none;
+    }
+    .app-frame-loading[hidden],
+    .app-frame-error[hidden] {
+        display: none;
+    }
+    .app-frame-spinner {
+        width: 28px;
+        height: 28px;
+        border: 3px solid var(--border-muted);
+        border-top-color: var(--content-primary);
+        border-radius: 50%;
+        animation: app-frame-spin 0.8s linear infinite;
+    }
+    @keyframes app-frame-spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+    .app-frame-error {
+        position: absolute;
+        inset-inline: 16px;
+        top: 40%;
+        margin: 0;
+        text-align: center;
+        color: var(--content-secondary);
+    }
+    .app-frame-error a {
+        color: var(--content-primary);
+    }
+</style>

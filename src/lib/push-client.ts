@@ -9,6 +9,8 @@ export interface PushPrefs {
     /** '*' = every category */
     categories: '*' | string[];
     frequency: Frequency;
+    /** "More notifications": up to five a day (daily only); left out keeps the stored choice */
+    extra?: boolean;
 }
 
 const API = '/api/push';
@@ -59,7 +61,7 @@ export async function fetchPrefs(sub: PushSubscription): Promise<PushPrefs | nul
     const res = await call<{ subscribed: boolean } & Partial<PushPrefs>>(
         `/subscription?endpoint=${encodeURIComponent(sub.endpoint)}`
     );
-    return res.subscribed ? { categories: res.categories!, frequency: res.frequency! } : null;
+    return res.subscribed ? { categories: res.categories!, frequency: res.frequency!, extra: res.extra === true } : null;
 }
 
 export async function savePrefs(sub: PushSubscription, prefs: PushPrefs): Promise<void> {

@@ -23,6 +23,9 @@ export const RELATED_WIDTH = 400;
 /** Explore tiles are ~92px tall strips, a few hundred px wide. */
 export const TILE_WIDTH = 400;
 
+/** Shown when an article has no cover, or its cover fails to load. */
+export const PLACEHOLDER_IMAGE = '/thumbs/placeholder.webp';
+
 /** Some catalog entries point their "image" at a podcast or video file. */
 export function isImageUrl(url: string | undefined): url is string {
     return !!url && !/\.(mp3|m4a|wav|ogg|mp4|mov|webm|pdf)(\?|$)/i.test(url);

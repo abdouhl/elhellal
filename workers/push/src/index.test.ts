@@ -1,6 +1,18 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { dayNumber, digestMessage, nextSlot, quickRead, readingReminder, streakReminder, weeklyRecap } from './index';
+import {
+    dayNumber,
+    digestMessage,
+    eveningRead,
+    morningPick,
+    nextSlot,
+    quickRead,
+    quizMessage,
+    quoteMessage,
+    readingReminder,
+    streakReminder,
+    weeklyRecap,
+} from './index';
 import type { PushDigest } from '../../../src/lib/push-digest';
 
 const at = (iso: string) => Date.parse(iso);
@@ -142,5 +154,36 @@ describe('nudges', () => {
     it('sums up the week, naming the top category', () => {
         const m = weeklyRecap({ week_reads: 9, week_minutes: 47, week_top: 'ai', read_streak: 4 }, digest.categories);
         expect(m.body).toBe('📖 9 مقالات · ⏱ 47 دقيقة · أكثر ما قرأت: الذكاء الاصطناعي\n🔥 سلسلتك: 4 أيام');
+    });
+});
+
+describe('more notifications', () => {
+    const digest: PushDigest = {
+        generatedAt: '2026-10-10T00:00:00Z',
+        categories: { history: 'التاريخ', ai: 'الذكاء الاصطناعي' },
+        articles: [
+            { s: 'a', t: 'أ', c: 'ai', d: '2026-10-10', m: 14, i: 'https://img/a.jpg' },
+            { s: 'b', t: 'ب', c: 'ai', d: '2026-10-09', m: 3, i: 'https://img/b.jpg' },
+            { s: 'c', t: 'ج', c: 'ai', d: '2026-10-09', m: 8 },
+            { s: 'd', t: 'د', c: 'history', d: '2026-10-08', m: 5, i: 'https://img/d.jpg' },
+        ],
+    };
+
+    it('picks a covered morning article in the topics, not the evening read, rotating by day', () => {
+        // The evening read for ai is 'b' (shortest): the morning one is the other covered article.
+        expect(morningPick(digest, ',ai,', 0)!.s).toBe('a');
+        expect(morningPick(digest, ',ai,', 1)!.s).toBe('a');
+        expect(new Set([0, 1, 2].map((d) => morningPick(digest, '*', d)!.s))).toEqual(new Set(['a', 'd']));
+        expect(morningPick(digest, ',none,', 0)).toBeNull();
+    });
+    it('opens the article from the morning and evening reads', () => {
+        expect(eveningRead(digest.articles[1]!).url).toBe('/articles/b/?utm_source=push&utm_medium=evening');
+        expect(eveningRead(digest.articles[1]!).body).toContain('3 د');
+    });
+    it('sends the quote and the quiz question of the day', () => {
+        expect(quoteMessage({ text: 'نص', title: 'قائل', url: 'https://q' }).body).toBe('❝ نص\n— قائل');
+        const q = quizMessage({ title: 'ما عاصمة أستراليا؟', options: ['كانبيرا', 'سيدني'] });
+        expect(q.body).toBe('ما عاصمة أستراليا؟\nكانبيرا · سيدني');
+        expect(q.url).toBe('/explore/?utm_source=push&utm_medium=quiz#quiz');
     });
 });

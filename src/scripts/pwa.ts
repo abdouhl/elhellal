@@ -7,7 +7,8 @@
  *  - remembers recently read articles for /offline/
  *  - offers installing the app (pwa-install.ts)
  *  - drives the installed app's shell: tab bar, back button, "more" sheet,
- *    and "recently read" on the home page
+ *    and the sibling sites (quotes, books, …) opening inside the app (/open/)
+ *  - swaps a missing or broken cover image for the placeholder
  *  - has the installed app save the home page's top articles for offline
  *    reading once a day
  *  - subscribes the installed app to the daily digest: silently when
@@ -21,12 +22,13 @@ import { shardOf } from '../lib/article-page';
 import { getBookmarks } from '../utils/bookmarks';
 import { currentSubscription, pushSupport, subscribe } from '../lib/push-client';
 import { hideBanner, isIos, isStandalone, onInstallPageLoad, setupInstall, trackPwaEvent } from './pwa-install';
-import { readInstallState, readRecent, rememberRecent, updateInstallState } from './pwa-store';
+import { readInstallState, rememberRecent, updateInstallState } from './pwa-store';
+import { PLACEHOLDER_IMAGE } from '../lib/images';
+import { navigate } from 'astro:transitions/client';
 import './reading';
 
 /** Top articles on the home page the installed app keeps for offline reading. */
 const DAILY_ARTICLES = 12;
-const RECENT_SHOWN = 6;
 
 // ─── Service worker ──────────────────────────────────────────────────────────
 
@@ -183,6 +185,52 @@ async function pingInstall() {
 
 // ─── App shell (installed app) ───────────────────────────────────────────────
 
+/** The sibling sites the installed app opens in its own viewer (src/pages/open.astro) instead of the browser. */
+const SISTER_HOSTS = ['quotes.elhellal.com', 'books.elhellal.com', 'biographies.elhellal.com', 'quiz.elhellal.com'];
+
+function sisterLink(target: Element): string | null {
+    const a = target.closest?.<HTMLAnchorElement>('a[href]');
+    if (!a || !SISTER_HOSTS.includes(a.hostname) || a.hasAttribute('download')) return null;
+    return a.href;
+}
+
+/** Dragging the "more" sheet down by its handle closes it. */
+function setupSheetDrag() {
+    let startY: number | null = null;
+    let dy = 0;
+    const panel = () => document.querySelector<HTMLElement>('#app-more-sheet .app-sheet-panel');
+    document.addEventListener(
+        'touchstart',
+        (e) => {
+            const p = panel();
+            if (!p || !document.documentElement.hasAttribute('data-more-open')) return;
+            if (!(e.target as Element).closest?.('.app-sheet-panel') || p.scrollTop > 0) return;
+            startY = e.touches[0]!.clientY;
+            dy = 0;
+        },
+        { passive: true }
+    );
+    document.addEventListener(
+        'touchmove',
+        (e) => {
+            const p = panel();
+            if (startY === null || !p) return;
+            dy = Math.max(0, e.touches[0]!.clientY - startY);
+            p.style.transition = 'none';
+            p.style.transform = `translateY(${dy}px)`;
+        },
+        { passive: true }
+    );
+    document.addEventListener('touchend', () => {
+        const p = panel();
+        if (startY === null || !p) return;
+        startY = null;
+        p.style.transition = '';
+        p.style.transform = '';
+        if (dy > 80) setMoreOpen(false);
+    });
+}
+
 function setMoreOpen(open: boolean) {
     document.documentElement.toggleAttribute('data-more-open', open);
     document.getElementById('app-more')?.setAttribute('aria-expanded', String(open));
@@ -221,32 +269,48 @@ function setupAppShell() {
             setMoreOpen(!document.documentElement.hasAttribute('data-more-open'));
             return;
         }
-        if (document.documentElement.hasAttribute('data-more-open') && !target.closest?.('#site-footer')) {
+        if (document.documentElement.hasAttribute('data-more-open') && !target.closest?.('#app-more-sheet .app-sheet-panel')) {
             setMoreOpen(false);
         }
+        const sister = isStandalone() && sisterLink(target);
+        if (sister && !(e as MouseEvent).defaultPrevented) {
+            e.preventDefault();
+            setMoreOpen(false);
+            navigate(`/open/?u=${encodeURIComponent(sister)}`);
+        }
     });
+    setupSheetDrag();
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') setMoreOpen(false);
     });
 }
 
-/** The installed app's home page lists the last articles read ([data-app-recent], index.astro). */
-function renderRecent() {
-    const section = document.querySelector<HTMLElement>('[data-app-recent]');
-    const list = section?.querySelector('ul');
-    if (!section || !list) return;
-    const recent = readRecent().slice(0, RECENT_SHOWN);
-    list.replaceChildren(
-        ...recent.map((page) => {
-            const li = document.createElement('li');
-            const a = document.createElement('a');
-            a.href = page.url;
-            a.textContent = page.title;
-            li.append(a);
-            return li;
-        })
-    );
-    section.hidden = !isStandalone() || recent.length === 0;
+// ─── Cover images ────────────────────────────────────────────────────────────
+
+const COVERS = '.card-cover img, .habit-card-cover img, .today-cover img, .related-cover img';
+
+function useFallback(img: HTMLImageElement) {
+    if (img.dataset.fallback) return;
+    img.dataset.fallback = '';
+    img.removeAttribute('srcset');
+    img.src = PLACEHOLDER_IMAGE;
+}
+
+// A cover whose host is down or gone shows the placeholder, not an empty frame.
+document.addEventListener(
+    'error',
+    (e) => {
+        const img = e.target;
+        if (img instanceof HTMLImageElement && img.matches(COVERS)) useFallback(img);
+    },
+    true
+);
+
+/** Covers that already failed before this script ran. */
+function fallbackBrokenCovers() {
+    for (const img of document.querySelectorAll<HTMLImageElement>(COVERS)) {
+        if (img.complete && img.naturalWidth === 0 && img.getAttribute('src')) useFallback(img);
+    }
 }
 
 // ─── Every page ──────────────────────────────────────────────────────────────
@@ -263,10 +327,8 @@ function onPageLoad() {
     }
 
     onInstallPageLoad();
-    if (standalone) {
-        renderRecent();
-        syncDaily();
-    }
+    if (standalone) syncDaily();
+    fallbackBrokenCovers();
     setupAppNotifications().catch(() => {});
     pingInstall().catch(() => {});
 }

@@ -179,8 +179,9 @@
 }
 .habit-row h2 {
     margin: 0 0 var(--spacing-03, 12px);
-    font-size: 16px;
-    color: var(--content-secondary, #aaa);
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--content-primary, #f0f0f0);
 }
 .habit-row ul {
     list-style: none;
@@ -201,6 +202,11 @@
     display: block;
     color: var(--content-primary, #f0f0f0);
     text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.12s ease-out;
+}
+.habit-card:active {
+    transform: scale(0.97);
 }
 .habit-card-cover {
     position: relative;
@@ -211,6 +217,7 @@
     background: rgba(255, 255, 255, 0.06);
 }
 .habit-card-cover img {
+    display: block;
     width: 100%;
     height: 100%;
     object-fit: cover;
