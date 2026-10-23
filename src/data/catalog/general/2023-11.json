@@ -7,7 +7,7 @@
     "created_at": "2023-11-20",
     "url": "https://mzeidan.substack.com/p/989",
     "original_img_url": "https://substack-post-media.s3.amazonaws.com/public/images/1a1f1936-01a5-414f-958b-836c89a1f703_1581x1054.jpeg",
-    "minutes": 12
+    "slug": "التضامن-مع-فلسطين-على-تيك-توك-حب-يتجاوز-الخوارزميات"
   },
   {
     "id_str": "1420369516406108662",
@@ -17,7 +17,7 @@
     "created_at": "2023-11-10",
     "url": "https://mzeidan.substack.com/p/337",
     "original_img_url": "https://substack-post-media.s3.amazonaws.com/public/images/a470c66f-ef80-4ffd-8d1b-b0a33344be17_1200x1484.jpeg",
-    "minutes": 3
+    "slug": "الواشنطن-بوست-وتبرير-المقتلة-في-قطاع-غزة"
   },
   {
     "id_str": "7644558640350257462",
@@ -27,6 +27,6 @@
     "created_at": "2023-11-01",
     "url": "https://mzeidan.substack.com/p/e26",
     "original_img_url": "https://substack-post-media.s3.amazonaws.com/public/images/2dba4865-b7a2-47b9-b402-473c0364e5bb_2400x1600.jpeg",
-    "minutes": 5
+    "slug": "مجزرة-جباليا-هل-حصل-كل-هذا-حقا"
   }
 ]
