@@ -171,6 +171,8 @@ function finish(slug: string, out = false) {
     if (!counted) return;
     celebrate(before, state, badges);
     reportRead(state);
+    // pwa-install.ts: a finished read is the moment to offer the app.
+    window.dispatchEvent(new CustomEvent('reading:read'));
 }
 
 function trackArticle() {

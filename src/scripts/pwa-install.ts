@@ -12,9 +12,10 @@
  *
  * Where it's offered: the header button (touch devices), the footer link,
  * [data-install-card] cards (home feed, end of articles), the /app/ page, and
- * a banner at moments with intent — a second article read, a third day back,
- * a bookmark, 3+ saved articles on /saved/, going offline or a slow network,
- * or straight away in an in-app browser. Every step is counted
+ * a banner at moments with intent — the first article actually read (20s in
+ * view, reading.ts), a second article opened, a third day back, a bookmark,
+ * 3+ saved articles on /saved/, going offline or a slow network. In-app
+ * browsers get it after a read too: on landing it was ignored. Every step is counted
  * (/api/push/event) so the admin's App & push tab shows the funnel.
  */
 
@@ -38,6 +39,8 @@ const READS_BEFORE_BANNER = 2;
 const DAYS_BEFORE_BANNER = 3;
 const SAVED_BEFORE_BANNER = 3;
 const DISMISS_DAYS = 14;
+/** After a read, let the streak toast (reading.ts) go first. */
+const AFTER_READ_DELAY_MS = 6000;
 const BANNER_SESSION_KEY = 'elhellal_install_banner_shown';
 
 let installEvent: BeforeInstallPromptEvent | null = null;
@@ -307,11 +310,11 @@ export async function promptInstall() {
 // ─── Banner ──────────────────────────────────────────────────────────────────
 
 const PITCH: Record<Reason, string> = {
-    reads: 'اقرأ مقالاتك المحفوظة دون اتصال، وافتح الهلال بلمسة واحدة.',
+    reads: 'خمسة مقالات منتقاة كل يوم على شاشتك الرئيسية: تفتح بلمسة وتُقرأ دون إنترنت.',
     return: 'عُدت إلينا! افتح الهلال من شاشتك الرئيسية مباشرة، دون بحث.',
     saved: 'مقالاتك المحفوظة تبقى في التطبيق وتُقرأ دون إنترنت.',
     offline: 'تطبيق الهلال يعمل حتى دون اتصال بالإنترنت.',
-    inapp: 'المتصفح المدمج هنا لا يثبّت التطبيقات: افتح الهلال في متصفحك لتثبيته.',
+    inapp: 'اقرأ براحة في متصفحك: احفظ المقالات، وأضف الهلال إلى شاشتك الرئيسية بلمسة.',
 };
 
 export function hideBanner() {
@@ -375,7 +378,8 @@ function slowConnection() {
 /** The banner's page-load triggers, most telling first. */
 function maybeShowBanner() {
     const state = readInstallState();
-    if (inAppBrowser()) return offerBanner('inapp');
+    // In-app visitors who have read before; first-timers wait for a read (setupInstall).
+    if (inAppBrowser()) return state.reads >= READS_BEFORE_BANNER ? offerBanner('inapp') : undefined;
     if (location.pathname === '/saved/' && getBookmarks().length >= SAVED_BEFORE_BANNER) return offerBanner('saved');
     if ((state.visitDays?.length ?? 0) >= DAYS_BEFORE_BANNER) return offerBanner('return');
     if (slowConnection() && state.reads >= 1) return offerBanner('offline');
@@ -438,6 +442,9 @@ export function setupInstall() {
     // Saving an article is a good moment: offline reading is the pitch.
     window.addEventListener('bookmarks:changed', () => offerBanner('saved'));
     window.addEventListener('offline', () => offerBanner('offline'));
+    window.addEventListener('reading:read', () =>
+        setTimeout(() => offerBanner(inAppBrowser() ? 'inapp' : 'reads'), AFTER_READ_DELAY_MS)
+    );
     document.addEventListener('click', (e) => {
         const trigger = (e.target as Element).closest?.<HTMLElement>('[data-install-trigger]');
         if (!trigger) return;

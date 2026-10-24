@@ -18,7 +18,7 @@ if (!cwd || !prompt.trim()) {
 // and shell access is limited to the repo's scripts and read-only tools. Shipping is left to the panel.
 const ALLOWED = [
     'Read', 'Glob', 'Grep', 'Edit', 'Write', 'WebSearch', 'WebFetch', 'TodoWrite', 'Skill',
-    'Bash(node:*)', 'Bash(bun run build)', 'Bash(bun run build-questions)', 'Bash(bun scripts/:*)', 'Bash(bun run check-data)',
+    'Bash(node:*)', 'Bash(bun run build)', 'Bash(bun run build-questions)', 'Bash(bun scripts/:*)', 'Bash(bun ../elhellal-quotes/scripts/:*)', 'Bash(bun ../elhellal-biographies/scripts/:*)', 'Bash(bun run check-data)',
     'Bash(ls:*)', 'Bash(cat:*)', 'Bash(head:*)', 'Bash(tail:*)', 'Bash(wc:*)', 'Bash(grep:*)', 'Bash(awk:*)', 'Bash(sed -n:*)', 'Bash(cut:*)', 'Bash(sort:*)', 'Bash(uniq:*)', 'Bash(find:*)', 'Bash(mkdir:*)', 'Bash(jq:*)',
     'Bash(git status:*)', 'Bash(git diff:*)', 'Bash(git show:*)', 'Bash(git log:*)',
 ];

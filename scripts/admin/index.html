@@ -1467,6 +1467,11 @@ async function aiCard(s, running) {
     rows.push(row('Book summaries', 'Long-form (1000–1500 words), sourced from Wikipedia and the web. Catalog books first, then quoted books not in the catalog yet (adds their entry too). Unsupported books are skipped, not padded.',
       num(v, 20), h('span', { class: 'meta' }, 'books, or'), field(v, 'target', { placeholder: 'one title or slug', style: 'min-width:220px' }),
       buttons('summaries', v, `Write ${v.target ? `a summary of “${v.target}”` : `${v.count} book summaries`} with Claude? It edits books.json and src/content/summaries/.`)));
+    const f = inputs('famous', { count: 50, target: '' });
+    rows.push(row('Famous book', 'Its most-liked Goodreads quotes into the quotes site (Arabic-edition quotes kept as is, the rest translated), then a long-form summary + catalog entry here, then the author’s biography if there is none. Syncs the links between the three sites.',
+      field(f, 'target', { placeholder: 'title or Goodreads book URL', style: 'min-width:260px' }), num(f, 200), h('span', { class: 'meta' }, 'quotes'),
+      buttons('famous', f, `Add “${f.target}” with Claude? It edits quotes.json, books.json, src/content/summaries/ and the biographies’ authors.json.`)));
+    rows.push(famousList(sites.ai.famous, f, running, isRunning('famous'), go));
   }
   if (s.name === 'biographies') {
     const v = inputs('biography', { count: 1, target: '' });
@@ -1498,6 +1503,30 @@ async function aiCard(s, running) {
         h('select', { onchange: (e) => { sites.aiModel = e.target.value; } }, sites.ai.models.map((m) => h('option', { value: m, selected: m === sites.aiModel }, m || 'default'))))),
     ...rows,
     h('p', { class: 'meta', style: 'margin-bottom:0' }, '“Run here” edits files without asking and can search the web; it never commits, pushes or deploys. Review the changed files above, then commit and deploy. Stop ends it.'));
+}
+
+// The famous-book list: the starting 50 plus every book the skill has added since, with each one's
+// progress on the three sites. Not-done books first; "Add" runs the skill for that one.
+function famousList(books, f, running, famousRunning, go) {
+  if (!books?.length) return null;
+  const done = (b) => b.quotes > 0 && b.summaryWords >= 1000 && b.biography;
+  const mark = (ok, text, title) => h('span', { class: `pill ${ok ? 'ok' : ''}`, title }, text);
+  const sorted = [...books].sort((a, b) => done(a) - done(b));
+  const finished = books.filter(done).length;
+  const ask = (b) => `Add “${b.title}” (${b.author}) with ${f.count} quotes? It edits quotes.json, books.json, src/content/summaries/ and the biographies’ authors.json.`;
+  return h('details', { style: 'margin-top:12px', open: true },
+    h('summary', {}, h('b', {}, 'Famous books'), h('span', { class: 'meta', style: 'display:inline' }, ` · ${finished}/${books.length} done · new books join the list when they’re added`)),
+    h('div', { class: 'list', style: 'max-height:420px;overflow:auto;margin-top:8px' }, h('table', {},
+      h('tr', {}, h('th', {}, 'Book'), h('th', { class: 'num' }, 'Quotes'), h('th', { class: 'num' }, 'Summary'), h('th', {}, 'Biography'), h('th', {}, '')),
+      sorted.map((b) => h('tr', {},
+        h('td', { dir: 'auto' }, h('b', {}, b.title), h('span', { class: 'meta', style: 'display:inline' }, ' — ', b.author), b.addedAt ? h('span', { class: 'meta', style: 'display:inline' }, ` · ${b.addedAt}`) : null),
+        h('td', { class: 'num' }, mark(b.quotes > 0, b.quotes || '—')),
+        h('td', { class: 'num' }, mark(b.summaryWords >= 1000, b.summaryWords ? `${b.summaryWords} w` : b.inCatalog ? 'short' : '—', b.inCatalog ? 'In books.json' : 'Not in books.json')),
+        h('td', {}, mark(b.biography, b.biography ? 'yes' : '—')),
+        h('td', {}, done(b) ? h('span', { class: 'ok' }, '✓') : h('div', { class: 'toolbar', style: 'margin:0;flex-wrap:nowrap' },
+          h('button', { class: 'btn', disabled: running, onclick: () => go('famous', { count: f.count, target: `${b.title} ${b.author}` }, 'run', ask(b)) }, famousRunning ? '…' : 'Add'),
+          h('button', { class: 'btn', title: 'Open in Terminal', onclick: () => go('famous', { count: f.count, target: `${b.title} ${b.author}` }, 'terminal') }, '↗'))),
+      )))));
 }
 
 // Books / biographies: whole entries edited as JSON

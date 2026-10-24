@@ -1967,9 +1967,52 @@ function bioCandidates() {
     return quoteAuthors().filter((a) => !have.has(a.slug)).map((a) => ({ slug: a.slug, name: a.name, quotes: quoteCount(a) })).sort((x, y) => y.quotes - x.quotes);
 }
 
+// The famous-book skill's list (../elhellal-books/.claude/skills/famous-book/famous-books.json): the
+// starting 50 plus every other book it adds. Each gets its progress across the three sites.
+const FAMOUS_JSON = path.join(SITES.books!.dir, '.claude/skills/famous-book/famous-books.json');
+interface FamousEntry { title: string; author: string; slug?: string; authorSlug?: string; addedAt?: string }
+
+/** Same folding as the skill's list.mjs: no diacritics/tatweel, one alef, ة→ه, ى→ي, letters and digits only. */
+const foldTitle = (s: unknown) => str(s).normalize('NFKC')
+    .replace(/[\u064B-\u065F\u0670\u0640]/g, '').replace(/[أإآٱ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي')
+    .toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+
+function famousBooks() {
+    if (!fs.existsSync(FAMOUS_JSON)) return [];
+    const has = (f: string) => fs.existsSync(f);
+    const quoteBooks = has(QUOTES_JSON) ? quoteAuthors().flatMap((a) => a.books.map((b) => ({ ...b, author: a }))) : [];
+    const catalog = has(BOOKS_JSON) ? readJson<{ slug: string; title: string; quotesSlug?: string; authorSlug?: string }[]>(BOOKS_JSON) : [];
+    const bios = new Set(has(BIOS_JSON) ? readJson<{ slug: string }[]>(BIOS_JSON).map((a) => a.slug) : []);
+    return readJson<FamousEntry[]>(FAMOUS_JSON).map((e) => {
+        // Recorded slug first; otherwise a book already on the sites under the same title.
+        const qb = quoteBooks.find((b) => b.slug === e.slug) ?? quoteBooks.find((b) => foldTitle(b.title) === foldTitle(e.title));
+        const slug = qb?.slug ?? e.slug;
+        const entry = catalog.find((b) => (slug && (b.quotesSlug === slug || b.slug === slug)) || foldTitle(b.title) === foldTitle(e.title));
+        const md = entry ? path.join(SUMMARIES_DIR, `${entry.slug}.md`) : '';
+        const authorSlug = qb?.author.slug ?? e.authorSlug ?? entry?.authorSlug;
+        return {
+            title: e.title,
+            author: e.author,
+            slug,
+            addedAt: e.addedAt,
+            quotes: qb?.quotes.length ?? 0,
+            summaryWords: md && has(md) ? fs.readFileSync(md, 'utf-8').split(/\s+/).filter(Boolean).length : 0,
+            inCatalog: !!entry,
+            biography: !!authorSlug && bios.has(authorSlug),
+        };
+    });
+}
+
 const AI_TASKS: Record<string, Record<string, AiTask>> = {
     books: {
         summaries: { label: 'Write book summaries', prompt: (x) => `/long-form-summary ${x.target || x.count}` },
+        famous: {
+            label: 'Add a famous book',
+            prompt: (x) => {
+                if (!x.target) throw new HttpError(400, 'Give a book title or Goodreads book URL');
+                return `/famous-book ${x.target} ${x.count}`;
+            },
+        },
     },
     biographies: {
         biography: {
@@ -2011,6 +2054,7 @@ function aiInfo() {
         models: AI_MODELS,
         bioCandidates: bios.slice(0, 60),
         bioMissing: bios.length,
+        famous: (() => { try { return famousBooks(); } catch { return []; } })(),
         quiz: { langs: QUIZ_LANG_FILES, allLangs: QUIZ_LANGS, cats: QUIZ_CATS },
     };
 }
@@ -2035,9 +2079,10 @@ function runAi(body: Body) {
     const prompt = task.prompt(input);
     const model = str(body.model);
     if (!AI_MODELS.includes(model)) throw new HttpError(400, `model must be one of ${AI_MODELS.filter(Boolean).join(', ')}`);
-    if (str(body.where) === 'terminal') return openClaude(prompt, model ? ['--model', model] : [], s.dir);
+    // The skills read and write each other's data (a famous book touches quotes, books and biographies).
+    const addDirs = [SITES.quotes!.dir, SITES.books!.dir, SITES.biographies!.dir].filter((d) => d !== s.dir).flatMap((d) => ['--add-dir', d]);
+    if (str(body.where) === 'terminal') return openClaude(prompt, [...addDirs.map(shellQuote), ...(model ? ['--model', model] : [])], s.dir);
     if (sitesSlot.proc) throw new HttpError(409, `${sitesSlot.job?.mode} is already running`);
-    const addDirs = [SITES.quotes!.dir, SITES.books!.dir].filter((d) => d !== s.dir).flatMap((d) => ['--add-dir', d]);
     const cmd = [BUN, path.join(ROOT, 'scripts/lib/claude-run.ts'), '--cwd', s.dir, ...addDirs, ...(model ? ['--model', model] : []), '--', prompt];
     return startCommand(sitesSlot, cmd, `claude -p ${shellQuote(prompt)}`, { mode: `${s.name}:ai-${taskName}`, scopes: [s.name] }, s.dir);
 }
@@ -2335,7 +2380,8 @@ const shellQuote = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
 
 /** Opens Terminal on a repo (the blog by default) running an interactive `claude <prompt>`. */
 function openClaude(prompt: string, flags: string[] = [], dir = BLOG_DIR) {
-    const command = `cd ${shellQuote(dir)} && claude ${flags.join(' ')} ${shellQuote(prompt)}`.replace(/ {2,}/g, ' ');
+    // Prompt first: variadic flags (--add-dir <directories...>) would swallow a prompt after them.
+    const command = `cd ${shellQuote(dir)} && claude ${shellQuote(prompt)} ${flags.join(' ')}`.replace(/ {2,}/g, ' ').trimEnd();
     const script = `tell application "Terminal"\nactivate\ndo script "${command.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"\nend tell`;
     const res = Bun.spawnSync(['osascript', '-e', script]);
     if (res.exitCode !== 0) throw new HttpError(500, res.stderr.toString() || 'Could not open Terminal');
