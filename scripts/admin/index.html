@@ -1391,6 +1391,7 @@ async function quotesSection() {
   const visible = data.items.map((x) => x.id);
   const author = data.authors.find((a) => a.slug === sites.author);
   return h('div', {},
+    goodreadsAuthorsCard(),
     h('h2', {}, 'Quotes'),
     h('div', { class: 'toolbar' }, siteSearch('Search quote text or id…'),
       h('select', { dir: 'auto', onchange: (e) => { sites.author = e.target.value; sites.book = ''; state.page = 1; render(); } },
@@ -1415,6 +1416,85 @@ async function quotesSection() {
     pager(data),
     h('p', { class: 'meta' }, 'Deleted quotes can come back on the next Goodreads import, which re-fetches every known author.'),
   );
+}
+
+// Famous Goodreads authors: goodreads.com/quotes (or a tag) grouped by author, most-liked first.
+// Tick authors, set how many quotes each, and import just those (`--only slug:N …`).
+const gr = { open: false, onlyNew: true, source: 'popular', tag: '', pages: 3, data: null, loading: false, error: '', count: 50, picks: new Map() };
+
+async function loadGoodreads(pages) {
+  gr.pages = pages; gr.loading = true; gr.error = ''; render();
+  try { gr.data = await api('/api/quotes/goodreads-authors?' + new URLSearchParams({ source: gr.source, tag: gr.source === 'tag' ? gr.tag : '', pages })); }
+  catch (e) { gr.error = e.message; }
+  gr.loading = false; render();
+}
+
+function goodreadsAuthorsCard() {
+  const running = !!siteJob.job?.running;
+  const importBtn = h('button', { class: 'btn primary', disabled: running }, '');
+  const syncImport = () => {
+    importBtn.textContent = gr.picks.size ? `Import ${gr.picks.size} author(s) · ${[...gr.picks.values()].reduce((n, c) => n + c, 0)} quotes max` : 'Import selected';
+    importBtn.disabled = running || !gr.picks.size;
+  };
+  importBtn.onclick = () => {
+    const args = ['--only', ...[...gr.picks].map(([slug, n]) => `${slug}:${n}`)];
+    if (!confirm(`Import ${gr.picks.size} author(s) from Goodreads? Needs Ollama running (non-Arabic quotes are translated) and writes quotes.json as it goes.`)) return;
+    siteJob.start('/api/sites/run', { site: 'quotes', step: 'import-quotes', args: args.join(' ') });
+    gr.picks.clear();
+  };
+  syncImport();
+
+  const all = gr.data?.authors ?? [];
+  const shown = gr.onlyNew ? all.filter((a) => a.have == null) : all;
+  const rows = shown.map((a) => {
+    const picked = gr.picks.has(a.slug);
+    const count = h('input', { type: 'number', min: 1, max: 9999, value: gr.picks.get(a.slug) ?? a.limit ?? Math.max(gr.count, a.have ?? 0), style: 'width:80px',
+      oninput: (e) => { const n = Math.max(1, Number(e.target.value) || 1); if (gr.picks.has(a.slug)) { gr.picks.set(a.slug, n); syncImport(); } } });
+    const box = h('input', { type: 'checkbox', checked: picked, onchange: (e) => {
+      e.target.checked ? gr.picks.set(a.slug, Math.max(1, Number(count.value) || 1)) : gr.picks.delete(a.slug); syncImport(); } });
+    return h('tr', {},
+      h('td', {}, box),
+      h('td', {}, a.image ? h('img', { src: a.image, alt: '', loading: 'lazy', style: 'width:32px;height:32px;border-radius:50%;object-fit:cover;vertical-align:middle' }) : null),
+      h('td', {}, h('a', { class: 'link', href: `https://www.goodreads.com/author/quotes/${a.slug}`, target: '_blank', rel: 'noreferrer' }, a.name),
+        a.arabicName === false && gr.data.source === 'arabic' ? h('span', { class: 'meta', style: 'display:inline', title: 'Latin-spelled name; most of their quotes here are in Arabic' }, ' · Arabic quotes') : null,
+        a.haveName ? h('span', { class: 'meta', style: 'display:inline', dir: 'auto' }, ` · ${a.haveName}`) : null),
+      h('td', { class: 'num' }, a.popular),
+      h('td', { class: 'num' }, a.likes.toLocaleString()),
+      h('td', { class: 'num' }, a.have != null ? h('span', { class: 'pill ok', title: a.limit ? `limit ${a.limit}` : 'default limit 500' }, a.have) : '—'),
+      h('td', {}, count));
+  });
+
+  const setAll = h('input', { type: 'number', min: 1, max: 9999, value: gr.count, style: 'width:80px', oninput: (e) => { gr.count = Math.max(1, Number(e.target.value) || 1); } });
+  const reload = () => { gr.data = null; gr.picks.clear(); loadGoodreads(gr.source === 'arabic' ? 1 : 3); };
+  const source = h('select', { disabled: gr.loading, onchange: (e) => { gr.source = e.target.value; if (gr.source !== 'tag') reload(); else render(); } },
+    [['popular', 'Popular quotes'], ['arabic', 'Arabic authors'], ['tag', 'A tag…']].map(([v, l]) => h('option', { value: v, selected: v === gr.source }, l)));
+  const tag = gr.source === 'tag' ? h('input', { type: 'search', placeholder: 'tag, e.g. wisdom or حب', value: gr.tag, dir: 'auto', style: 'width:200px',
+    oninput: (e) => { gr.tag = e.target.value.trim(); }, onkeydown: (e) => { if (e.key === 'Enter') reload(); } }) : null;
+
+  return h('details', { class: 'card', open: gr.open, ontoggle: (e) => { gr.open = e.target.open; if (gr.open && !gr.data && !gr.loading) loadGoodreads(gr.pages); } },
+    h('summary', { style: 'cursor:pointer' }, h('b', {}, 'Famous Goodreads authors'),
+      h('span', { class: 'meta', style: 'display:inline' }, ' · from goodreads.com/quotes (popular, Arabic or a tag), pick authors and how many quotes each')),
+    h('div', { class: 'toolbar', style: 'margin-top:8px' }, source, tag,
+      h('button', { class: 'btn', disabled: gr.loading, onclick: reload }, 'Load'),
+      gr.data && gr.pages < gr.data.maxPages ? h('button', { class: 'btn', disabled: gr.loading, onclick: () => loadGoodreads(Math.min(gr.data.maxPages, gr.pages + (gr.data.source === 'arabic' ? 1 : 3))) }, 'More pages') : null,
+      h('span', { class: 'meta' }, gr.loading
+        ? (gr.source === 'arabic' ? `Reading ${gr.pages} page(s) of each Arabic tag (about ${gr.pages * 30}s)…` : `Reading Goodreads (${gr.pages} pages)…`)
+        : gr.data ? `${shown.length} ${gr.onlyNew ? 'new ' : ''}of ${all.length} authors from ${gr.data.source === 'arabic' ? `${gr.data.pages} page(s) of ${gr.data.tags.length} Arabic tags` : `${gr.data.pages} page(s) × 30 quotes`}${gr.data.tag ? ` tagged “${gr.data.tag}”` : ''}` : ''),
+      gr.error ? h('span', { class: 'bad' }, gr.error) : null),
+    gr.data ? h('div', { class: 'toolbar' },
+      h('label', {}, h('input', { type: 'checkbox', checked: gr.onlyNew, onchange: (e) => {
+        gr.onlyNew = e.target.checked; if (gr.onlyNew) for (const k of gr.picks.keys()) if (all.find((a) => a.slug === k)?.have != null) gr.picks.delete(k); render(); } }), ' Only authors not on quotes.elhellal.com'),
+      h('label', { class: 'meta' }, 'Quotes each ', setAll),
+      h('button', { class: 'btn', onclick: () => { for (const k of gr.picks.keys()) gr.picks.set(k, gr.count); render(); } }, 'Apply to ticked'),
+      h('button', { class: 'btn', onclick: () => { gr.data.authors.filter((a) => a.have == null).forEach((a) => gr.picks.set(a.slug, gr.count)); render(); } }, 'Tick all new'),
+      h('button', { class: 'btn', onclick: () => { gr.picks.clear(); render(); } }, 'Clear'),
+      importBtn) : null,
+    gr.data && !shown.length ? h('div', { class: 'empty' }, 'Every author on these pages is already on the site — load more pages or try a tag.') : null,
+    shown.length ? h('div', { class: 'list', style: 'max-height:460px;overflow:auto' }, h('table', {},
+      h('tr', {}, h('th', {}, ''), h('th', {}, ''), h('th', {}, 'Author'), h('th', { class: 'num', title: 'Quotes of theirs on the loaded pages' }, 'Popular'),
+        h('th', { class: 'num', title: 'Likes on those quotes' }, 'Likes'), h('th', { class: 'num' }, 'Have'), h('th', {}, 'Keep at most')),
+      rows)) : null,
+    gr.data ? h('p', { class: 'meta', style: 'margin-bottom:0' }, 'Imports the most-liked quotes first, up to the number given; that number is saved on the author so later re-checks keep to it. Lowering it never deletes quotes already imported.') : null);
 }
 
 function quoteRow(x) {

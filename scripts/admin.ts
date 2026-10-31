@@ -1366,7 +1366,8 @@ const SITES: Record<string, Site> = {
             'check-data': runScript('Check data', 'check-data'),
             'sync-book-summaries': runScript('Sync book links', 'sync-book-summaries', { writes: true }),
             'sync-biographies': runScript('Sync biography links', 'sync-biographies', { writes: true }),
-            'import-quotes': runScript('Import from Goodreads', 'import-quotes', { writes: true, args: /^[\w.-]+$/ }),
+            // Args: Goodreads author slugs, each optionally `slug:N` (keep at most N quotes), plus --only (skip the re-check of known authors).
+            'import-quotes': runScript('Import from Goodreads', 'import-quotes', { writes: true, args: /^(--only|[\w.-]+(:\d{1,4})?)$/ }),
         },
     },
     books: {
@@ -1661,6 +1662,96 @@ function listQuotes(params: URLSearchParams) {
         items: items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
         authors: authors.map((a) => ({ slug: a.slug, name: a.name, count: quoteCount(a) })).sort((x, y) => y.count - x.count),
         books: author ? author.books.map((b) => ({ slug: b.slug, title: b.title, count: b.quotes.length })) : [],
+    };
+}
+
+// Goodreads' popular quotes (/quotes, /quotes/tag/<tag>, or a set of Arabic tags) grouped by author, to pick
+// who to import and how many of their quotes. Pages are cached for the session; each new page waits a bit (be polite).
+const GR_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+const GR_MAX_PAGES = 20; // Goodreads serves up to 100; 20 × 30 quotes is plenty to find the famous authors
+const GR_ARABIC_MAX_PAGES = 5; // per tag, so up to tags × 5 fetches
+/** Goodreads tags Arabic quotes collect under; Arabic mode reads page N of each. */
+const GR_ARABIC_TAGS = ['arabic', 'اقتباسات', 'حب', 'الحب', 'الحياة', 'حياة', 'حكمة', 'الحكمة', 'أدب', 'الأدب', 'شعر', 'الوطن', 'الحرية', 'الموت', 'الله', 'الإنسان', 'السعادة', 'الأمل', 'الحزن', 'فلسفة'];
+interface GrPageAuthor { quote: string; slug: string; name: string; image?: string; likes: number; arabic: boolean }
+const grPages = new Map<string, GrPageAuthor[]>();
+const isArabic = (s: string) => (s.match(/[؀-ۿ]/g) ?? []).length > (s.match(/[a-zA-Z]/g) ?? []).length;
+const foldName = (s: string) => s.replace(/[ً-ْـ]/g, '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[\s,،.]+/g, ' ').trim().toLowerCase();
+
+async function goodreadsPage(tag: string, page: number): Promise<GrPageAuthor[]> {
+    const key = `${tag}|${page}`;
+    const hit = grPages.get(key);
+    if (hit) return hit;
+    const url = `https://www.goodreads.com/quotes${tag ? `/tag/${encodeURIComponent(tag)}` : ''}?page=${page}`;
+    const res = await fetch(url, { headers: { 'User-Agent': GR_UA }, signal: AbortSignal.timeout(30_000) });
+    if (!res.ok && res.status !== 404) throw new HttpError(502, `Goodreads ${res.status} for ${url}`);
+    const { parse } = await import('node-html-parser');
+    const root = parse(res.ok ? await res.text() : '');
+    const rows: GrPageAuthor[] = [];
+    for (const block of root.querySelectorAll('.quoteDetails')) {
+        // Only quotes whose avatar links to an author page name a Goodreads author (some carry a quote image).
+        const href = block.querySelector('a.quoteAvatar')?.getAttribute('href') ?? '';
+        const slug = href.match(/\/author\/show\/([^/?#]+)/)?.[1];
+        if (!slug) continue;
+        const img = block.querySelector('a.quoteAvatar img');
+        const name = block.querySelector('.authorOrTitle')?.text.trim().replace(/,$/, '') || img?.getAttribute('alt')?.trim() || slug;
+        const likesLink = block.querySelector('.quoteFooter a.smallText');
+        const likes = Number((likesLink?.text ?? '').replace(/\D/g, '')) || 0;
+        const quote = likesLink?.getAttribute('href')?.match(/\/quotes\/(\d+)/)?.[1] ?? `${slug}:${likes}`;
+        const text = block.querySelector('.quoteText')?.childNodes.filter((n) => n.nodeType === 3).map((n) => n.rawText).join(' ') ?? '';
+        rows.push({ quote, slug, name, image: img?.getAttribute('src') ?? undefined, likes, arabic: isArabic(text) });
+    }
+    grPages.set(key, rows);
+    // Past the last page Goodreads repeats it, so an exhausted tag is remembered as empty.
+    const prev = page > 1 ? grPages.get(`${tag}|${page - 1}`) : undefined;
+    if (prev?.length && rows.length && rows[0]!.slug === prev[0]!.slug && rows.length === prev.length && rows.every((r, i) => r.likes === prev[i]!.likes)) grPages.set(key, []);
+    await new Promise((r) => setTimeout(r, 800));
+    return grPages.get(key)!;
+}
+
+async function goodreadsAuthors(params: URLSearchParams) {
+    const arabic = params.get('source') === 'arabic';
+    const tag = arabic ? '' : (params.get('tag') ?? '').trim().toLowerCase().replace(/\s+/g, '-');
+    if (tag && !/^[\p{L}\p{N}_-]+$/u.test(tag)) throw new HttpError(400, 'Tag must be letters, digits and dashes');
+    const maxPages = arabic ? GR_ARABIC_MAX_PAGES : GR_MAX_PAGES;
+    const pages = Math.min(maxPages, Math.max(1, Number(params.get('pages')) || (arabic ? 1 : 3)));
+    const tags = arabic ? GR_ARABIC_TAGS : [tag];
+    const byslug = new Map<string, Omit<GrPageAuthor, 'quote' | 'arabic'> & { popular: number; arabicQuotes: number }>();
+    const seen = new Set<string>();
+    for (const t of tags) {
+        for (let p = 1; p <= pages; p++) {
+            const rows = await goodreadsPage(t, p);
+            if (!rows.length) break;
+            for (const r of rows) {
+                // Arabic tags list the same quote under several tags: count it once.
+                if (seen.has(r.quote)) continue;
+                seen.add(r.quote);
+                const a = byslug.get(r.slug) ?? { slug: r.slug, name: r.name, image: r.image, likes: 0, popular: 0, arabicQuotes: 0 };
+                a.likes += r.likes;
+                a.popular++;
+                if (r.arabic) a.arabicQuotes++;
+                byslug.set(r.slug, a);
+            }
+        }
+    }
+    const mine = quoteAuthors();
+    const bySlug = new Map(mine.filter((a) => a.goodreadsSlug).map((a) => [a.goodreadsSlug as string, a]));
+    // Arabic names are kept verbatim on import, so an author added some other way (no Goodreads slug) still matches by name.
+    const byName = new Map(mine.map((a) => [foldName(a.name), a]));
+    let authors = [...byslug.values()].map((a) => ({ ...a, arabicName: isArabic(a.name) }));
+    // An Arabic author: an Arabic name, or mostly Arabic quotes (Latin-spelled names like "Khaled Ibrahim").
+    if (arabic) authors = authors.filter((a) => a.arabicName || a.arabicQuotes * 2 >= a.popular);
+    return {
+        source: arabic ? 'arabic' : tag ? 'tag' : 'popular',
+        tag,
+        tags: arabic ? GR_ARABIC_TAGS : undefined,
+        pages,
+        maxPages,
+        authors: authors
+            .sort((x, y) => y.likes - x.likes)
+            .map((a) => {
+                const m = bySlug.get(a.slug) ?? (a.arabicName ? byName.get(foldName(a.name)) : undefined);
+                return { ...a, have: m ? quoteCount(m) : null, haveName: m?.name ?? null, limit: (m?.goodreadsLimit as number | undefined) ?? null };
+            }),
     };
 }
 
@@ -2721,6 +2812,7 @@ const GET: Record<string, (params: URLSearchParams) => unknown | Promise<unknown
     '/api/sites/job': sitesJob,
     '/api/sites/ai': aiInfo,
     '/api/quotes': listQuotes,
+    '/api/quotes/goodreads-authors': goodreadsAuthors,
     '/api/entries': listCollection,
     '/api/entries/markdown': readMarkdown,
     '/api/quiz/bank': listBank,
