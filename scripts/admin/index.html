@@ -923,10 +923,10 @@ async function renderPublish() {
 }
 
 // ─── Social ───
-const social = jobPoller('soc', '/api/social/job', 'social', async () => { media.data = null; if (state.tab === 'social') renderSocial(); });
-const SOCIAL_TOOLS = { x: 'X (Twitter)', linkedin: 'LinkedIn', 'tiktok-slides': 'TikTok — articles slideshow', 'tiktok-books': 'TikTok — book summary' };
+const social = jobPoller('soc', '/api/social/job', 'social', async () => { media.data = null; if (soc.tool === 'tumblr' && tum.status?.connected) { tum.status = null; if (tum.queue) tumLoad('queue'); } if (state.tab === 'social') renderSocial(); });
+const SOCIAL_TOOLS = { x: 'X (Twitter)', linkedin: 'LinkedIn', tumblr: 'Tumblr', 'tiktok-slides': 'TikTok — articles slideshow', 'tiktok-books': 'TikTok — book summary' };
 const nextMonth = () => { const d = new Date(); d.setMonth(d.getMonth() + 1); return d.toISOString().slice(0, 7); };
-const soc = { tool: 'x', span: 'day', month: nextMonth(), days: '', articles: '', quizzes: '', book: true, category: '', since: '', date: '', random: false, dryRun: true, count: '', time: '', force: false, bookSlug: '', perDay: 1, times: ['19:00'] };
+const soc = { tool: 'x', span: 'day', month: nextMonth(), days: '', articles: '', quizzes: '', book: true, category: '', since: '', date: '', random: false, dryRun: true, count: '', time: '', force: false, bookSlug: '', perDay: 1, times: ['19:00'], quotes: '', books: '', bios: '', reblogs: '', from: '', to: '' };
 const TIKTOK_TIMES = { 1: ['19:00'], 2: ['13:00', '20:00'], 3: ['10:00', '15:00', '20:00'] };
 
 async function copySnippet(tool) {
@@ -969,6 +969,28 @@ async function renderSocial() {
         check('dryRun', 'Dry run', 'Print the plan without marking articles as used'),
       ),
     ];
+  } else if (t === 'tumblr') {
+    if (!['day', 'next', 'month'].includes(soc.span)) soc.span = 'next';
+    const timeIn = (key, ph) => h('input', { type: 'time', value: soc[key] || ph, disabled: running, oninput: (e) => { soc[key] = e.target.value; } });
+    form = [
+      h('div', { class: 'toolbar' },
+        field('Schedule', spanSel([['day', 'One day'], ['next', 'Next N days'], ['month', 'A calendar month']])),
+        soc.span === 'month' ? field('Month', monthIn) : field(soc.span === 'day' ? 'Day (default: today/tomorrow)' : 'First day', dateIn),
+        soc.span === 'next' ? field('Days', num('days', '7', 60)) : null,
+        field('Window from', timeIn('from', '08:00')),
+        field('to', timeIn('to', '23:00')),
+      ),
+      h('div', { class: 'toolbar' },
+        field('Articles / day', num('articles', '3', 12)),
+        field('Quotes / day', num('quotes', '2', 12)),
+        field('Quizzes / day', num('quizzes', '1', 12)),
+        field('Books / day', num('books', '1', 12)),
+        field('Biographies / day', num('bios', '0', 12)),
+        field('Self-reblogs / day', num('reblogs', '1', 12)),
+        field('Category', h('select', { disabled: running, onchange: (e) => { soc.category = e.target.value; } }, categoryOptions(soc.category, true))),
+      ),
+      h('div', { class: 'toolbar' }, check('random', 'Random article order'), check('dryRun', 'Dry run', 'Print the plan, post nothing')),
+    ];
   } else if (t === 'tiktok-slides') {
     if (!['day', 'month'].includes(soc.span)) soc.span = 'day';
     form = [h('div', { class: 'toolbar' },
@@ -992,6 +1014,7 @@ async function renderSocial() {
     const body = { tool: t, span: soc.span, month: soc.month, days: soc.days, articles: soc.articles, quizzes: soc.quizzes, book: soc.book, category: soc.category,
       since: soc.since, date: soc.date, random: soc.random, dryRun: soc.dryRun, count: soc.count, time: soc.time, force: soc.force, perDay: soc.perDay, times: soc.times };
     if (t === 'tiktok-books') body.book = soc.bookSlug;
+    if (t === 'tumblr') Object.assign(body, { quotes: soc.quotes, books: soc.books, bios: soc.bios, reblogs: soc.reblogs, from: soc.from, to: soc.to });
     social.start('/api/social/run', body);
   };
 
@@ -1005,7 +1028,9 @@ async function renderSocial() {
       h('div', { class: 'toolbar' },
         h('button', { class: 'btn primary', disabled: running, onclick: run }, soc.dryRun ? 'Dry run' : 'Run'),
         h('button', { class: 'btn danger', disabled: !running, onclick: () => act(() => api('/api/social/stop', {}), 'Stopping…') }, 'Stop'),
-        h('span', { class: 'meta' }, t === 'x' || t === 'linkedin'
+        h('span', { class: 'meta' }, t === 'tumblr'
+          ? 'Queues the posts on Tumblr through the API, each with its publish time — nothing to paste. Used items and taken slots are remembered; if Tumblr\'s daily cap (~150 photo posts) stops a long run, run it again tomorrow.'
+          : t === 'x' || t === 'linkedin'
           ? 'Writes a console snippet; paste it on the site in Chrome to schedule the posts. Picked items are remembered so they are never posted twice (not on dry runs).'
           : 'Renders PNGs + caption.txt to upload by hand in TikTok. Picked items are remembered (not on dry runs).'),
       ),
@@ -1017,6 +1042,7 @@ async function renderSocial() {
         h('a', { class: 'link', href: snip.post, target: '_blank', rel: 'noreferrer' }, `Open ${SOCIAL_TOOLS[t]} ↗`),
         h('span', { class: 'meta' }, 'then DevTools console (⌘⌥J) → paste, keep the tab in front until it logs "done".'))
       : h('div', { class: 'meta' }, 'No snippet yet.')) : '',
+    t === 'tumblr' ? tumblrPanel(running) : '',
     t === 'tiktok-slides' ? (() => {
       const p = info.tiktokPrompt;
       return h('div', { class: 'card', style: 'margin-top:10px' }, p ? h('div', { class: 'toolbar' },
@@ -1035,6 +1061,67 @@ async function renderSocial() {
     ...social.view(),
   );
   social.update(true);
+}
+
+// Tumblr (Social tab): connection, the blog's queue, best posts by notes.
+const tum = { status: null, queue: null, top: null, busy: '', sel: new Set() };
+async function tumLoad(what) {
+  tum.busy = what;
+  if (state.tab === 'social') renderSocial();
+  try {
+    if (what === 'status') tum.status = await api('/api/tumblr/status');
+    else tum[what] = await api('/api/tumblr/' + what);
+  } catch (e) { toast(e.message, true); if (what === 'status') tum.status = { connected: false, error: e.message }; }
+  tum.busy = '';
+  if (state.tab === 'social') renderSocial();
+}
+const fmtWhen = (ms) => ms ? new Date(ms).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+
+function tumblrPanel(running) {
+  if (!tum.status && !tum.busy) tumLoad('status');
+  const st = tum.status;
+  const thumb = (src) => src ? h('img', { src, loading: 'lazy', style: 'width:44px;height:44px;object-fit:cover;border-radius:6px' }) : h('span', { style: 'display:inline-block;width:44px' });
+  const conn = h('div', { class: 'card', style: 'margin-top:10px' },
+    !st ? h('div', { class: 'meta' }, 'Checking Tumblr…')
+    : st.connected ? h('div', { class: 'toolbar' },
+        h('strong', {}, '✓ ' + (st.title || st.blog)),
+        h('a', { class: 'link', href: st.url, target: '_blank', rel: 'noreferrer' }, st.url + ' ↗'),
+        h('span', { class: 'meta' }, `${st.posts ?? 0} posts · ${st.queue ?? '?'} queued` + (st.followers != null ? ` · ${st.followers} followers` : '')),
+        h('a', { class: 'link', href: `https://www.tumblr.com/blog/${st.blog}/queue`, target: '_blank', rel: 'noreferrer' }, 'Queue on Tumblr ↗'),
+        h('button', { class: 'btn', onclick: () => { tum.status = null; tumLoad('status'); } }, 'Refresh'),
+        h('button', { class: 'btn danger', onclick: () => { if (confirm('Forget the Tumblr login on this machine?')) act(async () => { await api('/api/tumblr/disconnect', {}); tum.status = null; tum.queue = tum.top = null; }, 'Disconnected'); } }, 'Disconnect'))
+    : h('div', { class: 'toolbar' },
+        h('a', { class: 'btn primary', href: '/api/tumblr/connect' }, 'Connect Tumblr'),
+        h('span', { class: 'meta' }, st.error ? st.error : `Logs in to tumblr.com and comes back here. The app's OAuth2 redirect URL must be ${st.redirectUri || 'http://localhost:4322/api/tumblr/callback'}.`)));
+  if (!st?.connected) return conn;
+
+  const q = tum.queue;
+  const queueCard = h('div', { class: 'card', style: 'margin-top:10px' },
+    h('div', { class: 'toolbar' }, h('strong', {}, 'Queue'),
+      h('button', { class: 'btn', disabled: !!tum.busy, onclick: () => tumLoad('queue') }, tum.busy === 'queue' ? 'Loading…' : q ? 'Reload' : 'Show queue'),
+      q ? h('span', { class: 'meta' }, `${q.posts.length} queued` + (q.posts.length ? ` · ${fmtWhen(q.posts[0].at)} → ${fmtWhen(q.posts.at(-1).at)}` : '')) : null,
+      tum.sel.size ? h('button', { class: 'btn danger', disabled: running, onclick: () => {
+        if (!confirm(`Delete ${tum.sel.size} queued post(s) from Tumblr? Their items become available to the scheduler again.`)) return;
+        act(async () => { const r = await api('/api/tumblr/delete', { ids: [...tum.sel] }); tum.sel.clear(); await tumLoad('queue'); return r; }, (r) => `Deleted ${r.deleted}`);
+      } }, `Delete ${tum.sel.size}`) : null),
+    q ? h('div', { class: 'list', style: 'max-height:420px;overflow:auto' }, h('table', {}, q.posts.map((p) => h('tr', {},
+      h('td', {}, h('input', { type: 'checkbox', checked: tum.sel.has(p.id), onchange: (e) => { e.target.checked ? tum.sel.add(p.id) : tum.sel.delete(p.id); renderSocial(); } })),
+      h('td', { style: 'white-space:nowrap' }, fmtWhen(p.at)),
+      h('td', {}, thumb(p.image)),
+      h('td', { dir: 'auto' }, (p.reblog ? '↻ ' : '') + (p.summary || '(no text)'), h('div', { class: 'meta', dir: 'auto' }, p.tags.slice(0, 6).map((t) => '#' + t).join(' '))))))) : null);
+
+  const tp = tum.top;
+  const topCard = h('div', { class: 'card', style: 'margin-top:10px' },
+    h('div', { class: 'toolbar' }, h('strong', {}, 'Best posts (notes)'),
+      h('button', { class: 'btn', disabled: !!tum.busy, onclick: () => tumLoad('top') }, tum.busy === 'top' ? 'Loading…' : tp ? 'Reload' : 'Load'),
+      tp ? h('span', { class: 'meta' }, `${tp.total} recent posts · ${tp.notes} notes · ` + Object.entries(tp.bySite).map(([k, v]) => `${k}: ${v.posts} posts / ${v.notes} notes`).join(' · ')) : h('span', { class: 'meta' }, 'Self-reblogs pick from the top of this list.')),
+    tp ? h('div', { class: 'list' }, h('table', {}, tp.top.map((p) => h('tr', {},
+      h('td', { class: 'num' }, String(p.notes)),
+      h('td', {}, thumb(p.image)),
+      h('td', { dir: 'auto' }, h('a', { class: 'link', href: p.url, target: '_blank', rel: 'noreferrer' }, (p.reblog ? '↻ ' : '') + (p.summary || p.url))),
+      h('td', { class: 'meta' }, p.site),
+      h('td', { class: 'meta', style: 'white-space:nowrap' }, fmtWhen(p.at)))))) : null);
+  return h('div', {}, conn, queueCard, topCard);
 }
 
 // Generated media folders (Social tab): pick posted ones and delete them to free space.

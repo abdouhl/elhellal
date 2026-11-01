@@ -20,7 +20,8 @@
       "محتوى عربي",
       "تعلم لغة جديدة"
     ],
-    "minutes": 1
+    "minutes": 1,
+    "slug": "أنت-عربي-rabe-moderno-estndar"
   },
   {
     "id_str": "9970918954866909983",
@@ -43,6 +44,7 @@
       "تنوع اللهجات",
       "تعليم اللغات"
     ],
-    "minutes": 1
+    "minutes": 1,
+    "slug": "أنت-عربي-dialecto-rabe-sirio-libans"
   }
 ]

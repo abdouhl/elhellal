@@ -7,7 +7,8 @@
     "created_at": "2025-02-23",
     "url": "https://khaledessam.substack.com/p/52d",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!7VOW!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fd0d37756-e846-4c04-947d-3c9e9a6a3b5a_3656x2742.jpeg",
-    "minutes": 1
+    "minutes": 1,
+    "slug": "الإغواء-الأخير"
   },
   {
     "id_str": "5841421423447529969",
@@ -26,7 +27,8 @@
     "screen_name": "hevi",
     "created_at": "2025-02-26",
     "url": "https://hevi.substack.com/p/06a",
-    "minutes": 2
+    "minutes": 2,
+    "slug": "عيد-ميلاد-مترو-الرياض-كومة-من-العشوائية"
   },
   {
     "id_str": "2030231839976955386",
@@ -65,7 +67,8 @@
     "screen_name": "faisalalshareef",
     "created_at": "2025-02-19",
     "url": "https://faisalalshareef.substack.com/p/167",
-    "minutes": 3
+    "minutes": 3,
+    "slug": "ما-يحدث-في-الرياضة-السعودية-يحدث-في-كل-الوظائف"
   },
   {
     "id_str": "6582125194199387655",
@@ -85,6 +88,7 @@
     "created_at": "2025-02-17",
     "url": "https://khaledessam.substack.com/p/0fa",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!ZNbv!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F23e3fd71-6499-4e69-a1f7-d2e060c5f64d_618x430.jpeg",
-    "minutes": 8
+    "minutes": 8,
+    "slug": "ناي-إعادة-عزف-لحن-الوجود"
   }
 ]

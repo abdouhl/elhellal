@@ -58,7 +58,8 @@
     "screen_name": "mzeidan",
     "created_at": "2025-06-17",
     "url": "https://mzeidan.substack.com/p/b88",
-    "original_img_url": "https://substack-post-media.s3.amazonaws.com/public/images/5e64973b-4843-4f76-97ff-a10e0496c517_1792x1145.png"
+    "original_img_url": "https://substack-post-media.s3.amazonaws.com/public/images/5e64973b-4843-4f76-97ff-a10e0496c517_1792x1145.png",
+    "slug": "الحرب-في-نيويورك-تايمز"
   },
   {
     "id_str": "8437910177233645229",
@@ -128,7 +129,8 @@
     "screen_name": "sfyasser",
     "created_at": "2025-06-21",
     "url": "https://sfyasser.substack.com/p/875",
-    "original_img_url": "https://substackcdn.com/image/fetch/$s_!flfr!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fa986eb81-427a-4a48-be64-03d72494e711_1600x1283.jpeg"
+    "original_img_url": "https://substackcdn.com/image/fetch/$s_!flfr!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fa986eb81-427a-4a48-be64-03d72494e711_1600x1283.jpeg",
+    "slug": "عندما-يثور-البسطاء"
   },
   {
     "id_str": "4981325891757570535",
@@ -147,7 +149,8 @@
     "screen_name": "sfyasser",
     "created_at": "2025-06-24",
     "url": "https://sfyasser.substack.com/p/388",
-    "original_img_url": "https://substackcdn.com/image/fetch/$s_!hvb8!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Feb5452a0-665f-46f3-9901-83aa85a1d72a_780x692.jpeg"
+    "original_img_url": "https://substackcdn.com/image/fetch/$s_!hvb8!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Feb5452a0-665f-46f3-9901-83aa85a1d72a_780x692.jpeg",
+    "slug": "كيف-استغلت-أوروبا-الدين-للسلطة-ثم-تخلت-عنه-للعلمانية"
   },
   {
     "id_str": "8377729911955189536",
@@ -243,7 +246,8 @@
     "created_at": "2025-06-25",
     "url": "https://almostthere25.substack.com/p/91e",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!vCGL!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fcdc877b2-01db-4963-bfd2-da28df24b66a_1024x1024.jpeg",
-    "minutes": 2
+    "minutes": 2,
+    "slug": "نحن-والفن-حين-نعثر-على-أنفسنا-متلبسين-بالشعور"
   },
   {
     "id_str": "7383708446320629233",
@@ -252,7 +256,8 @@
     "screen_name": "benlahbibwalid",
     "created_at": "2025-06-14",
     "url": "https://benlahbibwalid.substack.com/p/90a",
-    "minutes": 3
+    "minutes": 3,
+    "slug": "هل-المجانين-عقلاء"
   },
   {
     "id_str": "7951723684845140734",

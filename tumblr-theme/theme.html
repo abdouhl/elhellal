@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{block:PostSummary}{PostSummary} — {/block:PostSummary}{Title}</title>
+{block:Description}<meta name="description" content="{MetaDescription}">{/block:Description}
+<link rel="shortcut icon" href="{Favicon}">
+<link rel="alternate" type="application/rss+xml" href="{RSS}">
+
+<!-- Customizer options -->
+<meta name="color:Accent" content="#ff8c00">
+<meta name="color:Background" content="#faf7f2">
+<meta name="color:Card" content="#ffffff">
+<meta name="color:Text" content="#1d1a16">
+<meta name="if:Dark mode follows device" content="1">
+<meta name="if:Show tags" content="1">
+<meta name="if:Show sibling sites" content="1">
+<meta name="text:Site link" content="https://elhellal.com/">
+<meta name="text:Tagline" content="أفضل المقالات والاقتباسات والكتب العربية">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&family=Noto+Naskh+Arabic:wght@500;700&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --accent: {color:Accent};
+  --bg: {color:Background};
+  --card: {color:Card};
+  --text: {color:Text};
+  --muted: color-mix(in srgb, var(--text) 58%, var(--bg));
+  --line: color-mix(in srgb, var(--text) 11%, transparent);
+  --soft: color-mix(in srgb, var(--accent) 9%, var(--card));
+  --radius: 18px;
+  --sans: "IBM Plex Sans Arabic", system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif;
+  --naskh: "Noto Naskh Arabic", "Amiri", serif;
+  color-scheme: light;
+}
+{block:IfDarkModeFollowsDevice}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14120f; --card: #1d1a16; --text: #ece6dc; color-scheme: dark;
+  }
+}
+{/block:IfDarkModeFollowsDevice}
+:root[data-theme="dark"] { --bg: #14120f; --card: #1d1a16; --text: #ece6dc; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 400 17px/1.85 var(--sans);
+  text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 4px; }
+img, video, iframe { max-width: 100%; height: auto; display: block; }
+.wrap { max-width: 680px; margin: 0 auto; padding: 0 16px; }
+
+/* Header */
+.top { position: sticky; top: 0; z-index: 10; backdrop-filter: saturate(1.4) blur(14px); -webkit-backdrop-filter: saturate(1.4) blur(14px);
+  background: color-mix(in srgb, var(--bg) 82%, transparent); border-bottom: 1px solid var(--line); }
+.top .wrap { display: flex; align-items: center; gap: 12px; height: 60px; }
+.brand { display: flex; align-items: center; gap: 10px; color: var(--text); font-weight: 700; font-size: 19px; }
+.brand:hover { text-decoration: none; }
+.brand img { width: 34px; height: 34px; border-radius: 50%; }
+.top .spacer { flex: 1; }
+.icon-btn { display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line);
+  background: var(--card); color: var(--text); cursor: pointer; padding: 0; }
+.icon-btn:hover { border-color: var(--accent); color: var(--accent); text-decoration: none; }
+.icon-btn svg { width: 18px; height: 18px; }
+
+.hero { padding: 40px 0 8px; text-align: center; }
+.hero img { width: 84px; height: 84px; border-radius: 50%; margin: 0 auto 14px; box-shadow: 0 0 0 4px var(--card), 0 0 0 5px var(--line); }
+.hero h1 { margin: 0; font-size: 30px; line-height: 1.3; }
+.hero p { margin: 6px auto 0; color: var(--muted); max-width: 46ch; }
+.chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 20px 0 6px; padding: 0; list-style: none; }
+.chips a { display: inline-block; padding: 6px 14px; border-radius: 999px; background: var(--card); border: 1px solid var(--line);
+  color: var(--text); font-size: 14px; font-weight: 500; }
+.chips a:hover { border-color: var(--accent); color: var(--accent); text-decoration: none; }
+.chips a.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.search { margin: 18px auto 0; max-width: 420px; position: relative; }
+.search input { width: 100%; font: inherit; font-size: 15px; padding: 10px 44px 10px 16px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--card); color: var(--text); }
+.search input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.search svg { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); width: 18px; color: var(--muted); }
+
+.pagehead { text-align: center; margin: 30px 0 0; color: var(--muted); }
+.pagehead strong { color: var(--text); font-size: 22px; display: block; }
+
+/* Posts */
+.posts { display: grid; gap: 22px; padding: 26px 0 10px; }
+.post { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
+  box-shadow: 0 1px 2px rgb(0 0 0 / .03), 0 8px 24px -14px rgb(0 0 0 / .14); }
+.post .body { padding: 22px 24px 4px; overflow-wrap: anywhere; }
+.post .body > :first-child { margin-top: 0; }
+.post .body p { margin: 0 0 14px; }
+
+/* Full-bleed media: NPF image rows and legacy photos */
+.post .body .npf_row, .post .body figure.tmblr-full, .post .media { margin: -22px -24px 18px; }
+.post .body .npf_row:not(:first-child), .post .body figure.tmblr-full:not(:first-child) { margin-top: 6px; }
+.post .body .npf_row figure, .post .body figure { margin: 0; }
+.post .body figure img, .post .media img { width: 100%; }
+.post .body .npf_row { display: flex; gap: 3px; }
+.post .body .npf_row > * { flex: 1; }
+
+.post h1, .post h2, .post .title { font-size: 23px; line-height: 1.45; margin: 4px 0 10px; font-weight: 700; }
+.post h2 { font-size: 20px; }
+.post h1 a, .post .title a { color: var(--text); }
+
+/* Quotes: NPF quote subtype, blockquotes and legacy quote posts */
+.post .npf_quote, .post .quote-text {
+  font-family: var(--naskh); font-weight: 700; font-size: 26px; line-height: 1.75; margin: 6px 0 14px; position: relative; padding-top: 34px;
+}
+.post .npf_quote::before, .post .quote-text::before {
+  content: "”"; position: absolute; top: -14px; right: -4px; font: 700 76px/1 var(--naskh); color: var(--accent); opacity: .9;
+}
+.post blockquote, .post .npf_indented { margin: 0 0 14px; padding: 4px 16px 4px 0; border-right: 3px solid var(--accent); color: var(--muted); }
+.post .quote-source { color: var(--muted); }
+.post .npf_quote + p { color: var(--muted); font-weight: 500; }
+
+/* Call-to-action link blocks (bold links) become buttons */
+.post .body p > a:only-child > b:only-child, .post .body p > b:only-child > a:only-child,
+.post .body p > a:only-child > strong:only-child, .post .body p > strong:only-child > a:only-child { font-weight: 700; }
+.post .body p:has(> a:only-child > b), .post .body p:has(> b > a:only-child),
+.post .body p:has(> a:only-child > strong), .post .body p:has(> strong > a:only-child) { margin: 18px 0 16px; }
+.post .body p > a:only-child:has(> b, > strong), .post .body p > b:only-child > a, .post .body p > strong:only-child > a {
+  display: inline-flex; align-items: center; gap: 6px; padding: 9px 18px; border-radius: 999px;
+  background: var(--soft); color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent); transition: background .15s;
+}
+.post .body p > a:only-child:has(> b, > strong):hover, .post .body p > b:only-child > a:hover, .post .body p > strong:only-child > a:hover {
+  background: var(--accent); color: #fff; text-decoration: none;
+}
+
+/* NPF link card */
+.post .npf_link, .post .link-card { display: block; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; margin: 6px 0 16px; color: var(--text); }
+.post .npf_link:hover { border-color: var(--accent); text-decoration: none; }
+
+.post .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 12px 24px 16px; border-top: 1px solid var(--line);
+  font-size: 13.5px; color: var(--muted); }
+.post .meta a { color: var(--muted); }
+.post .meta a:hover { color: var(--accent); }
+.post .meta .grow { flex: 1; }
+.post .meta .controls { display: flex; gap: 6px; align-items: center; }
+.post .meta .controls .like_button, .post .meta .controls .reblog_button, .post .meta .controls iframe { width: 20px !important; height: 20px !important; max-width: none; display: block; background: transparent; color-scheme: normal; }
+.post .tags { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 24px 18px; margin: -4px 0 0; list-style: none; }
+.post .tags a { font-size: 13px; color: var(--muted); background: var(--bg); border-radius: 999px; padding: 3px 11px; }
+.post .tags a:hover { color: var(--accent); text-decoration: none; }
+
+/* Reblog trail */
+.post .reblog-head { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); padding: 16px 24px 0; }
+.post .reblog-head img { width: 22px; height: 22px; border-radius: 50%; }
+
+/* Permalink */
+.notes-wrap { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 24px; margin: 0 0 22px; font-size: 14.5px; }
+ol.notes { list-style: none; margin: 0; padding: 0; }
+ol.notes li { padding: 8px 0; border-bottom: 1px solid var(--line); display: flex; gap: 8px; align-items: center; }
+ol.notes li:last-child { border: 0; }
+ol.notes img.avatar { width: 24px; height: 24px; border-radius: 50%; }
+.more-notes { display: block; text-align: center; margin-top: 10px; }
+
+.related { background: var(--soft); border-radius: var(--radius); padding: 20px 24px; margin: 0 0 22px; text-align: center; }
+.related p { margin: 0 0 12px; font-weight: 700; }
+
+/* Pagination */
+.pager { display: flex; justify-content: space-between; gap: 12px; margin: 10px 0 40px; }
+.pager a, .pager span { flex: 1; text-align: center; padding: 12px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); color: var(--text); font-weight: 500; }
+.pager a:hover { border-color: var(--accent); color: var(--accent); text-decoration: none; }
+.pager span { visibility: hidden; }
+
+footer { border-top: 1px solid var(--line); padding: 28px 0 44px; text-align: center; color: var(--muted); font-size: 14px; }
+footer nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; margin-bottom: 10px; }
+footer nav a { color: var(--text); }
+
+@media (max-width: 520px) {
+  body { font-size: 16px; }
+  .post .body { padding: 18px 18px 2px; }
+  .post .body .npf_row, .post .body figure.tmblr-full, .post .media { margin: -18px -18px 16px; }
+  .post .meta { padding: 12px 18px 14px; }
+  .post .tags { padding: 0 18px 16px; }
+  .post .npf_quote, .post .quote-text { font-size: 22px; }
+  .hero { padding-top: 28px; }
+  .hero h1 { font-size: 26px; }
+}
+.tmblr-alt-text-helper { display: none !important; }
+.post .npf_quote { display: block; }
+.post .tags a, .post .meta a, .pagehead strong { unicode-bidi: plaintext; }
+{CustomCSS}
+</style>
+<script>
+  try { var t = localStorage.getItem('theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="{PortraitURL-64}" alt="">{Title}</a>
+    <span class="spacer"></span>
+    {block:AskEnabled}<a class="icon-btn" href="/ask" title="{AskLabel}" aria-label="{AskLabel}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></a>{/block:AskEnabled}
+    <a class="icon-btn" href="{text:Site link}" title="الهلال" aria-label="الهلال"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></a>
+    <button class="icon-btn" id="theme-toggle" type="button" aria-label="الوضع الليلي" title="الوضع الليلي"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
+  </div>
+</header>
+
+<main class="wrap">
+  {block:IndexPage}
+  <section class="hero" {block:TagPage}hidden{/block:TagPage}{block:SearchPage}hidden{/block:SearchPage}{block:PreviousPage}hidden{/block:PreviousPage}>
+    <img src="{PortraitURL-128}" alt="{Title}">
+    <h1>{Title}</h1>
+    {block:IfTagline}<p>{text:Tagline}</p>{/block:IfTagline}
+    <ul class="chips">
+      <li><a href="/tagged/مقالات">مقالات</a></li>
+      <li><a href="/tagged/اقتباسات">اقتباسات</a></li>
+      <li><a href="/tagged/ملخص كتاب">كتب</a></li>
+      <li><a href="/tagged/سيرة">سير</a></li>
+      <li><a href="/tagged/اختبار">اختبارات</a></li>
+    </ul>
+    <form class="search" action="/search" method="get" role="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input type="search" name="q" value="{SearchQuery}" placeholder="ابحث في المدونة…" aria-label="بحث">
+    </form>
+  </section>
+  {/block:IndexPage}
+
+  {block:TagPage}<div class="pagehead"><strong>#{Tag}</strong>كل المنشورات الموسومة</div>{/block:TagPage}
+  {block:SearchPage}<div class="pagehead"><strong>«{SearchQuery}»</strong>{SearchResultCount} نتيجة</div>
+    {block:NoSearchResults}<p class="pagehead">لا نتائج. جرّب كلمة أخرى.</p>{/block:NoSearchResults}{/block:SearchPage}
+
+  <div class="posts">
+  {block:Posts}
+  <article class="post post-{PostType}" id="p{PostID}">
+    {block:RebloggedFrom}
+    <div class="reblog-head"><img src="{ReblogParentPortraitURL-24}" alt=""><a href="{ReblogParentURL}">{ReblogParentName}</a></div>
+    {/block:RebloggedFrom}
+
+    {block:Text}
+    <div class="body">
+      {block:Title}<h1 class="title"><a href="{Permalink}">{Title}</a></h1>{/block:Title}
+      {Body}
+    </div>
+    {/block:Text}
+
+    {block:Photo}
+    <div class="media">{LinkOpenTag}<img src="{PhotoURL-HighRes}" alt="{PhotoAlt}">{LinkCloseTag}</div>
+    {block:Caption}<div class="body">{Caption}</div>{/block:Caption}
+    {/block:Photo}
+
+    {block:Photoset}
+    <div class="media">{Photoset-700}</div>
+    {block:Caption}<div class="body">{Caption}</div>{/block:Caption}
+    {/block:Photoset}
+
+    {block:Quote}
+    <div class="body">
+      <p class="quote-text">{Quote}</p>
+      {block:Source}<p class="quote-source">— {Source}</p>{/block:Source}
+    </div>
+    {/block:Quote}
+
+    {block:Link}
+    <div class="body">
+      <h1 class="title"><a href="{URL}" {Target}>{Name} ←</a></h1>
+      {block:Description}{Description}{/block:Description}
+    </div>
+    {/block:Link}
+
+    {block:Chat}
+    <div class="body">{block:Title}<h1 class="title">{Title}</h1>{/block:Title}
+      {block:Lines}<p>{block:Label}<b>{Label}</b> {/block:Label}{Line}</p>{/block:Lines}</div>
+    {/block:Chat}
+
+    {block:Video}<div class="media">{Video-700}</div>{block:Caption}<div class="body">{Caption}</div>{/block:Caption}{/block:Video}
+    {block:Audio}<div class="body">{AudioEmbed}{block:Caption}{Caption}{/block:Caption}</div>{/block:Audio}
+
+    {block:Answer}
+    <div class="body">
+      <blockquote><img src="{AskerPortraitURL-24}" alt="" style="display:inline;width:20px;border-radius:50%;vertical-align:middle"> {Asker}: {Question}</blockquote>
+      {Answer}
+    </div>
+    {/block:Answer}
+
+    <div class="meta">
+      <a href="{Permalink}">{block:Date}{DayOfMonth} {Month} {Year}{/block:Date}</a>
+      {block:NoteCount}<a href="{Permalink}#notes">{NoteCountWithLabel}</a>{/block:NoteCount}
+      {block:ContentSource}<a href="{SourceURL}">{SourceTitle}</a>{/block:ContentSource}
+      <span class="grow"></span>
+      <span class="controls">{LikeButton color="grey" size="20"}{ReblogButton color="grey" size="20"}</span>
+    </div>
+
+    {block:IfShowTags}{block:HasTags}
+    <ul class="tags">{block:Tags}<li><a href="{TagURL}">#{Tag}</a></li>{/block:Tags}</ul>
+    {/block:HasTags}{/block:IfShowTags}
+  </article>
+
+  {block:PermalinkPage}
+  <div class="related">
+    <p>اكتشف المزيد من عالم الهلال</p>
+    <ul class="chips" style="margin:0">
+      <li><a class="on" href="{text:Site link}?utm_source=tumblr&utm_medium=social">المقالات</a></li>
+      <li><a href="https://quotes.elhellal.com/?utm_source=tumblr&utm_medium=social">الاقتباسات</a></li>
+      <li><a href="https://books.elhellal.com/?utm_source=tumblr&utm_medium=social">الكتب</a></li>
+      <li><a href="https://biographies.elhellal.com/?utm_source=tumblr&utm_medium=social">السير</a></li>
+      <li><a href="https://quiz.elhellal.com/?utm_source=tumblr&utm_medium=social">الاختبارات</a></li>
+    </ul>
+  </div>
+  {block:PostNotes}<section class="notes-wrap" id="notes">{PostNotes-24}</section>{/block:PostNotes}
+  {/block:PermalinkPage}
+  {/block:Posts}
+  </div>
+
+  {block:Pagination}
+  <nav class="pager">
+    {block:PreviousPage}<a href="{PreviousPage}">→ الأحدث</a>{/block:PreviousPage}{block:NoPreviousPage}<span></span>{/block:NoPreviousPage}
+    {block:NextPage}<a href="{NextPage}">الأقدم ←</a>{/block:NextPage}
+  </nav>
+  {/block:Pagination}
+  {block:PermalinkPagination}
+  <nav class="pager">
+    {block:NextPost}<a href="{NextPost}">→ التالي</a>{/block:NextPost}
+    {block:PreviousPost}<a href="{PreviousPost}">السابق ←</a>{/block:PreviousPost}
+  </nav>
+  {/block:PermalinkPagination}
+</main>
+
+<footer>
+  <div class="wrap">
+    {block:IfShowSiblingSites}
+    <nav>
+      <a href="{text:Site link}?utm_source=tumblr&utm_medium=social">elhellal.com</a>
+      <a href="https://quotes.elhellal.com/?utm_source=tumblr&utm_medium=social">اقتباسات</a>
+      <a href="https://books.elhellal.com/?utm_source=tumblr&utm_medium=social">كتب</a>
+      <a href="https://biographies.elhellal.com/?utm_source=tumblr&utm_medium=social">سير</a>
+      <a href="https://quiz.elhellal.com/?utm_source=tumblr&utm_medium=social">اختبارات</a>
+      <a href="/archive">الأرشيف</a>
+      <a href="{RSS}">RSS</a>
+    </nav>
+    {/block:IfShowSiblingSites}
+    © {CopyrightYears} {Title}
+  </div>
+</footer>
+
+<script>
+  document.getElementById('theme-toggle').addEventListener('click', function () {
+    var root = document.documentElement;
+    var dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+    root.dataset.theme = dark ? 'light' : 'dark';
+    try { localStorage.setItem('theme', root.dataset.theme); } catch (e) {}
+  });
+</script>
+</body>
+</html>

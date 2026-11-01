@@ -42,6 +42,7 @@ import {
     saveBlocklist,
     saveOverrides,
 } from './lib/moderation.ts';
+import * as Tumblr from './lib/tumblr.ts';
 
 const portArg = process.argv.indexOf('--port');
 const PORT = portArg > -1 ? Number(process.argv[portArg + 1]) : 4322;
@@ -831,8 +832,9 @@ const PUBLISH_STEPS: Record<string, { cmd: string[]; display: string }> = {
     check: { cmd: [BUN, 'run', 'check-data'], display: 'bun run check-data' },
     'add-slugs': { cmd: [BUN, 'run', 'add-slugs'], display: 'bun run add-slugs' },
     build: { cmd: [BUN, 'run', 'build'], display: 'bun run build' },
-    deploy: { cmd: [BUN, 'x', 'wrangler', 'deploy'], display: 'bunx wrangler deploy' },
-    'build+deploy': { cmd: ['sh', '-c', `"${BUN}" run build && "${BUN}" x wrangler deploy`], display: 'bun run build && bunx wrangler deploy' },
+    // indexnow pings search engines with the pages that are new since the last deploy.
+    deploy: { cmd: ['sh', '-c', `"${BUN}" x wrangler deploy && "${BUN}" run indexnow`], display: 'bunx wrangler deploy && bun run indexnow' },
+    'build+deploy': { cmd: ['sh', '-c', `"${BUN}" run build && "${BUN}" x wrangler deploy && "${BUN}" run indexnow`], display: 'bun run build && bunx wrangler deploy && bun run indexnow' },
     push: { cmd: ['git', 'push'], display: 'git push' },
 };
 /** Steps that rewrite the catalog (prepare-data runs add-slugs). */
@@ -1060,6 +1062,7 @@ function rewriteCatalog() {
 const SOCIAL = {
     x: { script: 'x-schedule.ts', snippet: '.x-schedule/snippet.js', post: 'https://x.com/home' },
     linkedin: { script: 'linkedin-schedule.ts', snippet: '.linkedin-schedule/snippet.js', post: 'https://www.linkedin.com/company/84134110/admin/page-posts/published/' },
+    tumblr: { script: 'tumblr-schedule.ts' },
     'tiktok-slides': { script: 'generate-tiktok-slideshow.ts', out: 'tiktok-slides' },
     'tiktok-books': { script: 'generate-tiktok-book-summary.ts', out: 'tiktok-slides/book-summaries' },
 } as const;
@@ -1114,6 +1117,28 @@ function socialArgs(tool: SocialTool, body: Body): string[] {
         if (since) {
             if (!DATE_RE.test(since)) throw new HttpError(400, 'since must be YYYY-MM-DD');
             args.push('--since', since);
+        }
+        if (date && span !== 'month') args.push('--date', date);
+        if (body.random) args.push('--random');
+    } else if (tool === 'tumblr') {
+        if (span === 'day') args.push('--day');
+        else if (span === 'next') args.push('--next', String(intArg(body, 'days', 1, 60) ?? 7));
+        else if (span === 'month') args.push(...monthArgs(body));
+        else throw new HttpError(400, 'span must be day, next or month');
+        for (const k of ['articles', 'quotes', 'books', 'bios', 'quizzes', 'reblogs']) {
+            const n = intArg(body, k, 0, 12);
+            if (n !== null) args.push(`--${k}`, String(n));
+        }
+        for (const k of ['from', 'to']) {
+            const t = str(body[k]);
+            if (!t) continue;
+            if (!TIME_RE.test(t)) throw new HttpError(400, `${k} must be HH:MM`);
+            args.push(`--${k}`, t);
+        }
+        const category = str(body.category);
+        if (category) {
+            if (!data.articles.some((c) => c.category === category)) throw new HttpError(400, `Unknown category ${category}`);
+            args.push('--category', category);
         }
         if (date && span !== 'month') args.push('--date', date);
         if (body.random) args.push('--random');
@@ -1219,6 +1244,104 @@ function openOutput(body: Body) {
     if (!socialOutputs(tool).some((o) => o.name === name)) throw new HttpError(404, 'No such folder');
     Bun.spawn(['open', path.join(ROOT, SOCIAL[tool].out, name)]);
     return { ok: true };
+}
+
+// ─── Tumblr ──────────────────────────────────────────────────────────────────
+// OAuth2 login (Connect → tumblr.com → /api/tumblr/callback), the blog's
+// queue (what tumblr-schedule.ts queued, deletable) and its best posts by notes.
+
+let tumblrOAuthState = '';
+
+function tumblrConnect() {
+    tumblrOAuthState = crypto.randomUUID();
+    return Response.redirect(Tumblr.authorizeUrl(tumblrOAuthState), 302);
+}
+
+async function tumblrCallback(params: URLSearchParams) {
+    const page = (msg: string) =>
+        new Response(`<!doctype html><meta charset="utf-8"><p style="font:16px system-ui;padding:2em">${msg.replace(/</g, '&lt;')}</p><script>setTimeout(()=>location.href='/#social',1500)</script>`, {
+            headers: { 'content-type': 'text/html; charset=utf-8' },
+        });
+    if (params.get('error')) return page(`Tumblr: ${params.get('error_description') || params.get('error')}`);
+    if (!tumblrOAuthState || params.get('state') !== tumblrOAuthState) return page('Login expired or did not start here — click Connect Tumblr again.');
+    tumblrOAuthState = '';
+    await Tumblr.exchangeCode(params.get('code') ?? '');
+    return page('Tumblr connected ✓ — back to the admin panel…');
+}
+
+async function tumblrStatus() {
+    if (!Tumblr.isConnected()) return { connected: false, blog: Tumblr.BLOG, redirectUri: Tumblr.REDIRECT_URI };
+    const [info, followers] = await Promise.all([
+        Tumblr.tumblr('GET', `/blog/${Tumblr.BLOG}/info`),
+        Tumblr.tumblr('GET', `/blog/${Tumblr.BLOG}/followers`, { query: { limit: 1 } }).catch(() => null),
+    ]);
+    const b = info.blog;
+    return { connected: true, blog: Tumblr.BLOG, title: b.title, url: b.url, posts: b.posts, queue: b.queue ?? null, followers: followers?.total_users ?? b.followers ?? null };
+}
+
+/** Text of an NPF post for a one-line preview. */
+const npfSummary = (p: any) => p.summary || (p.content ?? []).filter((c: any) => c.type === 'text').map((c: any) => c.text).join(' ').slice(0, 160);
+const npfImage = (p: any) => [...(p.content ?? []), ...(p.trail ?? []).flatMap((t: any) => t.content ?? [])].find((c: any) => c.type === 'image')?.media?.at(-1)?.url ?? null;
+
+async function tumblrQueue() {
+    const out: any[] = [];
+    for (let offset = 0; offset < 400; offset += 20) {
+        const r = await Tumblr.tumblr('GET', `/blog/${Tumblr.BLOG}/posts/queue`, { query: { limit: 20, offset, npf: true } });
+        out.push(...r.posts);
+        if (r.posts.length < 20) break;
+    }
+    return {
+        posts: out
+            .map((p) => ({
+                id: p.id_string,
+                at: p.scheduled_publish_time ? p.scheduled_publish_time * 1000 : null,
+                reblog: !!p.parent_post_url || !!p.reblogged_from_id || (p.trail ?? []).length > 0,
+                summary: npfSummary(p),
+                image: npfImage(p),
+                tags: p.tags ?? [],
+            }))
+            .sort((a, b) => (a.at ?? 0) - (b.at ?? 0)),
+    };
+}
+
+async function tumblrDelete(body: Body) {
+    const ids = (Array.isArray(body.ids) ? body.ids : [body.id]).map(str).filter((id) => /^\d+$/.test(id));
+    if (!ids.length) throw new HttpError(400, 'No post ids');
+    for (const id of ids) await Tumblr.tumblr('POST', `/blog/${Tumblr.BLOG}/post/delete`, { json: { id } });
+    // Free the slots/items so the scheduler can use them again.
+    const file = path.join(Tumblr.TUMBLR_DIR, 'posted.json');
+    if (fs.existsSync(file)) {
+        const st = JSON.parse(fs.readFileSync(file, 'utf-8'));
+        for (const [key, v] of Object.entries<any>(st.items ?? {})) {
+            if (!ids.includes(v.post)) continue;
+            delete st.items[key];
+            if (st.slots?.[v.at] === key) delete st.slots[v.at];
+        }
+        fs.writeFileSync(file, JSON.stringify(st, null, 2));
+    }
+    return { deleted: ids.length };
+}
+
+/** The blog's recent published posts, most notes first, with where they link. */
+async function tumblrTop() {
+    const posts: any[] = [];
+    for (let offset = 0; offset < 200; offset += 20) {
+        const r = await Tumblr.tumblr('GET', `/blog/${Tumblr.BLOG}/posts`, { query: { limit: 20, offset, npf: true } });
+        posts.push(...r.posts);
+        if (r.posts.length < 20) break;
+    }
+    const site = (u: string | undefined) => (u ? (URL.parse(u)?.hostname ?? '') : '');
+    const top = posts
+        .map((p) => ({ id: p.id_string, url: p.post_url, at: p.timestamp * 1000, notes: p.note_count ?? 0, summary: npfSummary(p), image: npfImage(p), site: site(p.source_url), reblog: (p.trail ?? []).length > 0 }))
+        .sort((a, b) => b.notes - a.notes);
+    const bySite: Record<string, { posts: number; notes: number }> = {};
+    for (const p of top) {
+        const k = p.reblog ? 'reblogs' : p.site || 'other';
+        bySite[k] ??= { posts: 0, notes: 0 };
+        bySite[k].posts++;
+        bySite[k].notes += p.notes;
+    }
+    return { total: top.length, notes: top.reduce((n, p) => n + p.notes, 0), bySite, top: top.slice(0, 15) };
 }
 
 // ─── Generated media ──────────────────────────────────────────────────────────
@@ -2786,6 +2909,8 @@ const POST: Record<string, (body: Body) => unknown | Promise<unknown>> = {
     '/api/social/stop': () => stopJob(socialSlot),
     '/api/social/open': openOutput,
     '/api/social/tiktok-chrome': tiktokPostInChrome,
+    '/api/tumblr/delete': tumblrDelete,
+    '/api/tumblr/disconnect': () => (Tumblr.disconnect(), { ok: true }),
     '/api/media/delete': deleteMedia,
     '/api/sites/run': runSite,
     '/api/sites/stop': () => stopJob(sitesSlot),
@@ -2833,6 +2958,11 @@ const GET: Record<string, (params: URLSearchParams) => unknown | Promise<unknown
     '/api/social/job': socialState,
     '/api/social/snippet': socialSnippet,
     '/api/social/tiktok-prompt': tiktokPrompt,
+    '/api/tumblr/connect': tumblrConnect,
+    '/api/tumblr/callback': tumblrCallback,
+    '/api/tumblr/status': tumblrStatus,
+    '/api/tumblr/queue': tumblrQueue,
+    '/api/tumblr/top': tumblrTop,
     '/api/media': listMedia,
     '/api/dashboard': statsDashboard,
     '/api/sites': sitesOverview,
@@ -2869,7 +2999,10 @@ Bun.serve({
             if (req.method === 'GET' && url.pathname === '/') {
                 return new Response(Bun.file(PAGE), { headers: { 'content-type': 'text/html; charset=utf-8' } });
             }
-            if (req.method === 'GET' && GET[url.pathname]) return json(await GET[url.pathname]!(url.searchParams));
+            if (req.method === 'GET' && GET[url.pathname]) {
+                const out = await GET[url.pathname]!(url.searchParams);
+                return out instanceof Response ? out : json(out);
+            }
             if (req.method === 'POST' && POST[url.pathname]) {
                 const origin = req.headers.get('origin');
                 if (req.headers.get('x-admin') !== '1' || (origin && !HOSTS.has(URL.parse(origin)?.host ?? ''))) {
@@ -2881,6 +3014,7 @@ Bun.serve({
             return new Response('Not found', { status: 404 });
         } catch (err) {
             if (err instanceof HttpError) return json({ error: err.message }, err.status);
+            if (err instanceof Tumblr.TumblrError) return json({ error: err.message }, err.status === 401 ? 401 : 502);
             console.error(err);
             return json({ error: String(err) }, 500);
         }

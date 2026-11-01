@@ -62,3 +62,9 @@ public/pins/
 
 # the old monolithic article file — the catalog (src/data/catalog/) replaced it
 src/data/articles.json
+
+# Tumblr (OAuth token + scheduler state)
+.tumblr/
+
+# IndexNow: URLs already submitted (scripts/indexnow.ts)
+.cache/
