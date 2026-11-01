@@ -1122,10 +1122,13 @@ function socialArgs(tool: SocialTool, body: Body): string[] {
         if (count) args.push('--count', String(count));
         if (span === 'month') {
             args.push(...monthArgs(body));
-            const time = str(body.time);
-            if (time) {
-                if (!TIME_RE.test(time)) throw new HttpError(400, 'time must be HH:MM');
-                args.push('--time', time);
+            const perDay = intArg(body, 'perDay', 1, 3) ?? 1;
+            args.push('--per-day', String(perDay));
+            const times = (Array.isArray(body.times) ? body.times : [body.time]).map(str).filter(Boolean).slice(0, perDay);
+            if (times.length) {
+                if (!times.every((t) => TIME_RE.test(t))) throw new HttpError(400, 'times must be HH:MM');
+                if (times.length !== perDay) throw new HttpError(400, `Give ${perDay} post times`);
+                args.push('--time', times.join(','));
             }
         } else if (date) args.push('--date', date);
         if (body.force) args.push('--force');
@@ -1155,7 +1158,7 @@ function socialOutputs(tool: 'tiktok-slides' | 'tiktok-books') {
         fs.readdirSync(d, { withFileTypes: true }).reduce((n, e) => n + (e.isDirectory() ? pngs(path.join(d, e.name)) : e.name.endsWith('.png') ? 1 : 0), 0);
     return fs
         .readdirSync(dir, { withFileTypes: true })
-        .filter((e) => e.isDirectory() && DATE_RE.test(e.name))
+        .filter((e) => e.isDirectory() && /^\d{4}-\d{2}-\d{2}(-\d)?$/.test(e.name))
         .map((e) => e.name)
         .sort()
         .reverse()
@@ -1170,8 +1173,30 @@ function snippetInfo(tool: 'x' | 'linkedin') {
     return { mtime: st.mtimeMs, size: st.size, post: SOCIAL[tool].post };
 }
 
+const TIKTOK_PROMPT = path.join(ROOT, 'tiktok-slides/upload-prompt.txt');
+
+/** The Claude in Chrome prompt the last `tiktok-slides --month` run wrote. */
+function tiktokPromptInfo() {
+    if (!fs.existsSync(TIKTOK_PROMPT)) return null;
+    const text = fs.readFileSync(TIKTOK_PROMPT, 'utf-8');
+    const posts = [...text.matchAll(/^──────── POST \d+\/\d+ — (\S+) at (\S+)/gm)].map((m) => `${m[1]} ${m[2]}`);
+    return { mtime: fs.statSync(TIKTOK_PROMPT).mtimeMs, posts: posts.length, first: posts[0] ?? null, last: posts.at(-1) ?? null };
+}
+
+function tiktokPrompt() {
+    if (!fs.existsSync(TIKTOK_PROMPT)) throw new HttpError(404, 'No prompt yet — generate a month first');
+    return { text: fs.readFileSync(TIKTOK_PROMPT, 'utf-8') };
+}
+
+/** Opens Terminal running Claude Code with Chrome on the prompt file. */
+function tiktokPostInChrome() {
+    if (!fs.existsSync(TIKTOK_PROMPT)) throw new HttpError(404, 'No prompt yet — generate a month first');
+    return openClaude('Read tiktok-slides/upload-prompt.txt and do exactly what it says, using the Claude in Chrome tools.', ['--chrome'], ROOT);
+}
+
 function socialState(params: URLSearchParams) {
     return {
+        tiktokPrompt: tiktokPromptInfo(),
         job: socialSlot.job ? publicJob(socialSlot.job, Number(params.get('from')) || 0) : null,
         snippets: { x: snippetInfo('x'), linkedin: snippetInfo('linkedin') },
         outputs: { 'tiktok-slides': socialOutputs('tiktok-slides'), 'tiktok-books': socialOutputs('tiktok-books') },
@@ -1238,7 +1263,7 @@ const MEDIA_ROOTS: MediaRoot[] = [
 ];
 const MEDIA_ROOT_DIRS = new Set(MEDIA_ROOTS.map((r) => r.dir));
 /** Bookkeeping the generators need to not repeat themselves — never listed, never deleted. */
-const MEDIA_KEEP = new Set(['history.json', 'used.json', '.DS_Store']);
+const MEDIA_KEEP = new Set(['history.json', 'used.json', 'upload-prompt.txt', '.DS_Store']);
 
 function dirStats(dir: string) {
     let bytes = 0;
@@ -2760,6 +2785,7 @@ const POST: Record<string, (body: Body) => unknown | Promise<unknown>> = {
     '/api/social/run': runSocial,
     '/api/social/stop': () => stopJob(socialSlot),
     '/api/social/open': openOutput,
+    '/api/social/tiktok-chrome': tiktokPostInChrome,
     '/api/media/delete': deleteMedia,
     '/api/sites/run': runSite,
     '/api/sites/stop': () => stopJob(sitesSlot),
@@ -2806,6 +2832,7 @@ const GET: Record<string, (params: URLSearchParams) => unknown | Promise<unknown
     '/api/health': listHealth,
     '/api/social/job': socialState,
     '/api/social/snippet': socialSnippet,
+    '/api/social/tiktok-prompt': tiktokPrompt,
     '/api/media': listMedia,
     '/api/dashboard': statsDashboard,
     '/api/sites': sitesOverview,

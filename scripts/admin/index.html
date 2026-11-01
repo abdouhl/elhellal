@@ -926,7 +926,8 @@ async function renderPublish() {
 const social = jobPoller('soc', '/api/social/job', 'social', async () => { media.data = null; if (state.tab === 'social') renderSocial(); });
 const SOCIAL_TOOLS = { x: 'X (Twitter)', linkedin: 'LinkedIn', 'tiktok-slides': 'TikTok — articles slideshow', 'tiktok-books': 'TikTok — book summary' };
 const nextMonth = () => { const d = new Date(); d.setMonth(d.getMonth() + 1); return d.toISOString().slice(0, 7); };
-const soc = { tool: 'x', span: 'day', month: nextMonth(), days: '', articles: '', quizzes: '', book: true, category: '', since: '', date: '', random: false, dryRun: true, count: '', time: '', force: false, bookSlug: '' };
+const soc = { tool: 'x', span: 'day', month: nextMonth(), days: '', articles: '', quizzes: '', book: true, category: '', since: '', date: '', random: false, dryRun: true, count: '', time: '', force: false, bookSlug: '', perDay: 1, times: ['19:00'] };
+const TIKTOK_TIMES = { 1: ['19:00'], 2: ['13:00', '20:00'], 3: ['10:00', '15:00', '20:00'] };
 
 async function copySnippet(tool) {
   try {
@@ -973,7 +974,10 @@ async function renderSocial() {
     form = [h('div', { class: 'toolbar' },
       field('Generate', spanSel([['day', 'One slideshow'], ['month', 'One per day of a month']])),
       soc.span === 'month' ? field('Month', monthIn) : field('Date', dateIn),
-      soc.span === 'month' ? field('Post time', h('input', { type: 'time', value: soc.time || '19:00', disabled: running, oninput: (e) => { soc.time = e.target.value; } })) : null,
+      soc.span === 'month' ? field('Slideshows / day', h('select', { disabled: running, onchange: (e) => { soc.perDay = Number(e.target.value); soc.times = [...TIKTOK_TIMES[soc.perDay]]; renderSocial(); } },
+        [1, 2, 3].map((n) => h('option', { value: n, selected: soc.perDay === n }, String(n))))) : null,
+      ...(soc.span === 'month' ? soc.times.map((v, i) => field(soc.perDay > 1 ? `Post time #${i + 1}` : 'Post time',
+        h('input', { type: 'time', value: v, disabled: running, oninput: (e) => { soc.times[i] = e.target.value; } }))) : []),
       field('Articles per slideshow', num('count', '5', 12)),
     ), h('div', { class: 'toolbar' }, soc.span === 'month' ? check('force', 'Rebuild days already generated') : null, check('dryRun', 'Dry run'))];
   } else {
@@ -986,7 +990,7 @@ async function renderSocial() {
 
   const run = () => {
     const body = { tool: t, span: soc.span, month: soc.month, days: soc.days, articles: soc.articles, quizzes: soc.quizzes, book: soc.book, category: soc.category,
-      since: soc.since, date: soc.date, random: soc.random, dryRun: soc.dryRun, count: soc.count, time: soc.time, force: soc.force };
+      since: soc.since, date: soc.date, random: soc.random, dryRun: soc.dryRun, count: soc.count, time: soc.time, force: soc.force, perDay: soc.perDay, times: soc.times };
     if (t === 'tiktok-books') body.book = soc.bookSlug;
     social.start('/api/social/run', body);
   };
@@ -1013,6 +1017,15 @@ async function renderSocial() {
         h('a', { class: 'link', href: snip.post, target: '_blank', rel: 'noreferrer' }, `Open ${SOCIAL_TOOLS[t]} ↗`),
         h('span', { class: 'meta' }, 'then DevTools console (⌘⌥J) → paste, keep the tab in front until it logs "done".'))
       : h('div', { class: 'meta' }, 'No snippet yet.')) : '',
+    t === 'tiktok-slides' ? (() => {
+      const p = info.tiktokPrompt;
+      return h('div', { class: 'card', style: 'margin-top:10px' }, p ? h('div', { class: 'toolbar' },
+        h('strong', {}, 'Claude in Chrome upload'), h('span', { class: 'meta' }, `${p.posts} posts · ${p.first} → ${p.last} · written ${new Date(p.mtime).toLocaleString()}`),
+        h('button', { class: 'btn primary', disabled: running, onclick: () => act(() => api('/api/social/tiktok-chrome', {}), 'Opened Claude Code with Chrome in Terminal') }, 'Post in Chrome (Terminal)'),
+        h('button', { class: 'btn', onclick: () => act(async () => navigator.clipboard.writeText((await api('/api/social/tiktok-prompt')).text), 'Prompt copied') }, 'Copy prompt'),
+        h('span', { class: 'meta' }, 'Uploads each post\'s JPEGs, fills the caption, adds the first suggested sound and schedules it in TikTok Studio (30 days ahead max).'))
+        : h('div', { class: 'meta' }, 'Generate a month (not a dry run) to get the Claude in Chrome upload prompt.'));
+    })() : '',
     outputs ? h('div', { style: 'margin-top:10px' }, h('h2', {}, 'Recent output folders'),
       outputs.length ? h('div', { class: 'list' }, h('table', {}, outputs.map((o) => h('tr', {},
         h('td', {}, o.name), h('td', { class: 'num' }, `${o.images} images`),

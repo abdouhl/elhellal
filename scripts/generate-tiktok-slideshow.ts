@@ -18,12 +18,20 @@
  *   bun run tiktok-slides --month 10 2026            one slideshow per day of
  *                                                    that month (past days skipped)
  *   bun run tiktok-slides --month 10 2026 --time 19:00   time shown in the checklist
+ *   bun run tiktok-slides --month 10 2026 --per-day 3 --time 10:00,15:00,20:00
+ *                                                    2–3 slideshows a day, one time each
  *
  * --month renders tiktok-slides/<date>/ for every remaining day of that month,
  * then prints a checklist (date, post time, folder) to work through by hand in
  * TikTok Studio: Upload > Photos, add the PNGs in order, paste caption.txt,
  * Schedule. Days whose folder already has a manifest.json are reused, not
- * re-rendered (--force to rebuild them).
+ * re-rendered (--force to rebuild them). With --per-day 2/3 the extra
+ * slideshows of a day go to tiktok-slides/<date>-2/, <date>-3/.
+ *
+ * Every --month run also writes tiktok-slides/upload-prompt.txt: instructions
+ * for Claude Code + Claude in Chrome (`claude --chrome`) to upload each post's
+ * JPEGs (<folder>/upload/, small enough for the extension's file_upload), fill
+ * the caption, add the first suggested sound and schedule it in TikTok Studio.
  *
  * Selection: the --count newest articles (across all categories) that
  * haven't appeared in a previous run are picked, so a "daily series" run
@@ -68,7 +76,11 @@ const DRY_RUN = args.includes('--dry-run');
 const RESET_HISTORY = args.includes('--reset-history');
 const DATE_OVERRIDE = getArg('--date'); // YYYY-MM-DD
 const FORCE = args.includes('--force');
-const POST_TIME = getArg('--time') || '19:00'; // planned local post time for --month
+const PER_DAY = parseInt(getArg('--per-day') || '1', 10); // slideshows per day for --month
+// Default post times, spread over the day, for 1–3 slideshows a day.
+const DEFAULT_TIMES: Record<number, string[]> = { 1: ['19:00'], 2: ['13:00', '20:00'], 3: ['10:00', '15:00', '20:00'] };
+// Planned local post time(s) for --month: one per slideshow of a day, comma-separated.
+const POST_TIMES = (getArg('--time') || '').split(',').map((t) => t.trim()).filter(Boolean);
 // `--month 10 2026` → every day of that calendar month.
 const MONTH = (() => {
   const i = args.indexOf('--month');
@@ -102,10 +114,20 @@ if (!Number.isFinite(COUNT) || COUNT < 1 || COUNT > 12) {
   console.error('❌  --count must be a number between 1 and 12.');
   process.exit(1);
 }
-if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(POST_TIME)) {
-  console.error('❌  --time must be HH:MM (24h), e.g. 19:00');
+if (!Number.isInteger(PER_DAY) || PER_DAY < 1 || PER_DAY > 3) {
+  console.error('❌  --per-day must be 1, 2 or 3.');
   process.exit(1);
 }
+if (!POST_TIMES.every((t) => /^([01]\d|2[0-3]):[0-5]\d$/.test(t))) {
+  console.error('❌  --time must be HH:MM (24h), e.g. 19:00 — or one per slideshow: 13:00,20:00');
+  process.exit(1);
+}
+if (POST_TIMES.length && POST_TIMES.length !== PER_DAY) {
+  console.error(`❌  --time lists ${POST_TIMES.length} times but --per-day is ${PER_DAY}.`);
+  process.exit(1);
+}
+/** Post time of the n-th (0-based) slideshow of a day; defaults when no --time is given. */
+const postTime = (n: number) => (POST_TIMES.length ? POST_TIMES[n]! : DEFAULT_TIMES[PER_DAY]![n]!);
 
 // ─── Slide geometry — TikTok photo-post spec ───────────────────────────────
 const W = 1080;
@@ -426,6 +448,10 @@ interface DayResult {
   date: string;
   dir: string;
   slides: string[]; // absolute paths, upload order
+  /** JPEG copies of the slides (<dir>/upload/01.jpg…), what Claude in Chrome uploads. */
+  upload: string[];
+  /** Planned post time (HH:MM), set by --month. */
+  time?: string;
   caption: string;
   articles: { slug: string | undefined; title: string; category: string }[];
 }
@@ -433,8 +459,8 @@ interface DayResult {
 type Browser = Awaited<ReturnType<typeof puppeteer.launch>>;
 
 /** Renders one day's slideshow into tiktok-slides/<dateKey>/ and returns what was written. */
-async function renderDay(browser: Browser, featured: FeaturedArticle[], now: Date, dateKey: string): Promise<DayResult> {
-  const outDir = path.join(OUT_ROOT, dateKey);
+async function renderDay(browser: Browser, featured: FeaturedArticle[], now: Date, dateKey: string, folder = dateKey): Promise<DayResult> {
+  const outDir = path.join(OUT_ROOT, folder);
   fs.mkdirSync(outDir, { recursive: true });
 
   process.stdout.write('🖼  Fetching cover images… ');
@@ -459,6 +485,10 @@ async function renderDay(browser: Browser, featured: FeaturedArticle[], now: Dat
     // image even on a correctly-rendered page (a Puppeteer/Chromium quirk), while a plain
     // screenshot at a viewport already sized exactly to W×H captures correctly with no crop needed.
     await page.screenshot({ path: path.join(outDir, filename) as `${string}.png` });
+    // Same frame as a JPEG (~300 KB instead of ~1 MB): the Chrome extension's file_upload
+    // drops the connection on large payloads.
+    fs.mkdirSync(path.join(outDir, 'upload'), { recursive: true });
+    await page.screenshot({ path: path.join(outDir, 'upload', `${pad2(slideFiles.length + 1)}.jpg`) as `${string}.jpg`, type: 'jpeg', quality: 88 });
     console.log(`   🖼  ${filename}`);
   }
 
@@ -494,18 +524,28 @@ async function renderDay(browser: Browser, featured: FeaturedArticle[], now: Dat
   fs.writeFileSync(path.join(outDir, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf-8');
 
   console.log(`\n✅  ${dateKey} — ${slideFiles.length} slides in ${path.relative(process.cwd(), outDir)}/`);
-  return { date: dateKey, dir: outDir, slides: slideFiles.map((f) => path.join(outDir, f)), caption, articles };
+  return { date: dateKey, dir: outDir, slides: slideFiles.map((f) => path.join(outDir, f)), upload: uploadPaths(outDir, slideFiles.length), caption, articles };
+}
+
+const uploadPaths = (dir: string, n: number) => Array.from({ length: n }, (_, i) => path.join(dir, 'upload', `${pad2(i + 1)}.jpg`));
+
+/** JPEG copies for days rendered before upload/ existed (macOS `sips`). */
+function ensureUploadJpegs(day: DayResult): boolean {
+  if (day.upload.every((f) => fs.existsSync(f))) return true;
+  fs.mkdirSync(path.join(day.dir, 'upload'), { recursive: true });
+  return day.slides.every((png, i) =>
+    spawnSync('sips', ['-s', 'format', 'jpeg', '-s', 'formatOptions', '88', png, '--out', day.upload[i]], { stdio: 'ignore' }).status === 0);
 }
 
 /** Reads back a day that was already rendered on a previous run. */
-function loadExistingDay(dateKey: string): DayResult | null {
-  const dir = path.join(OUT_ROOT, dateKey);
+function loadExistingDay(dateKey: string, folder = dateKey): DayResult | null {
+  const dir = path.join(OUT_ROOT, folder);
   try {
     const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf-8'));
     const caption = fs.readFileSync(path.join(dir, 'caption.txt'), 'utf-8');
     const slides: string[] = manifest.slides.map((f: string) => path.join(dir, f));
     if (!slides.every((f) => fs.existsSync(f))) return null;
-    return { date: dateKey, dir, slides, caption, articles: manifest.articles };
+    return { date: manifest.date ?? dateKey, dir, slides, upload: uploadPaths(dir, slides.length), caption, articles: manifest.articles };
   } catch {
     return null;
   }
@@ -604,38 +644,40 @@ async function runMonth({ m, y }: { m: number; y: number }) {
   const all = loadCandidateArticles();
   const history = loadHistory();
 
-  console.log(`\n🗓  TikTok slideshows for ${y}-${pad2(m)} — ${dates.length} day(s), ${COUNT} articles each\n`);
+  const slots = dates.flatMap((date) => Array.from({ length: PER_DAY }, (_, n) => ({ date, n, folder: n ? `${date}-${n + 1}` : date })));
+  console.log(`\n🗓  TikTok slideshows for ${y}-${pad2(m)} — ${dates.length} day(s) × ${PER_DAY}, ${COUNT} articles each\n`);
 
   let browser: Browser | null = null;
   const results: DayResult[] = [];
-  for (const dateKey of dates) {
-    const existing = FORCE ? null : loadExistingDay(dateKey);
+  for (const { date, n, folder } of slots) {
+    const label = PER_DAY > 1 ? `${date} #${n + 1}` : date;
+    const existing = FORCE ? null : loadExistingDay(date, folder);
     if (existing) {
       // Keep its articles out of later days' picks even after a --reset-history.
       existing.articles.forEach((a) => a.slug && history.add(a.slug));
-      console.log(`⏭  ${dateKey} already generated — reusing (pass --force to rebuild)`);
-      results.push(existing);
+      console.log(`⏭  ${label} already generated — reusing (pass --force to rebuild)`);
+      results.push({ ...existing, time: postTime(n) });
       continue;
     }
 
     const featured = pickFeatured(all, history, COUNT);
     if (featured.length === 0) {
-      console.error(`❌  No articles left for ${dateKey}.`);
+      console.error(`❌  No articles left for ${label}.`);
       break;
     }
-    // Picks are claimed immediately so the next day in this run never repeats them.
+    // Picks are claimed immediately so the next slideshow in this run never repeats them.
     featured.forEach(({ article }) => history.add(article.slug!));
 
     if (DRY_RUN) {
-      console.log(`📅  ${dateKey}`);
+      console.log(`📅  ${label} ${postTime(n)}`);
       featured.forEach(({ article }, i) => console.log(`     ${i + 1}. ${article.title}`));
       continue;
     }
 
-    console.log(`\n🎬  ${dateKey}`);
+    console.log(`\n🎬  ${label}`);
     browser ??= await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security', '--disable-dev-shm-usage'] });
-    results.push(await renderDay(browser, featured, new Date(`${dateKey}T12:00:00Z`), dateKey));
-    // Persist after every day so an interrupted run never re-features what it already rendered.
+    results.push({ ...(await renderDay(browser, featured, new Date(`${date}T12:00:00Z`), date, folder)), time: postTime(n) });
+    // Persist after every slideshow so an interrupted run never re-features what it already rendered.
     fs.writeFileSync(HISTORY_FILE, JSON.stringify([...history], null, 2), 'utf-8');
   }
   await browser?.close();
@@ -645,12 +687,57 @@ async function runMonth({ m, y }: { m: number; y: number }) {
     return;
   }
 
+  const ready = results.filter((r) => ensureUploadJpegs(r) || (console.warn(`⚠️  ${r.dir}: could not make upload JPEGs — left out of the prompt`), false));
+  fs.writeFileSync(PROMPT_FILE, buildUploadPrompt(ready), 'utf-8');
+
   console.log(`\n✅  ${results.length} slideshow(s) ready — post each one in TikTok Studio (Upload > Photos):\n`);
   for (const r of results) {
-    console.log(`   ☐  ${r.date} ${POST_TIME}   ${path.relative(process.cwd(), r.dir)}/   (${r.slides.length} slides + caption.txt)`);
+    console.log(`   ☐  ${r.date} ${r.time}   ${path.relative(process.cwd(), r.dir)}/   (${r.slides.length} slides + caption.txt)`);
   }
-  console.log('');
-  await walkCaptions(results);
+  console.log(`\n🤖  Claude in Chrome prompt: ${path.relative(process.cwd(), PROMPT_FILE)}`);
+  console.log(`    Run it with:  claude --chrome "Read ${path.relative(process.cwd(), PROMPT_FILE)} and do exactly what it says."\n`);
+  if (process.stdin.isTTY) await walkCaptions(results);
+}
+
+const PROMPT_FILE = path.join(OUT_ROOT, 'upload-prompt.txt');
+
+/** Instructions for Claude Code driving TikTok Studio through the Claude in Chrome extension. */
+function buildUploadPrompt(posts: DayResult[]): string {
+  const block = (r: DayResult, i: number) => {
+    const { title, description } = splitCaption(r.caption);
+    const hashtags = r.caption.split('\n').filter((l) => l.trim().startsWith('#')).join(' ');
+    return `
+──────── POST ${i + 1}/${posts.length} — ${r.date} at ${r.time} ────────
+Folder: ${r.dir}
+Photos (${r.upload.length}, upload in this order):
+${r.upload.map((f) => `  ${f}`).join('\n')}
+
+Title:
+${title}
+
+Description:
+${description}
+
+${hashtags}
+`;
+  };
+  return `Upload and schedule ${posts.length} TikTok photo slideshows (Arabic reading lists from elhellal.com) in TikTok Studio, using the Claude in Chrome tools in my browser (I'm already logged in).
+
+How to do each post, one at a time, in the order listed:
+1. Open https://www.tiktok.com/tiktokstudio/upload?tab=photo (a fresh tab or reload for every post).
+2. Upload the post's photos with the file_upload tool into the page's photo <input type=file> — never click "Select photos", it opens a native picker you can't control. Upload 2–4 files per call (the extension disconnects on more than ~1.2 MB in one call), in the listed order.
+3. Count the photos in the editor ([class^=photoItem-]). A call that reports "never delivered" may still have delivered its files — re-count before retrying so nothing is uploaded twice. Remove duplicates; the count must equal the number listed.
+4. Title field: the Title text exactly. Description (the contenteditable editor): the Description text followed by the hashtag line, exactly as written (Arabic, keep emojis and line breaks) — insert it with a ClipboardEvent('paste') carrying the text, then check it shows correctly.
+5. Sound: click "Add sound" (or the music/Sounds button of the photo editor), and in the list that opens pick the FIRST sound shown (top of the recommended/"For you" list) — click it, then "Use"/"Add"/"Save" to apply it. Check the editor now shows that sound's name. If no sound panel exists, stop and tell me.
+6. Schedule: turn on "Schedule" and set the date and time given in the post header (my local time zone), then click Schedule and wait for the confirmation. Never click "Post" without scheduling.
+
+Rules:
+- First open https://www.tiktok.com/tiktokstudio/content (scheduled posts) and skip posts already scheduled for the same date and time with the same title.
+- TikTok only schedules up to 30 days ahead (to the minute): when a post is further out than that, stop there and tell me which date to come back on.
+- Never publish anything immediately — every post must be scheduled.
+- If an upload, the sound or a field fails twice, stop and tell me which post and what happened.
+- At the end, give me a table: date, time, photos, sound used, status.
+${posts.map(block).join('')}`;
 }
 
 async function main() {
