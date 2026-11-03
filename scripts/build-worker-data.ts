@@ -43,6 +43,7 @@ import {
     listingKey,
     listingName,
     listingShardOf,
+    isThinListing,
     type AuthorRecord,
     type ListingRecord,
     type ListingShard,
@@ -245,6 +246,7 @@ function buildArticleShards(categoryTitles: Record<string, string>, sisters: Ret
                 whyThisMatters: a.whyThisMatters,
                 whoShouldRead: a.whoShouldRead,
                 metaDescription: a.metaDescription,
+                ...(a.faq?.length ? { faq: a.faq.map((f): [string, string] => [f.q, f.a]) } : {}),
                 minutes: a.minutes,
                 category: cat.category,
                 categoryTitle: categoryTitles[cat.category]!,
@@ -479,8 +481,10 @@ function main() {
         .sort((a, b) => b.created_at.localeCompare(a.created_at) || a.slug.localeCompare(b.slug))
         .map((r) => ({ path: `/articles/${encodeURIComponent(r.slug)}/`, lastmod: r.created_at }));
     // lastmod: the newest article in the listing, i.e. when the page last changed.
+    // Thin listings are noindex (isThinListing), so they're left out here too.
     const listingPaths = listings.listings
         .flatMap((shard) => Object.values(shard))
+        .filter((r) => !isThinListing(r))
         .map((r) => ({
             path: `/${r.kind === 'tag' ? 'tags' : 'authors'}/${encodeURIComponent(listingName(r))}/`,
             lastmod: r.cards[0]?.date,

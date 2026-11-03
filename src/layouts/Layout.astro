@@ -36,6 +36,8 @@ export interface Props {
     showSearch?: boolean;
     searchPlaceholder?: string;
     noindex?: boolean;
+    /** Robots meta verbatim (e.g. a "{{robots}}" shell token); overrides noindex. */
+    robots?: string;
     twitterCreator?: string;
 }
 
@@ -60,8 +62,12 @@ const {
     showSearch = false,
     searchPlaceholder = "ابحث بالعنوان أو التصنيف أو الكاتب...",
     noindex = false,
+    robots,
     twitterCreator = "@abdou_hll",
 } = Astro.props;
+
+// Microsoft Clarity project id (clarity.microsoft.com → project → Settings).
+const CLARITY_ID: string = import.meta.env.PUBLIC_CLARITY_ID ?? "";
 ---
 
 <!doctype html>
@@ -140,12 +146,12 @@ const {
         <title>
             {
                 pageTitle
-                    ? `${pageTitle} | الهلال`
+                    ? pageTitle.endsWith("الهلال") ? pageTitle : `${pageTitle} | الهلال`
                     : `${site} — دليل منتقى لأفضل المقالات العربية على الإنترنت`
             }
         </title>
         <meta name="author" content="@abdou_hll" />
-        {noindex && <meta name="robots" content="noindex, follow" />}
+        {robots ? <meta name="robots" content={robots} /> : noindex && <meta name="robots" content="noindex, follow" />}
         <meta
             name="description"
             content={pageDescription ||
@@ -198,6 +204,29 @@ const {
 
             gtag("config", "G-MLVB12BM2C");
         </script>
+
+        <!-- Microsoft Clarity (heatmaps, session replays; links to Bing Webmaster
+             Tools). Main thread, since it records the DOM, but only once the page
+             has loaded and gone idle. Off until PUBLIC_CLARITY_ID is set at build. -->
+        {CLARITY_ID && (
+            <script is:inline define:vars={{ clarityId: CLARITY_ID }}>
+                (function () {
+                    function start() {
+                        (function (c, l, a, r, i, t, y) {
+                            c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments); };
+                            t = l.createElement(r); t.async = 1; t.src = "https://www.clarity.ms/tag/" + i;
+                            y = l.getElementsByTagName(r)[0]; y.parentNode.insertBefore(t, y);
+                        })(window, document, "clarity", "script", clarityId);
+                    }
+                    function idle() {
+                        if (window.requestIdleCallback) window.requestIdleCallback(start, { timeout: 4000 });
+                        else setTimeout(start, 2000);
+                    }
+                    if (document.readyState === "complete") idle();
+                    else addEventListener("load", idle, { once: true });
+                })();
+            </script>
+        )}
 
         <!-- Ad loader. AdSense runs on the main thread (ad rendering needs direct DOM
              access, so it can't go through Partytown), so it stays out of the way of

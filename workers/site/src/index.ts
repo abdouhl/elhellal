@@ -99,6 +99,20 @@ async function renderListing(request: Request, env: Env, kind: ListingKind, name
 export default {
     async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
         const url = new URL(request.url);
+        // Search-engine verification files (listed in wrangler.jsonc
+        // run_worker_first): the asset layer 307s `x.html` → `x`, and some
+        // verifiers (Petal) don't follow redirects. Serve the file as-is.
+        if (url.pathname.endsWith('.html') && !url.pathname.slice(1).includes('/')) {
+            const asset = await env.ASSETS.fetch(
+                new Request(new URL(url.pathname.slice(0, -5), url), request)
+            );
+            if (asset.ok) {
+                return new Response(request.method === 'HEAD' ? null : asset.body, {
+                    headers: { 'content-type': 'text/html; charset=utf-8' },
+                });
+            }
+            return asset;
+        }
         const match = url.pathname.match(PAGE_PATH);
         if (!match || (request.method !== 'GET' && request.method !== 'HEAD')) {
             return env.ASSETS.fetch(request);

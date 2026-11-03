@@ -21,6 +21,10 @@
 			"/articles/*",
 			"/tags/*",
 			"/authors/*",
+			// Verification files must answer 200 at their .html URL.
+			"/5cd5bae248.html",
+			"/google2cc97a95918ebdaf.html",
+			"/yandex_a71f06905e56b495.html",
 			"!/tags/",
 			"!/authors/"
 		]

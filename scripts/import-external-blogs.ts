@@ -267,6 +267,8 @@ function stripHtml(html: string): string {
         .replace(/&quot;/g, '"')
         .replace(/&apos;|&#39;/g, "'")
         .replace(/&nbsp;/g, ' ')
+        // Feeds that double-encode (Blogger) only now show their tags.
+        .replace(/<\/?[a-zA-Z][^>]*>/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
 }

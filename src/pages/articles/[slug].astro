@@ -79,6 +79,7 @@ interface ArticleView {
   tldr?: string | undefined;
   whyThisMatters?: string | undefined;
   whoItems: Array<{ text: string }>;
+  faqItems: Array<{ q: string; a: string }>;
   hasCore: boolean;
   keywords: Array<{ label: string; href: string }>;
   xShareUrl: string;
@@ -128,6 +129,7 @@ if (isShell) {
     tldr: T("tldr"),
     whyThisMatters: T("whyThisMatters"),
     whoItems: [{ text: T(".text") }],
+    faqItems: [{ q: T(".q"), a: T(".a") }],
     hasCore: true,
     keywords: [{ label: T(".label"), href: T(".href") }],
     xShareUrl: T("xShareUrl"),
@@ -185,6 +187,7 @@ if (isShell) {
         authorSubLabel: person.tagline,
         isSubstack: false,
         whoItems: [],
+        faqItems: [],
         hasCore: false,
         keywords: [],
         xShareUrl: `https://x.com/intent/post?text=${encodedShareText}&url=${encodedCanonicalUrl}`,
@@ -252,6 +255,7 @@ import InstallCard from "../../components/InstallCard.astro";
     <Fragment>
       <script type="application/ld+json" set:html="{{{articleLd}}}" />
       <script type="application/ld+json" set:html="{{{breadcrumbLd}}}" />
+      <Fragment set:html={`${open("faqLd")}<script type="application/ld+json">{{{faqLd}}}</script>${close("faqLd")}`} />
     </Fragment>
   ) : (
     <Fragment>
@@ -461,6 +465,24 @@ import InstallCard from "../../components/InstallCard.astro";
                   </ul>
                 </div>
                 <Fragment set:html={close("whoItems")} />
+
+                <Fragment set:html={open("faqItems")} />
+                {(isShell || v.faqItems.length > 0) && (
+                  <div class="core-section core-faq">
+                    <h2 class="core-label">
+                      <span class="core-emoji">❓</span> أسئلة شائعة
+                    </h2>
+                    <Fragment set:html={eachOpen("faqItems")} />
+                    {v.faqItems.map((item) => (
+                      <details class="faq-item">
+                        <summary>{item.q}</summary>
+                        <p class="core-body">{item.a}</p>
+                      </details>
+                    ))}
+                    <Fragment set:html={eachClose("faqItems")} />
+                  </div>
+                )}
+                <Fragment set:html={close("faqItems")} />
 
               </div>
               <Fragment set:html={close("hasCore")} />
@@ -968,6 +990,18 @@ import InstallCard from "../../components/InstallCard.astro";
       font-size: var(--desktop-body-sm);
       line-height: 1.7;
       color: #d0d0d0;
+    }
+    .faq-item {
+      border-top: 0.5px solid var(--border-muted);
+      padding: var(--spacing-03) 0;
+    }
+    .faq-item summary {
+      cursor: pointer;
+      font-weight: 600;
+      line-height: 1.7;
+    }
+    .faq-item .core-body {
+      margin-top: var(--spacing-02);
     }
     .core-list {
       margin: 0;

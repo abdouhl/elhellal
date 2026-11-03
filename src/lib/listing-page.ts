@@ -27,6 +27,17 @@ export const LISTING_SHARDS = 2048;
 /** Cards server-rendered on a listing page (and stored in its record). */
 export const LISTING_INITIAL = 30;
 
+/**
+ * Listings with fewer articles than this are thin: the page says noindex and
+ * stays out of the sitemaps and IndexNow, so crawlers spend their budget on
+ * articles (Bing's budget especially is small next to 33k articles).
+ */
+export const MIN_INDEXED_LISTING = 3;
+
+export function isThinListing(r: Pick<ListingRecord, 'total'>): boolean {
+    return r.total < MIN_INDEXED_LISTING;
+}
+
 /** Explore tiles stored per record. */
 export const LISTING_TILES = 30;
 
@@ -151,6 +162,7 @@ function itemListLd(r: ListingRecord, listName: string) {
 export function listingTemplateData(r: ListingRecord): TemplateData {
     const common = {
         total: r.total,
+        robots: isThinListing(r) ? 'noindex, follow' : 'index, follow',
         tiles: r.tiles.map((tile, i) => ({ ...tile, ...tileLoading(i) })),
         manyTiles: r.tiles.length > 2,
     };
@@ -169,6 +181,7 @@ export function listingTemplateData(r: ListingRecord): TemplateData {
         return {
             ...common,
             label: r.label,
+            metaDescription: tagDescription(r),
             articlesPhrase: articlesPhrase(r.total),
             writersPhrase: writersPhrase(r.writerCount ?? 0),
             latestDateAr: r.latestDateAr,
@@ -194,6 +207,7 @@ export function listingTemplateData(r: ListingRecord): TemplateData {
     return {
         ...common,
         authorLabel,
+        metaDescription: authorDescription(authorLabel, r.total, r.topCategories.map(([label]) => label), r.latestDateAr),
         nameDir: r.displayName ? 'rtl' : 'ltr',
         canonicalUrl,
         avatar,
@@ -218,6 +232,50 @@ export function listingTemplateData(r: ListingRecord): TemplateData {
             ])
         ),
     };
+}
+
+/** "أ، ب و ج" */
+function joinAr(items: string[]): string {
+    if (items.length <= 1) return items[0] ?? '';
+    return `${items.slice(0, -1).join('، ')} و${items[items.length - 1]}`;
+}
+
+/** Cuts a meta description to `max` characters at a word boundary. */
+export function clampDescription(text: string, max = 160): string {
+    if (text.length <= max) return text;
+    const cut = text.slice(0, max - 1);
+    const space = cut.lastIndexOf(' ');
+    return `${(space > max * 0.6 ? cut.slice(0, space) : cut).replace(/[،,.:\s]+$/, '')}…`;
+}
+
+/** "مقالة عربية منتقاة" / "مقالتان عربيتان منتقاتان" / "7 مقالات عربية منتقاة" / "25 مقالة عربية منتقاة" */
+function curatedPhrase(count: number): string {
+    if (count === 1) return 'مقالة عربية منتقاة';
+    if (count === 2) return 'مقالتان عربيتان منتقاتان';
+    return count <= 10 ? `${count} مقالات عربية منتقاة` : `${count} مقالة عربية منتقاة`;
+}
+
+function tagDescription(r: TagRecord): string {
+    const cats = (r.categories ?? []).map(([, title]) => title);
+    const parts = [
+        `مقالات عن «${r.label}»: ${curatedPhrase(r.total)}`,
+        r.writerCount ? ` ${writersPhrase(r.writerCount)}` : '',
+        cats.length ? ` في ${joinAr(cats)}` : '',
+        r.latestDateAr ? `، آخرها في ${r.latestDateAr}` : '',
+        '. اقرأ ملخص كل مقالة ورابطها الأصلي على الهلال.',
+    ];
+    return clampDescription(parts.join(''));
+}
+
+/** Also used by the prerendered personal-blog author pages. */
+export function authorDescription(name: string, total: number, categories: string[], latestDateAr?: string): string {
+    const parts = [
+        `${name}: ${curatedPhrase(total)}`,
+        categories.length ? ` عن ${joinAr(categories.slice(0, 3))}` : '',
+        latestDateAr ? `، آخرها في ${latestDateAr}` : '',
+        '. تصفّح المقالات مع ملخص كل منها ورابطها الأصلي على الهلال.',
+    ];
+    return clampDescription(parts.join(''));
 }
 
 /** "مقالة واحدة" / "مقالتين" / "7 مقالات" / "25 مقالة" */

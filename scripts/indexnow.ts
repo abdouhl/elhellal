@@ -17,6 +17,12 @@
  * are sent (none, without <lastmod>) and the rest are just recorded, so nothing
  * re-submits a whole site.
  *
+ * URLs go out in priority order (articles newest first, then categories and
+ * other pages, then tags, then authors) and at most PER_RUN per host; the rest
+ * stay pending for the next run, so a big backlog never spends the day's quota
+ * on author pages before articles. Thin tag/author pages aren't in the
+ * sitemaps at all (isThinListing in src/lib/listing-page.ts).
+ *
  *   bun run indexnow                   submit, every site
  *   bun run indexnow --only quiz       just quiz.elhellal.com (a host or its first label)
  *   bun run indexnow --dry-run         list what would be sent
@@ -33,6 +39,8 @@ const ENDPOINT = 'https://api.indexnow.org/indexnow';
 /** The protocol's limit per POST. */
 const BATCH = 10_000;
 const FIRST_RUN_DAYS = 7;
+/** Bing's daily IndexNow allowance per host is around 10k URLs. */
+const PER_RUN = 10_000;
 const MAIN = 'https://elhellal.com';
 const SUBDOMAINS = ['quotes', 'books', 'biographies', 'quiz', 'abderahmane'].map((s) => `https://${s}.elhellal.com`);
 
@@ -100,6 +108,20 @@ const hostOf = (u: string) => {
     }
 };
 
+/** Lower goes first: articles, then everything else, then tags, then authors. */
+function rank(url: string): number {
+    const p = new URL(url).pathname;
+    if (p.startsWith('/articles/')) return 0;
+    if (p.startsWith('/tags/')) return 2;
+    if (p.startsWith('/authors/')) return 3;
+    return 1;
+}
+
+function byPriority(lastmods: State) {
+    return (a: string, b: string) =>
+        rank(a) - rank(b) || (lastmods[b] ?? '').localeCompare(lastmods[a] ?? '') || (a < b ? -1 : a > b ? 1 : 0);
+}
+
 async function submit(site: string, key: string, urlList: string[]) {
     const res = await fetch(ENDPOINT, {
         method: 'POST',
@@ -132,6 +154,16 @@ async function runSite(site: string, key: string, state: State): Promise<State |
         console.log(`${host}: nothing new`);
         return current;
     }
+    toSend.sort(byPriority(current));
+    // Past the per-run cap: keep their old state so they count as new next run.
+    const deferred = toSend.slice(PER_RUN);
+    toSend = toSend.slice(0, PER_RUN);
+    const next: State = { ...current };
+    for (const u of deferred) {
+        if (u in previous) next[u] = previous[u]!;
+        else delete next[u];
+    }
+    if (deferred.length) console.log(`${host}: ${deferred.length} lower-priority URLs deferred to the next run`);
     if (dryRun) {
         console.log(`${host} (dry run): would send ${toSend.length} URLs`);
         for (const u of toSend.slice(0, 20)) console.log(`  ${decodeURI(u)}`);
@@ -149,7 +181,7 @@ async function runSite(site: string, key: string, state: State): Promise<State |
         const status = await submit(site, key, batch);
         console.log(`${host}: sent ${batch.length} URLs (HTTP ${status})`);
     }
-    return current;
+    return next;
 }
 
 async function main() {

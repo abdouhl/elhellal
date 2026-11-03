@@ -11,7 +11,7 @@ import { getPersonalAuthors, type AuthorArticle } from "../../utils/authors";
 import { categoryTiles, type ExploreTile } from "../../utils/exploreTiles";
 import { getCategoryTitles } from "../../lib/feed-data";
 import { toFeedCard, type FeedCard } from "../../lib/feed";
-import { LISTING_SHELL_SLUG } from "../../lib/listing-page";
+import { LISTING_SHELL_SLUG, authorDescription } from "../../lib/listing-page";
 import { shellMarkers } from "../../lib/shell-template";
 
 // This page renders in two modes:
@@ -45,6 +45,8 @@ const { open, close, eachOpen, eachClose } = shellMarkers(isShell);
 interface AuthorView {
   authorLabel: string;
   canonicalUrl: string;
+  metaDescription: string;
+  robots?: string | undefined;
   nameDir: string;
   total: number | string;
   latestDate?: string | undefined;
@@ -69,6 +71,8 @@ if (isShell) {
   v = {
     authorLabel: "{{authorLabel}}",
     canonicalUrl: "{{canonicalUrl}}",
+    metaDescription: "{{metaDescription}}",
+    robots: "{{robots}}",
     nameDir: "{{nameDir}}",
     total: "{{total}}",
     latestDate: "{{latestDateAr}}",
@@ -104,18 +108,18 @@ if (isShell) {
     categoryCounts.set(label, (categoryCounts.get(label) || 0) + 1);
   });
 
+  const topCategories = [...categoryCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const latestDate = sorted[0]
+    ? new Date(sorted[0].created_at).toLocaleDateString("ar", { year: "numeric", month: "long", day: "numeric" })
+    : undefined;
   v = {
     authorLabel: displayName || `@${screen_name}`,
+    metaDescription: authorDescription(displayName || `@${screen_name}`, sorted.length, topCategories.map(([label]) => label), latestDate),
     canonicalUrl: `https://elhellal.com/authors/${encodeURIComponent(screen_name)}/`,
     nameDir: displayName ? "rtl" : "ltr",
     total: sorted.length,
-    latestDate: sorted[0]
-      ? new Date(sorted[0].created_at).toLocaleDateString("ar", { year: "numeric", month: "long", day: "numeric" })
-      : undefined,
-    topCategories: [...categoryCounts.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([label, count]) => ({ label, count })),
+    latestDate,
+    topCategories: topCategories.map(([label, count]) => ({ label, count })),
     tiles: categoryTiles(articles),
     isPersonal: true,
     accent,
@@ -137,10 +141,11 @@ const breadcrumbs = [
   title="الهلال"
   tagline="دليل منتقى لأفضل المقالات العربية على الإنترنت"
   pageTitle={`مقالات ${v.authorLabel} | الهلال`}
-  pageDescription={`تصفح ${v.total} مقالة منشورة بواسطة ${v.authorLabel} على الهلال.`}
+  pageDescription={v.metaDescription}
+  robots={v.robots}
   canonicalUrl={v.canonicalUrl}
   ogTitle={`مقالات ${v.authorLabel} | الهلال`}
-  ogDescription={`${v.total} مقالة بواسطة ${v.authorLabel}`}
+  ogDescription={v.metaDescription}
   ogUrl={v.canonicalUrl}
   ogType="profile"
 >

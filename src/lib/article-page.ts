@@ -42,6 +42,8 @@ export interface ArticleRecord {
     whyThisMatters?: string;
     whoShouldRead?: string;
     metaDescription?: string;
+    /** [question, answer] pairs (Article.faq) */
+    faq?: Array<[string, string]>;
     /** Reading time of the original post (src/lib/reading-time.ts) */
     minutes?: number | undefined;
     // Precomputed at build time so the Worker does no Intl work or lookups:
@@ -109,6 +111,8 @@ export function articleTemplateData(r: ArticleRecord): TemplateData {
         description: r.preview_text,
         mainEntityOfPage: { '@type': 'WebPage', '@id': canonicalUrl },
     };
+    // The summary up front, for answer engines (Copilot, AI Overviews) quoting the page.
+    if (r.tldr) articleLd.abstract = r.tldr;
     if (r.original_img_url) articleLd.image = r.original_img_url;
     if (r.created_at) articleLd.datePublished = r.created_at;
     articleLd.author = { '@type': 'Person', name: authorDisplayName, url: authorUrl };
@@ -123,6 +127,19 @@ export function articleTemplateData(r: ArticleRecord): TemplateData {
         ],
     };
 
+    const faqItems = (r.faq ?? []).map(([q, a]) => ({ q, a }));
+    const faqLd = faqItems.length
+        ? jsonForScript({
+              '@context': 'https://schema.org',
+              '@type': 'FAQPage',
+              mainEntity: faqItems.map(({ q, a }) => ({
+                  '@type': 'Question',
+                  name: q,
+                  acceptedAnswer: { '@type': 'Answer', text: a },
+              })),
+          })
+        : '';
+
     const coverUrl = isImageUrl(r.original_img_url) ? r.original_img_url : undefined;
     const cover = coverUrl ? responsiveImage(coverUrl, HERO_WIDTHS) : undefined;
 
@@ -136,6 +153,7 @@ export function articleTemplateData(r: ArticleRecord): TemplateData {
         keywordsString: (r.keywords || []).map(([kw]) => kw).join(', '),
         articleLd: jsonForScript(articleLd),
         breadcrumbLd: jsonForScript(breadcrumbLd),
+        faqLd,
 
         slug: r.slug,
         title: r.title,
@@ -162,7 +180,8 @@ export function articleTemplateData(r: ArticleRecord): TemplateData {
         tldr: r.tldr,
         whyThisMatters: r.whyThisMatters,
         whoItems,
-        hasCore: !!(r.tldr || r.whyThisMatters || r.whoShouldRead),
+        faqItems,
+        hasCore: !!(r.tldr || r.whyThisMatters || r.whoShouldRead || faqItems.length),
         keywords: (r.keywords || []).map(([label, tagSlug]) => ({
             label,
             href: tagSlug ? `/tags/${encodeURIComponent(tagSlug)}/` : '',

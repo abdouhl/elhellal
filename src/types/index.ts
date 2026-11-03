@@ -44,6 +44,8 @@ export interface Article {
     whyThisMatters?: string;
     whoShouldRead?: string;
     metaDescription?: string;
+    /** Short Q&A shown under the summary and emitted as FAQPage JSON-LD */
+    faq?: Array<{ q: string; a: string }>;
     keywords?: string[];
     /** Estimated reading time of the original post, in minutes (src/lib/reading-time.ts) */
     minutes?: number;
