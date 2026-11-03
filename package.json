@@ -41,6 +41,7 @@
     "admin": "bun run scripts/admin.ts",
     "indexnow": "bun run scripts/indexnow.ts",
     "x-schedule": "bun run scripts/x-schedule.ts",
+    "x-stats": "bun run scripts/x-stats.ts",
     "tumblr-schedule": "bun run scripts/tumblr-schedule.ts",
     "linkedin-schedule": "bun run scripts/linkedin-schedule.ts",
     "update-metadata": "bun run scripts/update-metadata.ts",

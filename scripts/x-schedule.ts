@@ -5,9 +5,12 @@
  * Every day gets three kinds of post, scheduled through x.com's own
  * "Schedule post" dialog using the session you are already logged into in
  * Chrome (no API keys):
- *   - 4 articles   tldr + elhellal.com link (from the catalog, src/data/catalog/)
- *   - 2 quizzes    a question + its quiz.elhellal.com/q/<id>/ link — X shows
- *                  the question's OG image (from ../elhellal-quiz)
+ *   - 4 articles   title, the author's own opening lines (tldr when there's no
+ *                  usable preview), ✍️ author name + elhellal.com link. Most-read
+ *                  articles go first; one per category and per author each day
+ *   - 2 quizzes    the question with its choices (أ/ب/ج/د), a "reply with your
+ *                  answer" prompt + its quiz.elhellal.com/q/<id>/ link, rotating
+ *                  through the question categories (from ../elhellal-quiz)
  *   - 1 book       "الكتاب / الدرس" with 1-book.png + 2-lesson.png from
  *                  x-posts/<date>/<NN-book>/; missing ones are generated with
  *                  ../elhellal-quotes/scripts/generate-book-tweet.ts
@@ -38,19 +41,27 @@
  *   --since YYYY-MM-DD                 only articles created on/after this day (default 2026-09-15)
  *   --random                           random order instead of newest first
  *   --dry-run                          print the plan, don't mark articles as used
+ *   --show                             print each post's full text
  *
  * Articles, quiz questions and book folders already queued are remembered in
- * .x-schedule/posted.json so they are never picked twice.
+ * .x-schedule/posted.json so they are never picked twice. Each snippet downloads
+ * ~/Downloads/elhellal-x-<batch>.json with what it really scheduled; the next run
+ * reads it and puts anything it didn't get to back in the pool. What each post
+ * was is kept in .x-schedule/log.json for `bun run x-stats`.
  */
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { Article, Category } from "../src/types";
 import { readArticles } from "../src/lib/articles-store.ts";
+import { loadAuthorNames } from "./lib/author-names.ts";
+import { homedir } from "node:os";
 
 const ROOT = join(import.meta.dir, "..");
 const OUT_DIR = join(ROOT, ".x-schedule");
 const STATE_FILE = join(OUT_DIR, "posted.json");
 const SNIPPET_FILE = join(OUT_DIR, "snippet.js");
+const LOG_FILE = join(OUT_DIR, "log.json"); // what each queued post was (kind, category, author, text) — joined by x-stats
+const PENDING_FILE = join(OUT_DIR, "pending.json"); // batches whose snippet hasn't reported back yet
 const SITE = "https://elhellal.com";
 const QUIZ_SITE = "https://quiz.elhellal.com";
 const QUIZ_REPO = join(ROOT, "../elhellal-quiz");
@@ -177,19 +188,98 @@ function articleUrl(a: Article): string {
     return `${SITE}/articles/${encodeURIComponent(a.slug!)}/`;
 }
 
+// The summaries were written with Latin punctuation ("," 'x' "x" ?); make it read native.
+const AR = "\\u0600-\\u06FF";
+function arabize(s: string): string {
+    return s
+        .replace(/\s+/g, " ")
+        .replace(/(?<!\d),|,(?!\d)/g, "،")
+        .replace(/;/g, "؛")
+        .replace(new RegExp(`([${AR}])\\s*\\?`, "g"), "$1؟")
+        .replace(/["“]([^"“”]{1,120})["”]/g, "«$1»")
+        .replace(new RegExp(`'([^'\\n]*[${AR}][^'\\n]*)'`, "g"), "«$1»")
+        .replace(/\s+([،؛؟.!])/g, "$1")
+        .replace(/([،؛])(?=[^\s\d])/g, "$1 ")
+        .trim();
+}
+
+const cleanTitle = (t: string) => arabize(t.replace(/^[\s"'«“”]+|[\s"'»“”]+$/g, ""));
+
+// The author's own opening lines beat the AI summary as a hook ("يتناول المقال…" stops nobody).
+// Whole sentences while they fit, else the first one cut with "…"; the tldr when there's no usable preview.
+function excerpt(a: Article, budget: number): string {
+    const preview = arabize(a.preview_text ?? "");
+    const arabic = (preview.match(new RegExp(`[${AR}]`, "g")) ?? []).length;
+    const usable = preview.length >= 60 && arabic > preview.length / 2 && !preview.startsWith(cleanTitle(a.title));
+    const text = usable ? preview : arabize(a.tldr!);
+    let out = "";
+    for (const s of text.split(/(?<=[.!؟…])\s+/)) {
+        const next = out ? `${out} ${s}` : s;
+        if (weight(next) > budget) break;
+        out = next;
+    }
+    return out && weight(out) >= budget * 0.4 ? out : fit(text, budget);
+}
+
+const authorNames = loadAuthorNames();
 function buildTweet(a: Article): string {
-    const sep = "\n\n";
-    const body = fit(a.tldr!, MAX_WEIGHT - URL_WEIGHT - weight(sep));
-    return `${body}${sep}${articleUrl(a)}`;
+    const title = cleanTitle(a.title);
+    const name = authorNames[a.screen_name]?.replace(/\s+/g, " ").trim();
+    const byline = name ? `✍️ ${name}\n` : "";
+    const budget = MAX_WEIGHT - URL_WEIGHT - weight(`${title}\n\n\n\n${byline}`);
+    if (budget < 40) return `${fit(title, MAX_WEIGHT - URL_WEIGHT - weight(`\n\n${byline}`))}\n\n${byline}${articleUrl(a)}`;
+    return `${title}\n\n${excerpt(a, budget)}\n\n${byline}${articleUrl(a)}`;
 }
 
 // ── pick articles ──────────────────────────────────────────────────────
 const data = readArticles() as { articles: Category[] };
 mkdirSync(OUT_DIR, { recursive: true });
 const posted: Record<string, string> = existsSync(STATE_FILE) ? JSON.parse(readFileSync(STATE_FILE, "utf8")) : {};
+type LogEntry = { at: string; kind: string; batch: string; category?: string; author?: string; text: string };
+const log: Record<string, LogEntry> = existsSync(LOG_FILE) ? JSON.parse(readFileSync(LOG_FILE, "utf8")) : {};
+const pending: Record<string, string[]> = existsSync(PENDING_FILE) ? JSON.parse(readFileSync(PENDING_FILE, "utf8")) : {};
+
+// Items are reserved in posted.json when a snippet is made. The snippet downloads the ids it really
+// scheduled (~/Downloads/elhellal-x-<batch>.json); anything it didn't get to goes back in the pool.
+{
+    const downloads = join(homedir(), "Downloads");
+    const files = existsSync(downloads) ? readdirSync(downloads) : [];
+    for (const [batch, ids] of Object.entries(pending)) {
+        // A resumed run downloads again ("… (1).json"), so take the union of every report.
+        const reports = files.filter((f) => f.startsWith(`elhellal-x-${batch}`) && f.endsWith(".json"));
+        if (!reports.length) {
+            console.log(`(batch ${batch}: ${ids.length} posts reserved, waiting for its snippet's report in ~/Downloads)`);
+            continue;
+        }
+        const done = new Set<string>(reports.flatMap((f) => JSON.parse(readFileSync(join(downloads, f), "utf8")).done ?? []));
+        const missed = ids.filter((id) => !done.has(id));
+        for (const id of missed) {
+            delete posted[id];
+            delete log[id];
+        }
+        delete pending[batch];
+        console.log(`Batch ${batch}: ${done.size} scheduled${missed.length ? `, ${missed.length} not — back in the pool` : ""}.`);
+    }
+    if (!dryRun) {
+        writeFileSync(STATE_FILE, JSON.stringify(posted, null, 2));
+        writeFileSync(LOG_FILE, JSON.stringify(log, null, 2));
+        writeFileSync(PENDING_FILE, JSON.stringify(pending, null, 2));
+    }
+}
 
 const category = opt("category");
 const since = opt("since") ?? "2026-09-15";
+
+// Articles readers already open on the site (views worker) go first, even older than --since.
+const popular = new Map<string, number>();
+try {
+    const res = await fetch(`${SITE}/api/most-read?limit=50`, { signal: AbortSignal.timeout(6000) });
+    for (const e of ((await res.json()) as { items?: { slug: string; count: number }[] }).items ?? []) {
+        if (e.count >= 2) popular.set(e.slug, e.count);
+    }
+} catch {
+    console.warn("(most-read unavailable — no popularity boost this run)");
+}
 // The same post is sometimes imported twice under different ids/urls, so
 // "already used" is judged by author + text, not just by id.
 const contentKey = (a: Article) => `${a.screen_name}|${(a.preview_text || a.tldr || a.title).replace(/\s+/g, " ").trim().slice(0, 120)}`;
@@ -197,11 +287,13 @@ const all = data.articles.flatMap((c) => c.content);
 const usedKeys = new Set(all.filter((a) => posted[a.id_str]).map(contentKey));
 
 const seen = new Set<string>();
+const categoryOf = new Map<Article, string>();
 const pool = data.articles
     .filter((c) => !category || c.category === category)
-    .flatMap((c) => c.content)
+    .flatMap((c) => c.content.map((a) => (categoryOf.set(a, c.category), a)))
     .filter((a) => {
-        if (!a.tldr?.trim() || !a.slug || a.created_at < since || posted[a.id_str]) return false;
+        if (!a.tldr?.trim() || !a.slug || posted[a.id_str]) return false;
+        if (a.created_at < since && !popular.has(a.slug)) return false;
         const key = contentKey(a);
         if (usedKeys.has(key) || seen.has(key)) return false;
         seen.add(key);
@@ -216,18 +308,29 @@ if (flag("random")) {
 } else {
     pool.sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
+pool.sort((a, b) => (popular.get(b.slug!) ?? 0) - (popular.get(a.slug!) ?? 0)); // stable: popular first
 
 if (slots.length && pool.length < slots.length) {
     console.warn(`Only ${pool.length} unused articles with a tldr since ${since} — scheduling ${pool.length} of ${slots.length} slots.`);
 }
 
-type Item = { id: string; at: string; kind: "article" | "quiz" | "book"; text: string; media?: string[] };
-const queue: Item[] = pool.slice(0, slots.length).map((a, i) => ({
-    id: a.id_str,
-    at: slots[i]!,
-    kind: "article",
-    text: buildTweet(a),
-}));
+type Item = { id: string; at: string; kind: "article" | "quiz" | "book"; text: string; media?: string[]; category?: string; author?: string };
+const queue: Item[] = [];
+{
+    // No two articles from the same category or author on one day while others are available.
+    let day = "";
+    let usedToday = new Set<string>();
+    for (const at of slots) {
+        if (!pool.length) break;
+        if (at.slice(0, 10) !== day) [day, usedToday] = [at.slice(0, 10), new Set()];
+        const fresh = (a: Article) => !usedToday.has(categoryOf.get(a)!) && !usedToday.has(`@${a.screen_name}`);
+        let i = pool.findIndex(fresh);
+        if (i < 0) i = Math.max(0, pool.findIndex((a) => !usedToday.has(`@${a.screen_name}`)));
+        const a = pool.splice(i, 1)[0]!;
+        usedToday.add(categoryOf.get(a)!).add(`@${a.screen_name}`);
+        queue.push({ id: a.id_str, at, kind: "article", text: buildTweet(a), category: categoryOf.get(a), author: a.screen_name });
+    }
+}
 
 // ── quiz questions ─────────────────────────────────────────────────────
 if (quizSlots.length) {
@@ -235,19 +338,57 @@ if (quizSlots.length) {
     // Arabic questions only — the quiz repo also has an English set under /en/.
     const { engine } = await import(join(QUIZ_REPO, "src/game/ar.ts"));
     const seo = await import(join(QUIZ_REPO, "src/game/seo.ts"));
-    const ids = (engine.allQuestionIds() as [string, string][]).map(([id]) => id).filter((id) => !posted[`quiz:${id}`]);
-    for (let i = ids.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [ids[i], ids[j]] = [ids[j]!, ids[i]!];
+    const shuffle = <T>(xs: T[]) => {
+        for (let i = xs.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [xs[i], xs[j]] = [xs[j]!, xs[i]!];
+        }
+        return xs;
+    };
+    // One question per category in turn, so true/false (40% of the bank) doesn't crowd out the rest.
+    const byCat = new Map<string, string[]>();
+    for (const [id, cat] of engine.allQuestionIds() as [string, string][]) {
+        if (!posted[`quiz:${id}`]) byCat.set(cat, [...(byCat.get(cat) ?? []), id]);
     }
-    if (ids.length < quizSlots.length) console.warn(`Only ${ids.length} unused quiz questions — scheduling ${ids.length} of ${quizSlots.length} quiz slots.`);
-    quizSlots.slice(0, ids.length).forEach((at, i) => {
-        const id = ids[i]!;
+    const cats = shuffle([...byCat.keys()]);
+    for (const c of cats) shuffle(byCat.get(c)!);
+    const picks: [string, string][] = [];
+    for (let k = 0; picks.length < quizSlots.length && [...byCat.values()].some((l) => l.length); k++) {
+        const c = cats[k % cats.length]!;
+        const id = byCat.get(c)!.pop();
+        if (id) picks.push([id, c]);
+    }
+    if (picks.length < quizSlots.length) console.warn(`Only ${picks.length} unused quiz questions — scheduling ${picks.length} of ${quizSlots.length} quiz slots.`);
+    picks.forEach(([id, cat], i) => {
         const url = `${QUIZ_SITE}${seo.qPath("ar", id)}`;
-        const sep = "\n\n";
-        const body = fit(`🧠 ${seo.seoTitle("ar", engine.questionById(id))}`, MAX_WEIGHT - URL_WEIGHT - weight(sep));
-        queue.push({ id: `quiz:${id}`, at, kind: "quiz", text: `${body}${sep}${url}` });
+        const q = engine.questionById(id);
+        queue.push({ id: `quiz:${id}`, at: quizSlots[i]!, kind: "quiz", text: quizTweet(q, url, seo.seoTitle("ar", q)), category: cat });
     });
+}
+
+// The question with its choices on separate lines, and a reply prompt — replies are what X rewards.
+// Options are shuffled per question (stable by id) so the answer isn't always أ.
+function quizTweet(q: { id: string; text: string; options: string[]; claim?: string; year?: unknown }, url: string, title: string): string {
+    const stripQ = (s: string) => s.replace(/[؟?]\s*$/, "");
+    let body: string;
+    let cta: string;
+    if (q.year) {
+        body = `🧠 في أي عام؟\n${q.text}`;
+        cta = "اكتب العام في الرد، والجواب هنا 👇";
+    } else if (q.claim) {
+        body = `🧠 صح أم خطأ؟\n\n${stripQ(q.text)}: ${q.claim}`;
+        cta = "صح أم خطأ؟ جاوب في الرد، والجواب هنا 👇";
+    } else {
+        let h = 0;
+        for (const ch of q.id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+        const opts = q.options.map((o, i) => ({ o, k: ((h ^ (i * 2654435761)) >>> 0) % 1000 })).sort((a, b) => a.k - b.k);
+        const letters = ["أ", "ب", "ج", "د", "هـ", "و"];
+        body = `🧠 ${q.text}\n\n${opts.map(({ o }, i) => `${letters[i]}) ${o}`).join("\n")}`;
+        cta = "اكتب حرف إجابتك في الرد، والجواب هنا 👇";
+    }
+    const text = `${body}\n\n${cta}\n${url}`;
+    if (weight(text) - url.length + URL_WEIGHT <= MAX_WEIGHT) return text;
+    return `${fit(`🧠 ${title}`, MAX_WEIGHT - URL_WEIGHT - weight(`\n\n${cta}\n`))}\n\n${cta}\n${url}`;
 }
 
 // ── book / lesson ──────────────────────────────────────────────────────
@@ -303,7 +444,10 @@ const first = queue[0]!.at;
 const last = queue[queue.length - 1]!.at;
 
 // ── output ─────────────────────────────────────────────────────────────
-for (const q of queue) console.log(`${q.at.replace("T", " ")}  ${q.kind.padEnd(7)} ${q.kind === "book" ? q.id.slice(5) : q.text.split("\n")[0]!.slice(0, 70) + "…"}`);
+for (const q of queue) {
+    if (flag("show")) console.log(`\n── ${q.at.replace("T", " ")}  ${q.kind}${q.category ? ` (${q.category})` : ""}\n${q.text}`);
+    else console.log(`${q.at.replace("T", " ")}  ${q.kind.padEnd(7)} ${q.kind === "book" ? q.id.slice(5) : q.text.split("\n")[0]!.slice(0, 70) + "…"}`);
+}
 const count = (k: Item["kind"]) => queue.filter((q) => q.kind === k).length;
 console.log(`\n${queue.length} posts (${count("article")} articles, ${count("quiz")} quizzes, ${count("book")} books), ${first.replace("T", " ")} → ${last.replace("T", " ")}`);
 
@@ -312,11 +456,17 @@ if (dryRun) {
     process.exit(0);
 }
 
-const batch = `${mode}-${first}-${Date.now().toString(36)}`;
+const batch = `${mode}-${first}-${Date.now().toString(36)}`.replace(/[^\w-]/g, "-");
 const snippet = browserSnippet(batch, queue);
 writeFileSync(SNIPPET_FILE, snippet);
-for (const q of queue) posted[q.id] = q.at;
+for (const q of queue) {
+    posted[q.id] = q.at;
+    log[q.id] = { at: q.at, kind: q.kind, batch, category: q.category, author: q.author, text: q.text };
+}
+pending[batch] = queue.map((q) => q.id);
 writeFileSync(STATE_FILE, JSON.stringify(posted, null, 2));
+writeFileSync(LOG_FILE, JSON.stringify(log, null, 2));
+writeFileSync(PENDING_FILE, JSON.stringify(pending, null, 2));
 
 let copied = false;
 try {
@@ -414,6 +564,14 @@ function browserSnippet(batch: string, items: typeof queue): string {
     await waitFor(() => !modal(), "composer to close", 30000);
   }
 
+  // Tells the next \`bun run x-schedule\` which posts really got scheduled (the rest go back in its pool).
+  function report() {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([JSON.stringify({ batch: ${JSON.stringify(batch)}, done: [...done] })], { type: "application/json" }));
+    a.download = ${JSON.stringify(`elhellal-x-${batch}.json`)};
+    a.click();
+  }
+
   console.log("%celhellal → X: " + QUEUE.length + " posts (" + done.size + " already done)", "font-weight:bold");
 
   // Book posts carry two local images; the page can't read your disk, so you pick the x-posts folder once.
@@ -454,10 +612,12 @@ function browserSnippet(batch: string, items: typeof queue): string {
       console.log("✓ " + item.at.replace("T", " ") + " (" + done.size + "/" + QUEUE.length + ")");
     } catch (e) {
       console.error("✗ " + item.at + " — " + e.message + ". Stopping; fix and paste the snippet again to resume.");
+      report();
       return;
     }
     await sleep(2500 + Math.random() * 2500);
   }
+  report();
   console.log("%cdone — " + ok + " scheduled, " + skipped + " skipped. See x.com/compose/post/unsent/scheduled", "font-weight:bold;color:#1d9bf0");
 })();
 `;

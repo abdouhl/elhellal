@@ -4,10 +4,15 @@
  * ----------------------------------------
  * Same idea as x-schedule.ts, but for the LinkedIn page: posts are scheduled
  * through LinkedIn's own "Schedule post" dialog using the session you are
- * already logged into in Chrome (no API keys). Every day gets:
- *   - 4 articles   tldr (+ why it matters) + elhellal.com link — LinkedIn
- *                  shows the article's link preview card
- *   - 2 quizzes    a question + its quiz.elhellal.com/q/<id>/ link
+ * already logged into in Chrome (no API keys). Every day gets, interleaved
+ * and spread 09:00–21:00 (a company page loses reach when posts crowd together):
+ *   - 2 articles   title hook + tldr + why it matters + author byline + a
+ *                  question for the comments + hashtags + elhellal.com link
+ *                  (LinkedIn shows the article's link preview card)
+ *   - 1 quote      most-liked quotes from ../elhellal-quotes, authors taking
+ *                  turns, + a quotes.elhellal.com link
+ *   - 1 quiz       the question with its choices, answer in the comments,
+ *                  checked on quiz.elhellal.com/q/<id>/
  *
  *   bun run linkedin-schedule --day      one day (today if all slots are still
  *                                        ahead, otherwise tomorrow)
@@ -23,10 +28,11 @@
  * skips posts it already scheduled.
  *
  * Options:
- *   --articles 6                       articles per day, spread 08:00–22:00 (default 4)
- *   --quizzes 3                        Arabic quiz questions per day, spread 09:00–21:00 (default 2)
- *   --times 09:00,13:00,18:00,21:00   exact daily article slots (local time, 24h; "--no-articles" to skip)
- *   --quiz-times 11:00,16:00           exact daily quiz slots ("--no-quiz" to skip)
+ *   --articles 3 --quotes 1 --quizzes 1
+ *                                      posts per day of each kind (default 2/1/1, 0 = none)
+ *   --times 09:00,17:00                exact daily article slots (local time, 24h; "--no-articles" to skip)
+ *   --quote-times 13:00                exact daily quote slots ("--no-quotes" to skip)
+ *   --quiz-times 21:00                 exact daily quiz slots ("--no-quiz" to skip)
  *   --date YYYY-MM-DD                  day to use (--day) / first day (--month)
  *   --days 30                          number of days for --month
  *   --category <slug>                  only use articles from one category
@@ -35,7 +41,7 @@
  *   --dry-run                          print the plan, don't mark articles as used
  *   --no-book                          accepted for parity with x-schedule (LinkedIn has no book posts)
  *
- * Articles and quiz questions already queued are remembered in
+ * Articles, quotes and quiz questions already queued are remembered in
  * .linkedin-schedule/posted.json (separate from X's, so the same article can
  * go to both) and are never picked twice.
  */
@@ -51,6 +57,8 @@ const SNIPPET_FILE = join(OUT_DIR, "snippet.js");
 const SITE = "https://elhellal.com";
 const QUIZ_SITE = "https://quiz.elhellal.com";
 const QUIZ_REPO = join(ROOT, "../elhellal-quiz");
+const QUOTES_JSON = join(ROOT, "../elhellal-quotes/src/data/quotes.json");
+const AUTHOR_NAMES = join(ROOT, "src/data/author-names.json");
 const ADMIN_URL = "https://www.linkedin.com/company/84134110/admin/page-posts/published/";
 
 // LinkedIn allows 3000 chars; the feed folds after ~210, so the tldr leads.
@@ -66,37 +74,67 @@ const opt = (name: string) => {
 
 const mode = flag("month") ? "month" : flag("day") ? "day" : undefined;
 if (!mode) {
-    console.error("Usage: bun run linkedin-schedule --day | --month [M YYYY] [--articles N] [--quizzes N] [--times 09:00,13:00,18:00,21:00] [--quiz-times 11:00,16:00] [--no-articles|--no-quiz] [--date YYYY-MM-DD] [--days 30] [--category slug] [--random] [--dry-run]");
+    console.error("Usage: bun run linkedin-schedule --day | --month [M YYYY] [--articles 2] [--quotes 1] [--quizzes 1] [--times 09:00,17:00] [--quote-times 13:00] [--quiz-times 21:00] [--no-articles|--no-quotes|--no-quiz] [--date YYYY-MM-DD] [--days 30] [--category slug] [--random] [--dry-run]");
     process.exit(1);
 }
-// `n` posts a day spread evenly over [from, to] hours, nudged off times another kind already uses.
-function spread(n: number, taken: string[], from: number, to: number): string {
-    const hm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
-    const out: string[] = [];
-    for (let i = 0; i < n; i++) {
-        let m = n === 1 ? 13 * 60 : from * 60 + Math.round(((to - from) * 60 * i) / (n - 1) / 5) * 5;
-        while (taken.includes(hm(m)) || out.includes(hm(m))) m += 10;
-        out.push(hm(m));
-    }
-    return out.join(",");
-}
-function timeList(name: string, fallback: string, off: string, countName?: string, taken: string[] = [], window = [8, 22]): string[] {
-    if (flag(off)) return [];
-    const n = countName ? opt(countName) : undefined;
-    if (n !== undefined && !opt(name)) {
-        if (!/^\d+$/.test(n) || Number(n) > 24) throw new Error(`--${countName} takes a number of posts per day (0-24)`);
-        if (Number(n) === 0) return [];
-        fallback = spread(Number(n), taken, window[0]!, window[1]!);
-    }
-    const list = (opt(name) ?? fallback).split(",").map((t) => t.trim());
+// ── daily slots ────────────────────────────────────────────────────────
+// Each kind gets either its exact --*-times or a count; counted kinds are
+// interleaved (article, quote, article, quiz…) and spread evenly over the window,
+// nudged off any exact times another kind already uses.
+const WINDOW = [9 * 60, 21 * 60];
+const hm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+type Kind = "article" | "quote" | "quiz";
+const KIND_OPTS: Record<Kind, { times: string; count: string; off: string[]; def: number }> = {
+    article: { times: "times", count: "articles", off: ["no-articles"], def: 2 },
+    quote: { times: "quote-times", count: "quotes", off: ["no-quotes", "no-quote"], def: 1 },
+    quiz: { times: "quiz-times", count: "quizzes", off: ["no-quiz"], def: 1 },
+};
+const KINDS = Object.keys(KIND_OPTS) as Kind[];
+function exactTimes(k: Kind): string[] | undefined {
+    const raw = opt(KIND_OPTS[k].times);
+    if (raw === undefined || KIND_OPTS[k].off.some(flag)) return undefined;
+    const list = raw.split(",").map((t) => t.trim());
     for (const t of list) {
-        if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(t)) throw new Error(`Bad time "${t}" in --${name}, use HH:MM (24h)`);
+        if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(t)) throw new Error(`Bad time "${t}" in --${KIND_OPTS[k].times}, use HH:MM (24h)`);
     }
     return list;
 }
-const times = timeList("times", "09:00,13:00,18:00,21:00", "no-articles", "articles");
-const quizTimes = timeList("quiz-times", "11:00,16:00", "no-quiz", "quizzes", times, [9, 21]);
-const allTimes = [...times, ...quizTimes];
+function countOf(k: Kind): number {
+    if (KIND_OPTS[k].off.some(flag)) return 0;
+    const n = opt(KIND_OPTS[k].count);
+    if (n === undefined) return KIND_OPTS[k].def;
+    if (!/^\d+$/.test(n) || Number(n) > 24) throw new Error(`--${KIND_OPTS[k].count} takes a number of posts per day (0-24)`);
+    return Number(n);
+}
+const dayTimes: Record<Kind, string[]> = { article: [], quote: [], quiz: [] };
+const left: Record<Kind, number> = { article: 0, quote: 0, quiz: 0 };
+for (const k of KINDS) {
+    const exact = exactTimes(k);
+    if (exact) dayTimes[k] = exact;
+    else left[k] = countOf(k);
+}
+{
+    const order: Kind[] = [];
+    while (KINDS.some((k) => left[k] > 0)) {
+        // Most-remaining first, never the same kind twice in a row when another is left.
+        const next = KINDS.filter((k) => left[k] > 0).sort((a, b) => left[b] - left[a]);
+        const pick = next.find((k) => k !== order.at(-1)) ?? next[0]!;
+        order.push(pick);
+        left[pick]--;
+    }
+    const taken = new Set(KINDS.flatMap((k) => dayTimes[k]));
+    const [from, to] = WINDOW as [number, number];
+    order.forEach((k, i) => {
+        let m = order.length === 1 ? 13 * 60 : from + Math.round(((to - from) * i) / (order.length - 1) / 5) * 5;
+        while (taken.has(hm(m))) m += 10;
+        taken.add(hm(m));
+        dayTimes[k].push(hm(m));
+    });
+}
+const times = dayTimes.article;
+const quoteTimes = dayTimes.quote;
+const quizTimes = dayTimes.quiz;
+const allTimes = [...times, ...quoteTimes, ...quizTimes];
 // `--month 10 2026` → that calendar month; plain `--month` → next --days days.
 const monthArgs = (() => {
     const i = argv.indexOf("--month");
@@ -144,8 +182,9 @@ function slotsFor(list: string[]): string[] {
     return out;
 }
 const slots = slotsFor(times);
+const quoteSlots = slotsFor(quoteTimes);
 const quizSlots = slotsFor(quizTimes);
-if (!slots.length && !quizSlots.length) throw new Error(monthArgs ? "That month is already over — pick a future one" : "No future slots — pick a later --date or --times");
+if (!slots.length && !quoteSlots.length && !quizSlots.length) throw new Error(monthArgs ? "That month is already over — pick a future one" : "No future slots — pick a later --date or --times");
 
 // ── post text ──────────────────────────────────────────────────────────
 const clean = (s?: string) => (s ?? "").replace(/\s+/g, " ").trim();
@@ -156,12 +195,49 @@ function articleUrl(a: Article): string {
     return `${SITE}/articles/${a.slug!.replace(/\s/g, "-")}/`;
 }
 
-// The link goes last so LinkedIn builds the preview card from it.
-function buildPost(a: Article): string {
-    const parts = [clean(a.tldr)];
-    if (clean(a.whyThisMatters)) parts.push(`💡 ${clean(a.whyThisMatters)}`);
-    const tail = `📖 اقرأ المقال كاملاً:\n${articleUrl(a)}`;
-    let body = parts.join("\n\n");
+// "#علم_النفس": letters, digits and _ only (LinkedIn ends a hashtag at anything else).
+function hashtag(s: string): string {
+    const t = s.normalize("NFC").replace(/[\u064B-\u0652\u0640]/g, "").trim().replace(/\s+/g, "_").replace(/[^\p{L}\p{N}_]/gu, "");
+    return t.length >= 2 && t.length <= 30 ? `#${t}` : "";
+}
+function hashtags(words: (string | undefined)[], max = 5): string {
+    return [...new Set(words.map((w) => hashtag(w ?? "")).filter(Boolean))].slice(0, max).join(" ");
+}
+// "الاقتصاد والمال" → الاقتصاد, المال; "عام ومتنوع" is too vague to tag.
+function categoryWords(slug: string): string[] {
+    const title = categoryTitles.get(slug);
+    if (!title || slug === "general") return [];
+    return title.split(/\s+و(?=\S)/).map((w) => w.trim());
+}
+
+// Same item → same wording, so a rerun or --dry-run shows what will go out.
+function pickFor<T>(id: string, list: T[]): T {
+    let h = 0;
+    for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    return list[h % list.length]!;
+}
+const ARTICLE_ASKS = [
+    "ما رأيك؟ شاركنا في التعليقات 👇",
+    "هل تتفق مع الكاتب؟ أخبرنا في التعليقات 👇",
+    "ما الفكرة التي تراها أهمّ هنا؟ 👇",
+    "♻️ شاركه مع من يهمّه الموضوع.",
+];
+const QUOTE_ASKS = ["هل تتفق مع هذا القول؟ 👇", "ما الاقتباس الذي لا تنساه؟ شاركنا في التعليقات 👇", "♻️ شاركه مع من يحتاجه اليوم."];
+
+// The title is the hook (the feed folds after ~210 chars); the link goes last so
+// LinkedIn builds the preview card from it and the composer's caret never sits
+// right after a hashtag (which opens LinkedIn's hashtag typeahead).
+function buildPost(a: Article, catSlug: string): string {
+    const name = clean(authorNames[a.screen_name]);
+    const head = [clean(a.title), clean(a.tldr)];
+    if (clean(a.whyThisMatters)) head.push(`💡 ${clean(a.whyThisMatters)}`);
+    const tail = [
+        name && name.length <= 40 ? `✍️ بقلم ${name}` : "",
+        pickFor(a.id_str, ARTICLE_ASKS),
+        hashtags([...categoryWords(catSlug), ...(a.keywords ?? []).slice(0, 2), "مقالات عربية"]),
+        `📖 اقرأ المقال كاملاً:\n${articleUrl(a)}`,
+    ].filter(Boolean).join("\n\n");
+    let body = head.join("\n\n");
     const budget = MAX_CHARS - tail.length - 2;
     if (body.length > budget) body = body.slice(0, budget - 1).replace(/\s+\S*$/, "") + "…";
     return `${body}\n\n${tail}`;
@@ -171,6 +247,9 @@ function buildPost(a: Article): string {
 const data = readArticles() as { articles: Category[] };
 mkdirSync(OUT_DIR, { recursive: true });
 const posted: Record<string, string> = existsSync(STATE_FILE) ? JSON.parse(readFileSync(STATE_FILE, "utf8")) : {};
+const authorNames: Record<string, string> = existsSync(AUTHOR_NAMES) ? JSON.parse(readFileSync(AUTHOR_NAMES, "utf8")) : {};
+const categoryTitles = new Map(data.articles.map((c) => [c.category, c.title]));
+const categoryOf = new Map(data.articles.flatMap((c) => c.content.map((a) => [a.id_str, c.category] as const)));
 
 const category = opt("category");
 const since = opt("since") ?? "2026-09-15";
@@ -205,13 +284,65 @@ if (slots.length && pool.length < slots.length) {
     console.warn(`Only ${pool.length} unused articles with a tldr since ${since} — scheduling ${pool.length} of ${slots.length} slots.`);
 }
 
-type Item = { id: string; at: string; kind: "article" | "quiz"; text: string };
+type Item = { id: string; at: string; kind: Kind; text: string };
 const queue: Item[] = pool.slice(0, slots.length).map((a, i) => ({
     id: a.id_str,
     at: slots[i]!,
     kind: "article",
-    text: buildPost(a),
+    text: buildPost(a, categoryOf.get(a.id_str) ?? ""),
 }));
+
+// ── quotes ─────────────────────────────────────────────────────────────
+// Every author in ../elhellal-quotes (their own quotes and their books'), most-liked
+// first, authors taking turns so the page never runs one writer twice in a row.
+if (quoteSlots.length) {
+    if (!existsSync(QUOTES_JSON)) throw new Error(`Quotes data not found at ${QUOTES_JSON} (or pass --no-quotes)`);
+    type Q = { id: string; text: string; likes?: number; tags?: string[] };
+    const authors: { slug: string; name: string; quotes?: Q[]; books?: { title: string; quotes?: Q[] }[] }[] =
+        JSON.parse(readFileSync(QUOTES_JSON, "utf8")).authors ?? [];
+    const groups = authors
+        .map((a) =>
+            [...(a.quotes ?? []).map((q) => ({ q, a, book: "" })), ...(a.books ?? []).flatMap((b) => (b.quotes ?? []).map((q) => ({ q, a, book: b.title })))]
+                .filter(({ q }) => q.text?.trim() && q.text.length <= 600 && !posted[`quote:${q.id}`])
+                .sort((x, y) => (y.q.likes ?? 0) - (x.q.likes ?? 0)),
+        )
+        .filter((g) => g.length);
+    for (let i = groups.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [groups[i], groups[j]] = [groups[j]!, groups[i]!];
+    }
+    const mixed: (typeof groups)[number] = [];
+    for (let i = 0; groups.some((g) => g.length > i); i++) for (const g of groups) if (g[i]) mixed.push(g[i]!);
+    // quotes.json can be ahead of the live site (authors or quotes imported but
+    // not deployed yet), so only take quotes whose page is up. An author with a
+    // missing page is skipped from then on (new authors are missing entirely).
+    const missing = new Set<string>();
+    let offline = false;
+    const picked: typeof mixed = [];
+    for (const m of mixed) {
+        if (picked.length >= quoteSlots.length) break;
+        if (missing.has(m.a.slug)) continue;
+        const url = `https://quotes.elhellal.com/${m.a.slug}/${m.q.id}/`;
+        const ok = offline || (await fetch(url, { method: "HEAD" }).then((r) => r.ok, () => ((offline = true), true)));
+        if (ok) picked.push(m);
+        else missing.add(m.a.slug);
+    }
+    if (missing.size) console.warn(`Skipped ${missing.size} quote authors not live on quotes.elhellal.com yet (deploy elhellal-quotes to include them).`);
+    if (offline) console.warn("Could not reach quotes.elhellal.com — quote links were not checked.");
+    if (picked.length < quoteSlots.length) console.warn(`Only ${picked.length} unused live quotes — scheduling ${picked.length} of ${quoteSlots.length} quote slots.`);
+    quoteSlots.slice(0, picked.length).forEach((at, i) => {
+        const { q, a, book } = picked[i]!;
+        const url = `https://quotes.elhellal.com/${a.slug}/${q.id}/`;
+        const text = [
+            `❝ ${q.text.trim()} ❞`,
+            `— ${a.name}${book ? `، «${book}»` : ""}`,
+            pickFor(q.id, QUOTE_ASKS),
+            hashtags(["اقتباسات", a.name, ...(q.tags ?? []).slice(0, 2), "كتب"]),
+            `📚 المزيد من اقتباسات ${a.name}:\n${url}`,
+        ].join("\n\n");
+        queue.push({ id: `quote:${q.id}`, at, kind: "quote", text });
+    });
+}
 
 // ── quiz questions ─────────────────────────────────────────────────────
 if (quizSlots.length) {
@@ -228,8 +359,15 @@ if (quizSlots.length) {
     quizSlots.slice(0, ids.length).forEach((at, i) => {
         const id = ids[i]!;
         const url = `${QUIZ_SITE}${seo.qPath("ar", id)}`;
-        const title = clean(seo.seoTitle("ar", engine.questionById(id)));
-        queue.push({ id: `quiz:${id}`, at, kind: "quiz", text: `🧠 ${title}\n\nجرّب الإجابة 👇\n${url}` });
+        const q = engine.questionById(id);
+        const title = clean(seo.seoTitle("ar", q));
+        // Spell out the choices so people can answer in the feed; skip them when the
+        // title already names them (either-or, true/false and shared-prompt questions).
+        const listed = q.options.length > 2 && !q.options.every((o: string) => title.includes(o));
+        const choices = listed ? q.options.map((o: string, k: number) => `${"أبجدهوزح"[k]}) ${o}`).join("\n") : "";
+        const ask = q.year ? "اكتب السنة في التعليقات، ثم تحقّق من إجابتك 👇" : "اكتب إجابتك في التعليقات، ثم تحقّق منها هنا 👇";
+        const text = [`🧠 ${title}`, choices, hashtags(["اختبر معلوماتك", "ثقافة عامة", "مسابقة"]), `${ask}\n${url}`].filter(Boolean).join("\n\n");
+        queue.push({ id: `quiz:${id}`, at, kind: "quiz", text });
     });
 }
 
@@ -241,9 +379,11 @@ const last = queue[queue.length - 1]!.at;
 // ── output ─────────────────────────────────────────────────────────────
 for (const q of queue) console.log(`${q.at.replace("T", " ")}  ${q.kind.padEnd(7)} ${q.text.split("\n")[0]!.slice(0, 70)}…`);
 const count = (k: Item["kind"]) => queue.filter((q) => q.kind === k).length;
-console.log(`\n${queue.length} posts (${count("article")} articles, ${count("quiz")} quizzes), ${first.replace("T", " ")} → ${last.replace("T", " ")}`);
+console.log(`\n${queue.length} posts (${count("article")} articles, ${count("quote")} quotes, ${count("quiz")} quizzes), ${first.replace("T", " ")} → ${last.replace("T", " ")}`);
 
 if (dryRun) {
+    // One day is short enough to read every post in full before scheduling.
+    if (mode === "day") for (const q of queue) console.log(`\n── ${q.at.replace("T", " ")} ${q.kind} ──\n${q.text}`);
     console.log("\n--dry-run: nothing written.");
     process.exit(0);
 }

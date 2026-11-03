@@ -591,7 +591,7 @@ function addCandidates() {
     const r = await api('/api/candidates/add', { items: cands.add });
     cands.add = ''; await loadCandidates();
     return r;
-  }, (r) => `Added ${r.added}` + (r.skipped.length ? ` · skipped blocked: ${r.skipped.join(', ')}` : ''));
+  }, (r) => `Added ${r.added}` + (r.skipped.length ? ` · skipped (blocked or already on the site): ${r.skipped.join(', ')}` : ''));
 }
 
 function countPosts() {
@@ -958,8 +958,9 @@ async function renderSocial() {
         field('Schedule', spanSel([['day', 'One day'], ['next', 'Next N days'], ['month', 'A calendar month']])),
         soc.span === 'month' ? field('Month', monthIn) : field(soc.span === 'day' ? 'Day (default: today/tomorrow)' : 'First day', dateIn),
         soc.span === 'next' ? field('Days', num('days', '30', 60)) : null,
-        field('Articles / day', num('articles', '4 (0 = none)', 12)),
-        field('Quizzes / day', num('quizzes', '2 (0 = none)', 12)),
+        field('Articles / day', num('articles', t === 'linkedin' ? '2 (0 = none)' : '4 (0 = none)', 12)),
+        t === 'linkedin' ? field('Quotes / day', num('quotes', '1 (0 = none)', 12)) : null,
+        field('Quizzes / day', num('quizzes', t === 'linkedin' ? '1 (0 = none)' : '2 (0 = none)', 12)),
         field('Category', h('select', { disabled: running, onchange: (e) => { soc.category = e.target.value; } }, categoryOptions(soc.category, true))),
         field('Articles since', h('input', { type: 'date', value: soc.since, disabled: running, oninput: (e) => { soc.since = e.target.value; } })),
       ),
@@ -1014,6 +1015,7 @@ async function renderSocial() {
     const body = { tool: t, span: soc.span, month: soc.month, days: soc.days, articles: soc.articles, quizzes: soc.quizzes, book: soc.book, category: soc.category,
       since: soc.since, date: soc.date, random: soc.random, dryRun: soc.dryRun, count: soc.count, time: soc.time, force: soc.force, perDay: soc.perDay, times: soc.times };
     if (t === 'tiktok-books') body.book = soc.bookSlug;
+    if (t === 'linkedin') body.quotes = soc.quotes;
     if (t === 'tumblr') Object.assign(body, { quotes: soc.quotes, books: soc.books, bios: soc.bios, reblogs: soc.reblogs, from: soc.from, to: soc.to });
     social.start('/api/social/run', body);
   };
@@ -1440,8 +1442,12 @@ function siteCard(s, running) {
     siteJob.start('/api/sites/run', { site: s.name, step: key, args });
   } }, isRunning(key) ? label + '…' : label);
   const scriptButtons = s.steps.map((st) => {
-    if (st.key === 'import-quotes') return [h('input', { placeholder: 'Goodreads slugs (optional)', value: sites.args, style: 'min-width:220px', oninput: (e) => { sites.args = e.target.value; } }),
-      step(st.key, st.label, '', 'Import from Goodreads? It re-checks every known author too (slow, needs Ollama running) and writes quotes.json as it goes.', sites.args)];
+    if (st.key === 'import-quotes') return [h('input', { placeholder: 'slugs, or empty = listed not imported', title: 'Empty: the Goodreads list\'s authors not on the site yet. Slugs (slug:N): just those. --all: re-check every known author.', value: sites.args, style: 'min-width:240px', oninput: (e) => { sites.args = e.target.value; } }),
+      h('button', { class: 'btn', disabled: running, onclick: () => {
+        const args = sites.args.trim();
+        if (!confirm(`Import from Goodreads? ${/--all/.test(args) ? 'Re-checks every known author (slow)' : args ? 'Imports just these authors' : 'Imports the listed authors not on the site yet'}; needs Ollama running and writes quotes.json as it goes.`)) return;
+        siteJob.start('/api/sites/run', { site: s.name, step: st.key, args });
+      } }, isRunning(st.key) ? st.label + '…' : st.label)];
     if (st.key === 'd1-migrate') return step(st.key, st.label, '', 'Apply pending migrations to the live quiz D1 database?');
     if (st.key === 'youtube-batch') return null; // its own form in quizSection
     return step(st.key, st.label);
@@ -1490,6 +1496,8 @@ async function quotesSection() {
   const data = await api('/api/quotes?' + new URLSearchParams({ q: sites.q, author: sites.author, book: sites.book, sort: sites.sort, page: state.page }));
   const visible = data.items.map((x) => x.id);
   const author = data.authors.find((a) => a.slug === sites.author);
+  // The saved Goodreads list is a local file read: refresh it every render so "Have" follows imports.
+  await loadGoodreadsList();
   return h('div', {},
     goodreadsAuthorsCard(),
     h('h2', {}, 'Quotes'),
@@ -1514,87 +1522,134 @@ async function quotesSection() {
       } }, 'Delete author') : null),
     data.items.length ? h('div', { class: 'list' }, data.items.map(quoteRow)) : h('div', { class: 'list' }, h('div', { class: 'empty' }, 'No quotes')),
     pager(data),
-    h('p', { class: 'meta' }, 'Deleted quotes can come back on the next Goodreads import, which re-fetches every known author.'),
+    h('p', { class: 'meta' }, 'Deleted quotes can come back on a full re-check (Import from Goodreads with --all), which re-fetches every known author.'),
   );
 }
 
-// Famous Goodreads authors: goodreads.com/quotes (or a tag) grouped by author, most-liked first.
-// Tick authors, set how many quotes each, and import just those (`--only slug:N …`).
-const gr = { open: false, onlyNew: true, source: 'popular', tag: '', pages: 3, data: null, loading: false, error: '', count: 50, picks: new Map() };
+// Famous Goodreads authors: a saved list filled by scans of goodreads.com/quotes (popular, the Arabic tags or one tag),
+// read from disk instead of re-scraping. Tick authors and import them (`--only slug:N …`), or import every listed
+// author not on the site yet (what a plain "Import from Goodreads" run does too).
+const gr = { open: false, lang: '', source: 'popular', tag: '', pages: { popular: 3, arabic: 1, tag: 3 }, filter: '', list: null, scanning: false, scanMsg: '', error: '', count: 50, picks: new Map() };
 
-async function loadGoodreads(pages) {
-  gr.pages = pages; gr.loading = true; gr.error = ''; render();
-  try { gr.data = await api('/api/quotes/goodreads-authors?' + new URLSearchParams({ source: gr.source, tag: gr.source === 'tag' ? gr.tag : '', pages })); }
+async function loadGoodreadsList() {
+  try { gr.list = await api('/api/quotes/goodreads-authors'); gr.count = gr.count || gr.list.defaultWant; }
   catch (e) { gr.error = e.message; }
-  gr.loading = false; render();
 }
+
+async function scanGoodreads(more) {
+  const key = gr.source;
+  if (key === 'tag' && !gr.tag) { gr.error = 'Type a tag first'; render(); return; }
+  if (more) gr.pages[key] = Math.min(gr.list?.maxPages?.[key] ?? 20, gr.pages[key] + (key === 'arabic' ? 1 : 3));
+  gr.scanning = true; gr.error = ''; gr.scanMsg = ''; render();
+  try {
+    const r = await api('/api/quotes/goodreads-scan', { source: key, tag: key === 'tag' ? gr.tag : '', pages: gr.pages[key] });
+    gr.scanMsg = `Scanned ${r.pages} page(s)${r.tags ? ` of ${r.tags.length} Arabic tags` : ''}: ${r.found} author(s), ${r.added} new to the list`;
+    await loadGoodreadsList();
+  } catch (e) { gr.error = e.message; }
+  gr.scanning = false; render();
+}
+
+// Language filter for the Goodreads list: an Arabic name, mostly Arabic quotes, or either.
+const grArabicQuotes = (a) => a.arabicQuotes > 0 && a.arabicQuotes * 2 >= a.popular;
+const GR_LANG = {
+  name: { label: 'Arabic author (name)', test: (a) => a.arabicName },
+  quotes: { label: 'Arabic quotes', test: grArabicQuotes },
+  either: { label: 'Arabic name or quotes', test: (a) => a.arabicName || grArabicQuotes(a) },
+  other: { label: 'Not Arabic', test: (a) => !a.arabicName && !grArabicQuotes(a) },
+};
+const grSourceLabel = (s) => s === 'popular' ? 'Popular' : s === 'arabic' ? 'Arabic' : s.startsWith('tag:') ? `#${s.slice(4)}` : s;
 
 function goodreadsAuthorsCard() {
   const running = !!siteJob.job?.running;
-  const importBtn = h('button', { class: 'btn primary', disabled: running }, '');
+  const all = gr.list?.authors ?? [];
+  const pending = all.filter((a) => a.have == null);
+  const wantOf = (a) => gr.picks.get(a.slug) ?? a.want ?? a.limit ?? Math.max(gr.list?.defaultWant ?? 50, a.have ?? 0);
+  const importBtn = h('button', { class: 'btn', disabled: running }, '');
   const syncImport = () => {
-    importBtn.textContent = gr.picks.size ? `Import ${gr.picks.size} author(s) · ${[...gr.picks.values()].reduce((n, c) => n + c, 0)} quotes max` : 'Import selected';
+    importBtn.textContent = gr.picks.size ? `Import ${gr.picks.size} ticked · ${[...gr.picks.values()].reduce((n, c) => n + c, 0)} quotes max` : 'Import ticked';
     importBtn.disabled = running || !gr.picks.size;
   };
   importBtn.onclick = () => {
-    const args = ['--only', ...[...gr.picks].map(([slug, n]) => `${slug}:${n}`)];
+    // A person with several Goodreads profiles imports all of them (into one author, sharing the cap).
+    const aliases = (slug) => all.find((a) => a.slug === slug)?.aliases ?? [];
+    const args = ['--only', ...[...gr.picks].flatMap(([slug, n]) => [slug, ...aliases(slug)].map((s) => `${s}:${n}`))];
     if (!confirm(`Import ${gr.picks.size} author(s) from Goodreads? Needs Ollama running (non-Arabic quotes are translated) and writes quotes.json as it goes.`)) return;
     siteJob.start('/api/sites/run', { site: 'quotes', step: 'import-quotes', args: args.join(' ') });
     gr.picks.clear();
   };
   syncImport();
+  const importPending = h('button', { class: 'btn primary', disabled: running || !pending.length, onclick: () => {
+    const quotes = pending.reduce((n, a) => n + (a.want ?? gr.list.defaultWant), 0);
+    if (!confirm(`Import the ${pending.length} listed author(s) not on the site yet (${quotes} quotes max)? Needs Ollama running and writes quotes.json as it goes.`)) return;
+    siteJob.start('/api/sites/run', { site: 'quotes', step: 'import-quotes', args: '' });
+    gr.picks.clear();
+  } }, `Import ${pending.length} not imported`);
 
-  const all = gr.data?.authors ?? [];
-  const shown = gr.onlyNew ? all.filter((a) => a.have == null) : all;
+  const sources = [...new Set(all.flatMap((a) => a.sources))];
+  let shown = pending;
+  if (gr.filter) shown = shown.filter((a) => a.sources.includes(gr.filter));
+  if (gr.lang) shown = shown.filter(GR_LANG[gr.lang].test);
+  const setWant = (slugs, want) => api('/api/quotes/goodreads-set', { slugs, want }).catch((e) => { gr.error = e.message; render(); });
   const rows = shown.map((a) => {
     const picked = gr.picks.has(a.slug);
-    const count = h('input', { type: 'number', min: 1, max: 9999, value: gr.picks.get(a.slug) ?? a.limit ?? Math.max(gr.count, a.have ?? 0), style: 'width:80px',
-      oninput: (e) => { const n = Math.max(1, Number(e.target.value) || 1); if (gr.picks.has(a.slug)) { gr.picks.set(a.slug, n); syncImport(); } } });
+    const count = h('input', { type: 'number', min: 1, max: 9999, value: wantOf(a), style: 'width:80px',
+      onchange: (e) => { const n = Math.min(9999, Math.max(1, Number(e.target.value) || 1)); a.want = n; if (gr.picks.has(a.slug)) { gr.picks.set(a.slug, n); syncImport(); } setWant([a.slug], n); } });
     const box = h('input', { type: 'checkbox', checked: picked, onchange: (e) => {
       e.target.checked ? gr.picks.set(a.slug, Math.max(1, Number(count.value) || 1)) : gr.picks.delete(a.slug); syncImport(); } });
     return h('tr', {},
       h('td', {}, box),
       h('td', {}, a.image ? h('img', { src: a.image, alt: '', loading: 'lazy', style: 'width:32px;height:32px;border-radius:50%;object-fit:cover;vertical-align:middle' }) : null),
       h('td', {}, h('a', { class: 'link', href: `https://www.goodreads.com/author/quotes/${a.slug}`, target: '_blank', rel: 'noreferrer' }, a.name),
-        a.arabicName === false && gr.data.source === 'arabic' ? h('span', { class: 'meta', style: 'display:inline', title: 'Latin-spelled name; most of their quotes here are in Arabic' }, ' · Arabic quotes') : null,
-        a.haveName ? h('span', { class: 'meta', style: 'display:inline', dir: 'auto' }, ` · ${a.haveName}`) : null),
+        a.arabicName === false && a.sources.includes('arabic') ? h('span', { class: 'meta', style: 'display:inline', title: 'Latin-spelled name; most of their quotes are in Arabic' }, ' · Arabic quotes') : null,
+        a.aliases?.length ? h('span', { class: 'meta', style: 'display:inline', title: `Also on Goodreads as ${a.aliases.join(', ')} — imported together` }, ` · ${a.aliases.length + 1} profiles`) : null,
+      ),
+      h('td', { class: 'meta', style: 'white-space:nowrap', dir: 'auto' }, a.sources.map(grSourceLabel).join(', ')),
+      h('td', { class: 'meta', style: 'white-space:nowrap' }, a.added_at),
       h('td', { class: 'num' }, a.popular),
+      h('td', { class: 'num', title: 'Their scanned quotes that are in Arabic' }, a.popular ? `${a.arabicQuotes}/${a.popular}` : '—'),
       h('td', { class: 'num' }, a.likes.toLocaleString()),
-      h('td', { class: 'num' }, a.have != null ? h('span', { class: 'pill ok', title: a.limit ? `limit ${a.limit}` : 'default limit 500' }, a.have) : '—'),
       h('td', {}, count));
   });
 
-  const setAll = h('input', { type: 'number', min: 1, max: 9999, value: gr.count, style: 'width:80px', oninput: (e) => { gr.count = Math.max(1, Number(e.target.value) || 1); } });
-  const reload = () => { gr.data = null; gr.picks.clear(); loadGoodreads(gr.source === 'arabic' ? 1 : 3); };
-  const source = h('select', { disabled: gr.loading, onchange: (e) => { gr.source = e.target.value; if (gr.source !== 'tag') reload(); else render(); } },
+  const setAll = h('input', { type: 'number', min: 1, max: 9999, value: gr.count, style: 'width:80px', oninput: (e) => { gr.count = Math.min(9999, Math.max(1, Number(e.target.value) || 1)); } });
+  // The list shows the authors found by the selected source (or all of them, from the filter select).
+  const source = h('select', { disabled: gr.scanning, onchange: (e) => { gr.source = e.target.value; render(); } },
     [['popular', 'Popular quotes'], ['arabic', 'Arabic authors'], ['tag', 'A tag…']].map(([v, l]) => h('option', { value: v, selected: v === gr.source }, l)));
   const tag = gr.source === 'tag' ? h('input', { type: 'search', placeholder: 'tag, e.g. wisdom or حب', value: gr.tag, dir: 'auto', style: 'width:200px',
-    oninput: (e) => { gr.tag = e.target.value.trim(); }, onkeydown: (e) => { if (e.key === 'Enter') reload(); } }) : null;
+    oninput: (e) => { gr.tag = e.target.value.trim(); }, onkeydown: (e) => { if (e.key === 'Enter') scanGoodreads(false); } }) : null;
+  const p = gr.pages[gr.source];
 
-  return h('details', { class: 'card', open: gr.open, ontoggle: (e) => { gr.open = e.target.open; if (gr.open && !gr.data && !gr.loading) loadGoodreads(gr.pages); } },
+  return h('details', { class: 'card', open: gr.open, ontoggle: (e) => { const was = gr.open; gr.open = e.target.open; if (gr.open && !was) render(); } },
     h('summary', { style: 'cursor:pointer' }, h('b', {}, 'Famous Goodreads authors'),
-      h('span', { class: 'meta', style: 'display:inline' }, ' · from goodreads.com/quotes (popular, Arabic or a tag), pick authors and how many quotes each')),
-    h('div', { class: 'toolbar', style: 'margin-top:8px' }, source, tag,
-      h('button', { class: 'btn', disabled: gr.loading, onclick: reload }, 'Load'),
-      gr.data && gr.pages < gr.data.maxPages ? h('button', { class: 'btn', disabled: gr.loading, onclick: () => loadGoodreads(Math.min(gr.data.maxPages, gr.pages + (gr.data.source === 'arabic' ? 1 : 3))) }, 'More pages') : null,
-      h('span', { class: 'meta' }, gr.loading
-        ? (gr.source === 'arabic' ? `Reading ${gr.pages} page(s) of each Arabic tag (about ${gr.pages * 30}s)…` : `Reading Goodreads (${gr.pages} pages)…`)
-        : gr.data ? `${shown.length} ${gr.onlyNew ? 'new ' : ''}of ${all.length} authors from ${gr.data.source === 'arabic' ? `${gr.data.pages} page(s) of ${gr.data.tags.length} Arabic tags` : `${gr.data.pages} page(s) × 30 quotes`}${gr.data.tag ? ` tagged “${gr.data.tag}”` : ''}` : ''),
+      h('span', { class: 'meta', style: 'display:inline' }, gr.list ? ` · ${all.length} listed, ${pending.length} not imported yet` : ' · a saved list of authors found on goodreads.com/quotes; scan to add more, then import')),
+    h('div', { class: 'toolbar', style: 'margin-top:8px' }, h('span', { class: 'meta' }, 'Scan'), source, tag,
+      h('button', { class: 'btn', disabled: gr.scanning, title: `Reads ${p} page(s) and adds new authors to the list`, onclick: () => scanGoodreads(false) }, `Scan ${p} page(s)`),
+      p < (gr.list?.maxPages?.[gr.source] ?? 20) ? h('button', { class: 'btn', disabled: gr.scanning, onclick: () => scanGoodreads(true) }, 'Scan more pages') : null,
+      h('span', { class: 'meta' }, gr.scanning
+        ? (gr.source === 'arabic' ? `Reading ${p} page(s) of each Arabic tag (about ${p * 30}s)…` : `Reading Goodreads (${p} pages)…`)
+        : gr.scanMsg),
       gr.error ? h('span', { class: 'bad' }, gr.error) : null),
-    gr.data ? h('div', { class: 'toolbar' },
-      h('label', {}, h('input', { type: 'checkbox', checked: gr.onlyNew, onchange: (e) => {
-        gr.onlyNew = e.target.checked; if (gr.onlyNew) for (const k of gr.picks.keys()) if (all.find((a) => a.slug === k)?.have != null) gr.picks.delete(k); render(); } }), ' Only authors not on quotes.elhellal.com'),
+    gr.list ? h('div', { class: 'toolbar' },
+      h('select', { onchange: (e) => { gr.lang = e.target.value; render(); } },
+        h('option', { value: '' }, 'Any language'), Object.entries(GR_LANG).map(([k, f]) => h('option', { value: k, selected: k === gr.lang }, `${f.label} · ${all.filter(f.test).filter((a) => !gr.filter || a.sources.includes(gr.filter)).length}`))),
+      h('select', { onchange: (e) => { gr.filter = e.target.value; render(); } },
+        h('option', { value: '', selected: !gr.filter }, `All sources · ${all.filter((a) => !gr.lang || GR_LANG[gr.lang].test(a)).length}`), sources.map((s) => h('option', { value: s, selected: s === gr.filter }, `${grSourceLabel(s)} · ${all.filter((a) => a.sources.includes(s) && (!gr.lang || GR_LANG[gr.lang].test(a))).length}`))),
       h('label', { class: 'meta' }, 'Quotes each ', setAll),
-      h('button', { class: 'btn', onclick: () => { for (const k of gr.picks.keys()) gr.picks.set(k, gr.count); render(); } }, 'Apply to ticked'),
-      h('button', { class: 'btn', onclick: () => { gr.data.authors.filter((a) => a.have == null).forEach((a) => gr.picks.set(a.slug, gr.count)); render(); } }, 'Tick all new'),
+      h('button', { class: 'btn', disabled: !gr.picks.size, title: 'Also saved on the list, for later imports', onclick: async () => {
+        const slugs = [...gr.picks.keys()]; for (const k of slugs) gr.picks.set(k, gr.count); await setWant(slugs, gr.count); await loadGoodreadsList(); render(); } }, 'Apply to ticked'),
+      h('button', { class: 'btn', onclick: () => { shown.forEach((a) => gr.picks.set(a.slug, wantOf(a))); render(); } }, 'Tick all shown'),
       h('button', { class: 'btn', onclick: () => { gr.picks.clear(); render(); } }, 'Clear'),
-      importBtn) : null,
-    gr.data && !shown.length ? h('div', { class: 'empty' }, 'Every author on these pages is already on the site — load more pages or try a tag.') : null,
+      h('button', { class: 'btn danger', disabled: !gr.picks.size, title: 'Hide from the list; scans will not add them back', onclick: async () => {
+        await api('/api/quotes/goodreads-set', { slugs: [...gr.picks.keys()], dismissed: true }); gr.picks.clear(); await loadGoodreadsList(); render(); } }, 'Dismiss ticked'),
+      h('span', { class: 'meta' }, `Showing ${shown.length} of ${all.length}`),
+      importBtn, importPending) : null,
+    gr.list && !all.length ? h('div', { class: 'empty' }, 'The list is empty — scan popular quotes, the Arabic tags or a tag to fill it.') : null,
+    gr.list && all.length && !shown.length ? h('div', { class: 'empty' }, gr.filter && !sources.includes(gr.filter) ? `Nothing from ${grSourceLabel(gr.filter)} on the list yet — click Scan.` : 'No listed author matches these filters — scan more pages or another tag.') : null,
     shown.length ? h('div', { class: 'list', style: 'max-height:460px;overflow:auto' }, h('table', {},
-      h('tr', {}, h('th', {}, ''), h('th', {}, ''), h('th', {}, 'Author'), h('th', { class: 'num', title: 'Quotes of theirs on the loaded pages' }, 'Popular'),
-        h('th', { class: 'num', title: 'Likes on those quotes' }, 'Likes'), h('th', { class: 'num' }, 'Have'), h('th', {}, 'Keep at most')),
+      h('tr', {}, h('th', {}, ''), h('th', {}, ''), h('th', {}, 'Author'), h('th', {}, 'Found in'), h('th', {}, 'Added'), h('th', { class: 'num', title: 'Their quotes on the scanned pages' }, 'Popular'),
+        h('th', { class: 'num', title: 'Arabic / all of their scanned quotes' }, 'Arabic'), h('th', { class: 'num', title: 'Likes on those quotes' }, 'Likes'), h('th', {}, 'Keep at most')),
       rows)) : null,
-    gr.data ? h('p', { class: 'meta', style: 'margin-bottom:0' }, 'Imports the most-liked quotes first, up to the number given; that number is saved on the author so later re-checks keep to it. Lowering it never deletes quotes already imported.') : null);
+    gr.list ? h('p', { class: 'meta', style: 'margin-bottom:0' }, `Imports the most-liked quotes first, up to the number given (saved on the list; default ${gr.list.defaultWant}), and the importer saves it on the author so later re-checks keep to it. Lowering it never deletes quotes already imported.${gr.list.dismissed ? ` ${gr.list.dismissed} dismissed author(s) hidden.` : ''}`) : null);
 }
 
 function quoteRow(x) {

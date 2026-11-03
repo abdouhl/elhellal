@@ -651,6 +651,16 @@ function saveCandidates(list: Candidate[]) {
     fs.writeFileSync(CANDIDATES_PATH, JSON.stringify(list, null, 2) + '\n');
 }
 
+/** Articles on the site per author (lowercased screen_name). */
+function articleCountsByAuthor() {
+    const counts = new Map<string, number>();
+    for (const r of rows()) {
+        const name = r.article.screen_name.toLowerCase();
+        counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
+    return counts;
+}
+
 interface DiscoveredPublication {
     subdomain: string;
     name?: string;
@@ -673,10 +683,12 @@ function mergeDiscovery(): number {
     const list = loadCandidates();
     const byName = new Map(list.map((c) => [c.username, c]));
     const blocked = new Set(loadBlocklist().authors);
+    const onSite = articleCountsByAuthor();
     let added = 0;
     for (const p of pubs) {
         const username = substackUsername(p.subdomain);
-        if (!username || blocked.has(username)) continue;
+        // Authors with articles on the site already are imported: not candidates any more.
+        if (!username || blocked.has(username) || onSite.has(username)) continue;
         const sample = p.posts?.[0];
         const stats = {
             name: p.name || undefined,
@@ -712,13 +724,13 @@ const discoverSlot: Slot = {
 
 function listCandidates() {
     const blocked = new Set(loadBlocklist().authors);
-    const counts = new Map<string, number>();
-    for (const r of rows()) {
-        const name = r.article.screen_name.toLowerCase();
-        counts.set(name, (counts.get(name) ?? 0) + 1);
-    }
-    const items = loadCandidates()
-        .map((c) => ({ ...c, articles: counts.get(c.username) ?? 0, blocked: blocked.has(c.username) }))
+    const counts = articleCountsByAuthor();
+    // Drop candidates who have articles on the site now (imported since they were listed).
+    const all = loadCandidates();
+    const pending = all.filter((c) => !counts.has(c.username));
+    if (pending.length !== all.length) saveCandidates(pending);
+    const items = pending
+        .map((c) => ({ ...c, articles: 0, blocked: blocked.has(c.username) }))
         .sort((a, b) => b.added_at.localeCompare(a.added_at) || (b.score ?? 0) - (a.score ?? 0));
     return { items };
 }
@@ -728,12 +740,13 @@ function addCandidates(body: Body) {
     const bad = inputs.filter((i) => !substackUsername(i));
     if (bad.length) throw new HttpError(400, `Not a Substack username or *.substack.com URL: ${bad.join(', ')}`);
     const blocked = new Set(loadBlocklist().authors);
+    const onSite = articleCountsByAuthor();
     const list = loadCandidates();
     const have = new Set(list.map((c) => c.username));
     const skipped: string[] = [];
     let added = 0;
     for (const username of new Set(inputs.map((i) => substackUsername(i)!))) {
-        if (blocked.has(username)) skipped.push(username);
+        if (blocked.has(username) || onSite.has(username)) skipped.push(username);
         else if (!have.has(username)) {
             list.push({ username, source: 'manual', added_at: today() });
             have.add(username);
@@ -1103,6 +1116,11 @@ function socialArgs(tool: SocialTool, body: Body): string[] {
         else if (articles) args.push('--articles', String(articles));
         if (quizzes === 0) args.push('--no-quiz');
         else if (quizzes) args.push('--quizzes', String(quizzes));
+        if (tool === 'linkedin') {
+            const quotes = intArg(body, 'quotes', 0, 12);
+            if (quotes === 0) args.push('--no-quotes');
+            else if (quotes) args.push('--quotes', String(quotes));
+        }
         if (tool === 'x' && body.book === false) args.push('--no-book');
         if (span === 'next') {
             const days = intArg(body, 'days', 1, 60);
@@ -1514,8 +1532,9 @@ const SITES: Record<string, Site> = {
             'check-data': runScript('Check data', 'check-data'),
             'sync-book-summaries': runScript('Sync book links', 'sync-book-summaries', { writes: true }),
             'sync-biographies': runScript('Sync biography links', 'sync-biographies', { writes: true }),
-            // Args: Goodreads author slugs, each optionally `slug:N` (keep at most N quotes), plus --only (skip the re-check of known authors).
-            'import-quotes': runScript('Import from Goodreads', 'import-quotes', { writes: true, args: /^(--only|[\w.-]+(:\d{1,4})?)$/ }),
+            // Args: Goodreads author slugs, each optionally `slug:N` (keep at most N quotes). runSite turns no args into the listed
+            // authors not imported yet and adds --only to typed slugs; --all re-checks every known author (the script's own default).
+            'import-quotes': runScript('Import from Goodreads', 'import-quotes', { writes: true, args: /^(--only|--all|[\w.-]+(:\d{1,4})?)$/ }),
         },
     },
     books: {
@@ -1605,10 +1624,18 @@ function runSite(body: Body) {
     if (!step) throw new HttpError(400, `Unknown step ${stepName}`);
     if (stepName === 'deploy' && !fs.existsSync(path.join(s.dir, s.builtFile ?? 'dist/_worker.js'))) throw new HttpError(400, 'No build in dist/ — build first');
     if (stepName === 'push' && gitIn(s.dir, 'branch', '--show-current').out.trim() !== 'main') throw new HttpError(409, `${s.title} is not on main`);
-    const args = splitList(body.args);
+    let args = splitList(body.args);
     if (args.length && !step.args) throw new HttpError(400, `${stepName} takes no arguments`);
     const bad = args.find((a) => !step.args!.test(a));
     if (bad) throw new HttpError(400, `Invalid argument ${bad}`);
+    if (s.name === 'quotes' && stepName === 'import-quotes') {
+        const all = args.includes('--all');
+        args = args.filter((a) => a !== '--all');
+        if (!all && !args.length) {
+            args = pendingQuoteImportArgs();
+            if (!args.length) throw new HttpError(400, 'Every listed Goodreads author is already imported — scan for more in “Famous Goodreads authors”, or pass --all to re-check known authors');
+        } else if (!all && !args.includes('--only')) args.unshift('--only');
+    }
     return startCommand(sitesSlot, [...step.cmd, ...args], [step.display, ...args].join(' '), { mode: `${s.name}:${stepName}`, scopes: [s.name] }, path.join(s.dir, step.cwd ?? ''), step.env);
 }
 
@@ -1815,15 +1842,18 @@ function listQuotes(params: URLSearchParams) {
 
 // Goodreads' popular quotes (/quotes, /quotes/tag/<tag>, or a set of Arabic tags) grouped by author, to pick
 // who to import and how many of their quotes. Pages are cached for the session; each new page waits a bit (be polite).
+// A scan adds what it finds to a saved list (.goodreads-discovery/authors.json), which is what the card shows.
 const GR_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 const GR_MAX_PAGES = 20; // Goodreads serves up to 100; 20 × 30 quotes is plenty to find the famous authors
 const GR_ARABIC_MAX_PAGES = 5; // per tag, so up to tags × 5 fetches
 /** Goodreads tags Arabic quotes collect under; Arabic mode reads page N of each. */
 const GR_ARABIC_TAGS = ['arabic', 'اقتباسات', 'حب', 'الحب', 'الحياة', 'حياة', 'حكمة', 'الحكمة', 'أدب', 'الأدب', 'شعر', 'الوطن', 'الحرية', 'الموت', 'الله', 'الإنسان', 'السعادة', 'الأمل', 'الحزن', 'فلسفة'];
-interface GrPageAuthor { quote: string; slug: string; name: string; image?: string; likes: number; arabic: boolean }
+interface GrPageAuthor { quote: string; slug: string; name: string; image?: string | undefined; likes: number; arabic: boolean }
 const grPages = new Map<string, GrPageAuthor[]>();
 const isArabic = (s: string) => (s.match(/[؀-ۿ]/g) ?? []).length > (s.match(/[a-zA-Z]/g) ?? []).length;
-const foldName = (s: string) => s.replace(/[ً-ْـ]/g, '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[\s,،.]+/g, ' ').trim().toLowerCase();
+// Same folding as foldAuthorName in elhellal-quotes/scripts/lib/goodreads.ts ("الطيب صالح" = "طيب صالح").
+const foldName = (s: string) => s.replace(/[ً-ْـ]/g, '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[\s,،.\-_]+/g, ' ').trim().toLowerCase()
+    .split(' ').map((w) => (w.length > 3 && w.startsWith('ال') ? w.slice(2) : w)).join(' ');
 
 async function goodreadsPage(tag: string, page: number): Promise<GrPageAuthor[]> {
     const key = `${tag}|${page}`;
@@ -1856,12 +1886,64 @@ async function goodreadsPage(tag: string, page: number): Promise<GrPageAuthor[]>
     return grPages.get(key)!;
 }
 
-async function goodreadsAuthors(params: URLSearchParams) {
-    const arabic = params.get('source') === 'arabic';
-    const tag = arabic ? '' : (params.get('tag') ?? '').trim().toLowerCase().replace(/\s+/g, '-');
+// Scanned authors are kept in a list (like the Substack import list) instead of being scraped
+// every time the card opens: a scan merges what it finds, the card reads the list, and a plain
+// "Import from Goodreads" run imports only the listed authors not on the site yet.
+const GR_LIST_DIR = path.join(ROOT, '.goodreads-discovery');
+const GR_LIST_PATH = path.join(GR_LIST_DIR, 'authors.json');
+const GR_DEFAULT_WANT = 50;
+
+interface GrListed {
+    slug: string;
+    name: string;
+    image?: string | undefined;
+    likes: number;
+    popular: number;
+    arabicQuotes: number;
+    arabicName: boolean;
+    /** Other Goodreads profiles of the same person, imported together. */
+    aliases: string[];
+    /** Where scans found them: popular, arabic, tag:<tag>. */
+    sources: string[];
+    added_at: string;
+    seen_at: string;
+    /** How many quotes to import (default GR_DEFAULT_WANT). */
+    want?: number | undefined;
+    /** Hidden from the list, and never re-added by a scan. */
+    dismissed?: boolean | undefined;
+}
+
+function loadGrList(): GrListed[] {
+    try {
+        return JSON.parse(fs.readFileSync(GR_LIST_PATH, 'utf-8')) as GrListed[];
+    } catch {
+        return [];
+    }
+}
+
+function saveGrList(list: GrListed[]) {
+    fs.mkdirSync(GR_LIST_DIR, { recursive: true });
+    fs.writeFileSync(GR_LIST_PATH, JSON.stringify(list, null, 2) + '\n');
+}
+
+/** Finds the quotes.json author a Goodreads row is: by profile slug (or alias), else by Arabic name. */
+function quoteAuthorMatcher() {
+    const mine = fs.existsSync(QUOTES_JSON) ? quoteAuthors() : [];
+    const bySlug = new Map<string, QuoteAuthor>();
+    for (const a of mine) for (const g of [a.goodreadsSlug, ...((a.goodreadsAliases as string[] | undefined) ?? [])]) if (g) bySlug.set(g as string, a);
+    // Arabic names are kept verbatim on import, so an author added some other way (or under another profile) still matches by name.
+    const byName = new Map(mine.map((a) => [foldName(a.name), a]));
+    return (a: { slug: string; aliases?: string[]; name: string; arabicName: boolean }) =>
+        [a.slug, ...(a.aliases ?? [])].map((s) => bySlug.get(s)).find(Boolean) ?? (a.arabicName ? byName.get(foldName(a.name)) : undefined);
+}
+
+/** Reads Goodreads' popular quotes (/quotes, a tag, or the Arabic tags) and merges their authors into the list. */
+async function scanGoodreads(body: Body) {
+    const arabic = body.source === 'arabic';
+    const tag = arabic ? '' : str(body.tag).trim().toLowerCase().replace(/\s+/g, '-');
     if (tag && !/^[\p{L}\p{N}_-]+$/u.test(tag)) throw new HttpError(400, 'Tag must be letters, digits and dashes');
     const maxPages = arabic ? GR_ARABIC_MAX_PAGES : GR_MAX_PAGES;
-    const pages = Math.min(maxPages, Math.max(1, Number(params.get('pages')) || (arabic ? 1 : 3)));
+    const pages = Math.min(maxPages, Math.max(1, Number(body.pages) || (arabic ? 1 : 3)));
     const tags = arabic ? GR_ARABIC_TAGS : [tag];
     const byslug = new Map<string, Omit<GrPageAuthor, 'quote' | 'arabic'> & { popular: number; arabicQuotes: number }>();
     const seen = new Set<string>();
@@ -1881,26 +1963,100 @@ async function goodreadsAuthors(params: URLSearchParams) {
             }
         }
     }
-    const mine = quoteAuthors();
-    const bySlug = new Map(mine.filter((a) => a.goodreadsSlug).map((a) => [a.goodreadsSlug as string, a]));
-    // Arabic names are kept verbatim on import, so an author added some other way (no Goodreads slug) still matches by name.
-    const byName = new Map(mine.map((a) => [foldName(a.name), a]));
+    const match = quoteAuthorMatcher();
     let authors = [...byslug.values()].map((a) => ({ ...a, arabicName: isArabic(a.name) }));
     // An Arabic author: an Arabic name, or mostly Arabic quotes (Latin-spelled names like "Khaled Ibrahim").
     if (arabic) authors = authors.filter((a) => a.arabicName || a.arabicQuotes * 2 >= a.popular);
-    return {
-        source: arabic ? 'arabic' : tag ? 'tag' : 'popular',
-        tag,
-        tags: arabic ? GR_ARABIC_TAGS : undefined,
-        pages,
-        maxPages,
-        authors: authors
-            .sort((x, y) => y.likes - x.likes)
-            .map((a) => {
-                const m = bySlug.get(a.slug) ?? (a.arabicName ? byName.get(foldName(a.name)) : undefined);
-                return { ...a, have: m ? quoteCount(m) : null, haveName: m?.name ?? null, limit: (m?.goodreadsLimit as number | undefined) ?? null };
-            }),
-    };
+    // Goodreads often has two profiles for one person ("5835922.Naguib_Mahfouz" and "4273240._", both named نجيب محفوظ):
+    // one row per person, importing every profile (the importer merges them into one author).
+    const people = new Map<string, (typeof authors)[number] & { aliases: string[] }>();
+    for (const a of authors.sort((x, y) => y.likes - x.likes)) {
+        const m = match({ ...a, aliases: [] });
+        const key = m ? `have:${m.slug}` : a.arabicName ? `name:${foldName(a.name)}` : `slug:${a.slug}`;
+        const p = people.get(key);
+        if (!p) { people.set(key, { ...a, aliases: [] }); continue; }
+        p.aliases.push(a.slug);
+        p.likes += a.likes;
+        p.popular += a.popular;
+        p.arabicQuotes += a.arabicQuotes;
+        if (!p.image && a.image) p.image = a.image;
+    }
+
+    const source = arabic ? 'arabic' : tag ? `tag:${tag}` : 'popular';
+    const list = loadGrList();
+    const index = new Map<string, GrListed>();
+    for (const e of list) for (const s of [e.slug, ...e.aliases]) index.set(s, e);
+    const byName = new Map(list.filter((e) => e.arabicName).map((e) => [foldName(e.name), e]));
+    let added = 0;
+    let updated = 0;
+    for (const p of people.values()) {
+        // Authors already on the quotes site are imported: not listed.
+        if (match(p)) continue;
+        const e = [p.slug, ...p.aliases].map((s) => index.get(s)).find(Boolean) ?? (p.arabicName ? byName.get(foldName(p.name)) : undefined);
+        if (e) {
+            for (const s of [p.slug, ...p.aliases]) if (s !== e.slug && !e.aliases.includes(s)) { e.aliases.push(s); index.set(s, e); }
+            e.image ||= p.image;
+            e.likes = Math.max(e.likes, p.likes);
+            e.popular = Math.max(e.popular, p.popular);
+            e.arabicQuotes = Math.max(e.arabicQuotes, p.arabicQuotes);
+            if (!e.sources.includes(source)) e.sources.push(source);
+            e.seen_at = today();
+            updated++;
+        } else {
+            const n: GrListed = { slug: p.slug, name: p.name, image: p.image, likes: p.likes, popular: p.popular, arabicQuotes: p.arabicQuotes, arabicName: p.arabicName,
+                aliases: p.aliases, sources: [source], added_at: today(), seen_at: today() };
+            list.push(n);
+            for (const s of [n.slug, ...n.aliases]) index.set(s, n);
+            if (n.arabicName) byName.set(foldName(n.name), n);
+            added++;
+        }
+    }
+    saveGrList(list);
+    return { source, pages, maxPages, tags: arabic ? GR_ARABIC_TAGS : undefined, found: people.size, added, updated };
+}
+
+/** The listed authors, each with what the site already has of them. */
+function goodreadsAuthors(params: URLSearchParams) {
+    const match = quoteAuthorMatcher();
+    const withDismissed = params.get('dismissed') === '1';
+    // Drop listed authors who have quotes on the site now (imported since they were listed).
+    const listed = loadGrList();
+    const all = listed.filter((e) => !match(e));
+    if (all.length !== listed.length) saveGrList(all);
+    const authors = all
+        .filter((e) => withDismissed || !e.dismissed)
+        .map((e) => {
+            const m = match(e);
+            return { ...e, want: e.want ?? null, have: m ? quoteCount(m) : null, haveName: m?.name ?? null, limit: (m?.goodreadsLimit as number | undefined) ?? null };
+        })
+        .sort((x, y) => y.likes - x.likes);
+    return { authors, dismissed: all.filter((e) => e.dismissed).length, defaultWant: GR_DEFAULT_WANT, maxPages: { popular: GR_MAX_PAGES, arabic: GR_ARABIC_MAX_PAGES, tag: GR_MAX_PAGES } };
+}
+
+/** Sets how many quotes to import and/or (un)dismisses listed authors. */
+function setGoodreadsAuthors(body: Body) {
+    const slugs = ids(body.slugs);
+    if (!slugs.size) throw new HttpError(400, 'No authors given');
+    const want = body.want == null ? undefined : Number(body.want);
+    if (want !== undefined && (!Number.isInteger(want) || want < 1 || want > 9999)) throw new HttpError(400, 'Quotes must be 1–9999');
+    const list = loadGrList();
+    let changed = 0;
+    for (const e of list) {
+        if (!slugs.has(e.slug)) continue;
+        if (want !== undefined) e.want = want;
+        if (typeof body.dismissed === 'boolean') e.dismissed = body.dismissed || undefined;
+        changed++;
+    }
+    saveGrList(list);
+    return { changed };
+}
+
+/** `--only slug:N …` for every listed author not on the site yet (all of a person's profiles). */
+function pendingQuoteImportArgs(): string[] {
+    const match = quoteAuthorMatcher();
+    const pending = loadGrList().filter((e) => !e.dismissed && !match(e));
+    if (!pending.length) return [];
+    return ['--only', ...pending.flatMap((e) => [e.slug, ...e.aliases].map((s) => `${s}:${e.want ?? GR_DEFAULT_WANT}`))];
 }
 
 function editQuote(body: Body) {
@@ -2917,6 +3073,8 @@ const POST: Record<string, (body: Body) => unknown | Promise<unknown>> = {
     '/api/sites/ai': runAi,
     '/api/sites/commit': commitSite,
     '/api/quotes/edit': editQuote,
+    '/api/quotes/goodreads-scan': scanGoodreads,
+    '/api/quotes/goodreads-set': setGoodreadsAuthors,
     '/api/quotes/remove': removeQuotes,
     '/api/quotes/remove-author': removeQuoteAuthor,
     '/api/entries/save': saveEntry,
