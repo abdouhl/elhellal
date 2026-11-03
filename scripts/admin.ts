@@ -1508,7 +1508,7 @@ interface Site {
     /** What the Sites tab edits and commits, relative to the repo. */
     data: string[];
     steps: Record<string, SiteStep>;
-    /** Build/ship buttons; defaults to RELEASE_STEPS (wrangler deploy). */
+    /** Build/ship buttons; defaults to releaseFor (wrangler deploy + IndexNow). */
     release?: Record<string, SiteStep>;
     /** File whose presence/mtime means "built" (default dist/_worker.js). */
     builtFile?: string;
@@ -1516,11 +1516,17 @@ interface Site {
 
 const siteDir = (name: string) => path.join(DEV_DIR, name);
 const runScript = (label: string, script: string, extra: Partial<SiteStep> = {}): SiteStep => ({ label, cmd: [BUN, 'run', script], display: `bun run ${script}`, ...extra });
-const RELEASE_STEPS: Record<string, SiteStep> = {
+/** Pings IndexNow with the site's new pages (elhellal's scripts/indexnow.ts, which reads the live sitemaps). */
+const indexNow = (url: string) => `"${BUN}" run --cwd "${ROOT}" indexnow --only ${new URL(url).host}`;
+const releaseFor = (url: string): Record<string, SiteStep> => ({
     build: runScript('Build', 'build'),
-    deploy: { label: 'Deploy', cmd: [BUN, 'x', 'wrangler', 'deploy'], display: 'bunx wrangler deploy' },
-    'build+deploy': { label: 'Build & deploy', cmd: ['sh', '-c', `"${BUN}" run build && "${BUN}" x wrangler deploy`], display: 'bun run build && bunx wrangler deploy' },
-};
+    deploy: { label: 'Deploy', cmd: ['sh', '-c', `"${BUN}" x wrangler deploy && ${indexNow(url)}`], display: 'bunx wrangler deploy && bun run indexnow' },
+    'build+deploy': {
+        label: 'Build & deploy',
+        cmd: ['sh', '-c', `"${BUN}" run build && "${BUN}" x wrangler deploy && ${indexNow(url)}`],
+        display: 'bun run build && bunx wrangler deploy && bun run indexnow',
+    },
+});
 
 const SITES: Record<string, Site> = {
     quotes: {
@@ -1598,7 +1604,7 @@ const SITES: Record<string, Site> = {
     },
 };
 
-const releaseSteps = (s: Site) => s.release ?? RELEASE_STEPS;
+const releaseSteps = (s: Site) => s.release ?? releaseFor(s.url);
 
 function site(name: unknown): Site & { name: string } {
     const s = SITES[str(name)];
