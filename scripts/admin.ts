@@ -43,6 +43,7 @@ import {
     saveOverrides,
 } from './lib/moderation.ts';
 import * as Tumblr from './lib/tumblr.ts';
+import { archivePages } from './lib/substack-archive.ts';
 
 const portArg = process.argv.indexOf('--port');
 const PORT = portArg > -1 ? Number(process.argv[portArg + 1]) : 4322;
@@ -777,13 +778,10 @@ async function substackPostCount(username: string): Promise<number> {
         if (xml.includes('<urlset')) return new Set(xml.match(/<loc>[^<]*\/p\/[^<]*<\/loc>/g) ?? []).size;
     }
     const slugs = new Set<string>();
-    for (let offset = 0; offset < 10_000; offset += 50) {
-        const res = await fetch(`${base}/api/v1/archive?sort=new&offset=${offset}&limit=50`, { headers: SUBSTACK_HEADERS, signal: AbortSignal.timeout(15000) });
-        if (!res.ok) throw new Error(`archive ${res.status}`);
-        const page = (await res.json()) as { slug: string }[];
+    for await (const page of archivePages<{ slug: string }>(base, { limit: 50, headers: SUBSTACK_HEADERS })) {
         const before = slugs.size;
         for (const p of page) slugs.add(p.slug);
-        if (!page.length || slugs.size === before) break; // end, or a publication that repeats its last page
+        if (slugs.size === before || slugs.size >= 10_000) break; // a publication that repeats its last page, or a safety cap
     }
     return slugs.size;
 }

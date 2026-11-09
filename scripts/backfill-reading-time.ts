@@ -16,6 +16,7 @@
 import { readArticles, writeArticles } from '../src/lib/articles-store.ts';
 import { minutesForWords } from '../src/lib/reading-time.ts';
 import type { Article } from '../src/types/index.ts';
+import { archivePages } from './lib/substack-archive.ts';
 
 const FETCH_HEADERS = {
     Accept: 'application/json',
@@ -48,23 +49,12 @@ function postSlug(url: string | undefined): string | null {
 /** Word counts for the given post slugs of one author; stops once all are found. */
 async function wordCounts(user: string, wanted: Set<string>): Promise<Map<string, number>> {
     const found = new Map<string, number>();
-    for (let page = 0; page < MAX_PAGES && found.size < wanted.size; page++) {
-        const res = await fetch(
-            `https://${user}.substack.com/api/v1/archive?sort=new&offset=${page * PAGE_SIZE}&limit=${PAGE_SIZE}`,
-            { headers: FETCH_HEADERS, signal: AbortSignal.timeout(15000) }
-        );
-        if (res.status === 429) {
-            console.log('   ⏳ rate limited, waiting 30s');
-            await sleep(30_000);
-            page--;
-            continue;
-        }
-        if (!res.ok) throw new Error(`archive ${res.status}`);
-        const entries = (await res.json()) as ArchiveEntry[];
-        if (entries.length === 0) break;
+    let page = 0;
+    for await (const entries of archivePages<ArchiveEntry>(`https://${user}.substack.com`, { limit: PAGE_SIZE, headers: FETCH_HEADERS })) {
         for (const e of entries) {
             if (wanted.has(e.slug) && e.wordcount) found.set(e.slug, e.wordcount);
         }
+        if (++page >= MAX_PAGES || found.size >= wanted.size) break;
         await sleep(DELAY_MS);
     }
     return found;

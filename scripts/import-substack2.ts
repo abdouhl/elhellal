@@ -44,6 +44,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { isPersian } from './lib/persian';
+import { archivePages } from './lib/substack-archive.ts';
 import type { ArticlesConfig, Article } from '../src/types/index.ts';
 import { personalBlogs } from '../src/data/personal-blogs.ts';
 import { fetchAuthorName, loadAuthorNames, saveAuthorNames } from './lib/author-names.ts';
@@ -292,36 +293,21 @@ interface ImportItem {
 async function fetchArchive(substackUser: string, allExistingIds: Set<string>): Promise<ArchiveEntry[]> {
     const base = `https://${substackUser}.substack.com`;
     const all: ArchiveEntry[] = [];
-    let offset = 0;
-    const limit = 12; // larger limits return inconsistent counts from Substack
 
     const seenSlugs = new Set<string>();
     let page = 0;
     const MAX_PAGES = 500; // safety cap — 500 * 12 = 6000 posts, far past any realistic archive
     let hitKnownArticle = false;
 
-    while (true) {
+    for await (const entries of archivePages<ArchiveEntry>(base, { limit: 12, headers: FETCH_HEADERS })) {
         page++;
         if (page > MAX_PAGES) {
             console.log(`   ⚠️  hit ${MAX_PAGES}-page safety cap, stopping pagination early`);
             break;
         }
 
-        let res: Response;
-        try {
-            res = await fetch(
-                `${base}/api/v1/archive?sort=new&offset=${offset}&limit=${limit}`,
-                { headers: FETCH_HEADERS, signal: AbortSignal.timeout(15000) },
-            );
-        } catch (e: any) {
-            throw new Error(`archive fetch failed at offset ${offset}: ${e.message}`);
-        }
-        if (!res.ok) throw new Error(`archive ${res.status} ${res.statusText}`);
-        const entries = await res.json() as ArchiveEntry[];
-        if (entries.length === 0) break;
-
-        // Some publications don't honor `offset` correctly and just repeat the
-        // last page forever — bail if every slug in this page has already been seen.
+        // Some publications repeat the last page forever — bail if every slug
+        // in this page has already been seen.
         const newEntries = entries.filter(e => !seenSlugs.has(e.slug));
         if (newEntries.length === 0) {
             console.log(`   ⚠️  page repeated with no new posts, stopping pagination`);
@@ -342,9 +328,7 @@ async function fetchArchive(substackUser: string, allExistingIds: Set<string>): 
             break;
         }
 
-        console.log(`   📄 page ${page}: offset=${offset} got=${entries.length} (${all.length} total so far)`);
-
-        offset += entries.length;
+        console.log(`   📄 page ${page}: got=${entries.length} (${all.length} total so far)`);
         await sleep(ARCHIVE_PAGE_DELAY_MS);
     }
 
