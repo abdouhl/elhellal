@@ -19,6 +19,11 @@ const LEADERBOARD_SIZE = 50;
 const DEFAULT_LIMIT = 8;
 const MAX_LIMIT = 50;
 const DEDUPE_TTL_SECONDS = 1800; // one increment per visitor per article per 30 min
+// Visits that came from a social post (?utm_source=x&utm_content=<post id>), counted per post so
+// `bun run x-stats --report` can rank posts by the readers they actually sent.
+const CLICK_SOURCES = new Set(["x", "tumblr", "linkedin"]);
+const CID_RE = /^[\p{L}\p{N}_:.\/-]{1,160}$/u;
+const MAX_CLICK_IDS = 5000;
 
 function isAllowedOrigin(origin: string | null): boolean {
 	if (!origin) return false;
@@ -97,9 +102,39 @@ async function handleTrackView(request: Request, env: Env, origin: string | null
 		await env.ARTICLE_VIEWS.put(countKey, String(count));
 		await env.ARTICLE_VIEWS.put(seenKey, "1", { expirationTtl: DEDUPE_TTL_SECONDS });
 		await upsertLeaderboard(env, slug, count);
+		const { src, cid } = body as { src?: unknown; cid?: unknown };
+		if (typeof src === "string" && CLICK_SOURCES.has(src) && typeof cid === "string" && CID_RE.test(cid)) {
+			await countClick(env, src, cid);
+		}
 	}
 
 	return json({ slug, count, counted: !alreadySeen }, { status: 200 }, origin);
+}
+
+async function getClicks(env: Env, src: string): Promise<Record<string, number>> {
+	try {
+		const parsed = JSON.parse((await env.ARTICLE_VIEWS.get(`clicks:${src}`)) || "{}");
+		return parsed && typeof parsed === "object" ? parsed : {};
+	} catch {
+		return {};
+	}
+}
+
+async function countClick(env: Env, src: string, cid: string): Promise<void> {
+	const map = await getClicks(env, src);
+	map[cid] = (map[cid] ?? 0) + 1;
+	const ids = Object.keys(map);
+	// Keep the map bounded: drop the least-clicked ids first.
+	if (ids.length > MAX_CLICK_IDS) {
+		for (const id of ids.sort((a, b) => map[a]! - map[b]!).slice(0, ids.length - MAX_CLICK_IDS)) delete map[id];
+	}
+	await env.ARTICLE_VIEWS.put(`clicks:${src}`, JSON.stringify(map));
+}
+
+async function handleSocialClicks(request: Request, env: Env, origin: string | null): Promise<Response> {
+	const src = new URL(request.url).searchParams.get("source") || "";
+	if (!CLICK_SOURCES.has(src)) return json({ error: "unknown source" }, { status: 400 }, origin);
+	return json({ source: src, clicks: await getClicks(env, src) }, { status: 200, headers: { "Cache-Control": "no-store" } }, origin);
 }
 
 async function handleMostRead(request: Request, env: Env, origin: string | null): Promise<Response> {
@@ -132,6 +167,10 @@ export default {
 
 		if (url.pathname === "/api/most-read" && request.method === "GET") {
 			return handleMostRead(request, env, origin);
+		}
+
+		if (url.pathname === "/api/social-clicks" && request.method === "GET") {
+			return handleSocialClicks(request, env, origin);
 		}
 
 		return json({ error: "not found" }, { status: 404 }, origin);

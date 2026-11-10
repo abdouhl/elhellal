@@ -719,7 +719,12 @@ import InstallCard from "../../components/InstallCard.astro";
         fetch(`${VIEWS_API_BASE}/track-view`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ slug }),
+          // A visit from a social post carries its id (?utm_source=x&utm_content=<id>) — counted per post.
+          body: JSON.stringify({
+            slug,
+            src: new URLSearchParams(location.search).get("utm_source") || undefined,
+            cid: new URLSearchParams(location.search).get("utm_content") || undefined,
+          }),
           keepalive: true,
         })
           .then(() => {

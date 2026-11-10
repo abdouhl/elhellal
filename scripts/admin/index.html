@@ -923,10 +923,12 @@ async function renderPublish() {
 }
 
 // ─── Social ───
-const social = jobPoller('soc', '/api/social/job', 'social', async () => { media.data = null; if (soc.tool === 'tumblr' && tum.status?.connected) { tum.status = null; if (tum.queue) tumLoad('queue'); } if (state.tab === 'social') renderSocial(); });
+const social = jobPoller('soc', '/api/social/job', 'social', async () => { media.data = null; if (typeof xp !== 'undefined') xp.data = null; if (soc.tool === 'tumblr' && tum.status?.connected) { tum.status = null; if (tum.queue) tumLoad('queue'); } if (state.tab === 'social') renderSocial(); });
 const SOCIAL_TOOLS = { x: 'X (Twitter)', linkedin: 'LinkedIn', tumblr: 'Tumblr', 'tiktok-slides': 'TikTok — articles slideshow', 'tiktok-books': 'TikTok — book summary' };
 const nextMonth = () => { const d = new Date(); d.setMonth(d.getMonth() + 1); return d.toISOString().slice(0, 7); };
-const soc = { tool: 'x', span: 'day', month: nextMonth(), days: '', articles: '', quizzes: '', book: true, category: '', since: '', date: '', random: false, dryRun: true, count: '', time: '', force: false, bookSlug: '', perDay: 1, times: ['19:00'], quotes: '', books: '', bios: '', reblogs: '', from: '', to: '' };
+const soc = { tool: 'x', span: 'day', month: nextMonth(), days: '', articles: '', quizzes: '', book: true, category: '', since: '', date: '', random: false, dryRun: true, count: '', time: '', force: false, bookSlug: '', perDay: 1, times: ['19:00'], quotes: '', books: '', bios: '', reblogs: '', from: '', to: '',
+  // X only
+  cards: true, xBios: true, roundup: true, recycle: true, jitter: true, aiHooks: false, autoTimes: false, noLinkShare: '', tz: 'Asia/Riyadh', ramadan: 'auto' };
 const TIKTOK_TIMES = { 1: ['19:00'], 2: ['13:00', '20:00'], 3: ['10:00', '15:00', '20:00'] };
 
 async function copySnippet(tool) {
@@ -959,13 +961,27 @@ async function renderSocial() {
         soc.span === 'month' ? field('Month', monthIn) : field(soc.span === 'day' ? 'Day (default: today/tomorrow)' : 'First day', dateIn),
         soc.span === 'next' ? field('Days', num('days', '30', 60)) : null,
         field('Articles / day', num('articles', t === 'linkedin' ? '2 (0 = none)' : '4 (0 = none)', 12)),
-        t === 'linkedin' ? field('Quotes / day', num('quotes', '1 (0 = none)', 12)) : null,
+        field('Quotes / day', num('quotes', '1 (0 = none)', 12)),
         field('Quizzes / day', num('quizzes', t === 'linkedin' ? '1 (0 = none)' : '2 (0 = none)', 12)),
         field('Category', h('select', { disabled: running, onchange: (e) => { soc.category = e.target.value; } }, categoryOptions(soc.category, true))),
         field('Articles since', h('input', { type: 'date', value: soc.since, disabled: running, oninput: (e) => { soc.since = e.target.value; } })),
       ),
+      t === 'x' ? h('div', { class: 'toolbar' },
+        field('Audience clock', h('select', { disabled: running, onchange: (e) => { soc.tz = e.target.value; } },
+          [['Asia/Riyadh', 'Gulf (Riyadh)'], ['Africa/Cairo', 'Egypt (Cairo)'], ['Africa/Algiers', 'Maghreb (Algiers)'], ['local', 'This Mac']].map(([v, l]) => h('option', { value: v, selected: soc.tz === v }, l)))),
+        field('Ramadan slots', h('select', { disabled: running, onchange: (e) => { soc.ramadan = e.target.value; } },
+          [['auto', 'Auto (Hijri calendar)'], ['on', 'On'], ['off', 'Off']].map(([v, l]) => h('option', { value: v, selected: soc.ramadan === v }, l)))),
+        field('Articles without link %', num('noLinkShare', '20', 100)),
+      ) : null,
       h('div', { class: 'toolbar' },
         t === 'x' ? check('book', 'Daily book post') : null,
+        t === 'x' ? check('cards', 'Image cards', 'Article, quiz, quote and biography posts get a 4:5 card (x-posts/cards/)') : null,
+        t === 'x' ? check('xBios', 'Biographies', 'Anniversaries + Mondays and Thursdays') : null,
+        t === 'x' ? check('roundup', 'Saturday roundup') : null,
+        t === 'x' ? check('recycle', 'Re-post winners', 'Top fifth by x-stats comes back after 60 days with a new hook') : null,
+        t === 'x' ? check('aiHooks', 'AI hooks', 'Claude writes an opening line for some articles (cached in .x-schedule/hooks.json)') : null,
+        t === 'x' ? check('autoTimes', 'Auto times', 'Move the worst article hour to the best unused one (needs x-stats insights)') : null,
+        t === 'x' ? check('jitter', 'Jitter minutes', 'Post a few minutes off the round time') : null,
         check('random', 'Random order'),
         check('dryRun', 'Dry run', 'Print the plan without marking articles as used'),
       ),
@@ -1016,6 +1032,8 @@ async function renderSocial() {
       since: soc.since, date: soc.date, random: soc.random, dryRun: soc.dryRun, count: soc.count, time: soc.time, force: soc.force, perDay: soc.perDay, times: soc.times };
     if (t === 'tiktok-books') body.book = soc.bookSlug;
     if (t === 'linkedin') body.quotes = soc.quotes;
+    if (t === 'x') Object.assign(body, { quotes: soc.quotes, cards: soc.cards, bios: soc.xBios, roundup: soc.roundup, recycle: soc.recycle, jitter: soc.jitter,
+      aiHooks: soc.aiHooks, autoTimes: soc.autoTimes, noLinkShare: soc.noLinkShare, tz: soc.tz, ramadan: soc.ramadan });
     if (t === 'tumblr') Object.assign(body, { quotes: soc.quotes, books: soc.books, bios: soc.bios, reblogs: soc.reblogs, from: soc.from, to: soc.to });
     social.start('/api/social/run', body);
   };
@@ -1044,6 +1062,7 @@ async function renderSocial() {
         h('a', { class: 'link', href: snip.post, target: '_blank', rel: 'noreferrer' }, `Open ${SOCIAL_TOOLS[t]} ↗`),
         h('span', { class: 'meta' }, 'then DevTools console (⌘⌥J) → paste, keep the tab in front until it logs "done".'))
       : h('div', { class: 'meta' }, 'No snippet yet.')) : '',
+    t === 'x' ? xPanel(running) : '',
     t === 'tumblr' ? tumblrPanel(running) : '',
     t === 'tiktok-slides' ? (() => {
       const p = info.tiktokPrompt;
@@ -1063,6 +1082,78 @@ async function renderSocial() {
     ...social.view(),
   );
   social.update(true);
+}
+
+// X (Social tab): one-click run / verify, stats, and the latest batch as an editable calendar.
+const xp = { data: null, loading: false, edits: {}, drop: new Set(), open: false };
+async function xLoadPlan() {
+  xp.loading = true;
+  try { xp.data = await api('/api/social/x-plan'); xp.edits = {}; xp.drop = new Set(); } catch (e) { toast(e.message, true); }
+  xp.loading = false;
+  if (state.tab === 'social') renderSocial();
+}
+function xWeight(text) {
+  let n = 0;
+  for (const ch of text.replace(/https?:\/\/\S+/g, 'x'.repeat(23))) {
+    const cp = ch.codePointAt(0);
+    n += cp <= 4351 || (cp >= 8192 && cp <= 8205) || (cp >= 8208 && cp <= 8223) || (cp >= 8242 && cp <= 8247) ? 1 : 2;
+  }
+  return n;
+}
+function xPanel(running) {
+  if (!xp.data && !xp.loading) xLoadPlan();
+  const job = (body, msg) => { social.start('/api/social/run', body); toast(msg); };
+  const plan = xp.data?.plan;
+  const editable = !!xp.data?.editable;
+  const items = plan ? plan.items : [];
+  const days = {};
+  for (const q of items) (days[q.at.slice(0, 10)] ??= []).push(q);
+  const KIND_ICON = { article: '📰', quiz: '🧠', quote: '❝', book: '📖', bio: '👤', roundup: '📚' };
+  const save = () => {
+    const out = items.filter((q) => !xp.drop.has(q.id)).map((q) => ({ id: q.id, at: xp.edits[q.id]?.at ?? q.at, text: xp.edits[q.id]?.text ?? q.text }));
+    const over = out.find((q) => xWeight(q.text) > 280);
+    if (over) return toast(`${over.at.replace('T', ' ')} is over 280`, true);
+    act(async () => { await api('/api/social/x-plan', { items: out }); xp.data = null; }, 'Rebuilding the snippet…');
+  };
+  const dirty = xp.drop.size || Object.keys(xp.edits).length;
+  return h('div', { class: 'card', style: 'margin-top:10px' },
+    h('div', { class: 'toolbar' },
+      h('strong', {}, 'Schedule on X'),
+      h('button', { class: 'btn primary', disabled: running, onclick: () => job({ tool: 'x-run' }, 'Opening a Chrome window — log into X there the first time') }, 'Run in Chrome (one click)'),
+      h('button', { class: 'btn', disabled: running, onclick: () => job({ tool: 'x-run', verify: true }, 'Checking X\'s scheduled list…') }, 'Verify scheduled'),
+      h('button', { class: 'btn', disabled: running, title: 'Put posts that are missing on X back in the pool', onclick: () => job({ tool: 'x-run', fix: true }, 'Verifying and fixing…') }, 'Verify + fix'),
+      h('span', { class: 'meta' }, 'A Chrome window with its own profile runs the latest snippet (images from x-posts/, no folder to pick), then compares X\'s scheduled list with the log.')),
+    h('div', { class: 'toolbar' },
+      h('strong', {}, 'Stats'),
+      h('button', { class: 'btn', disabled: running, onclick: () => job({ tool: 'x-stats' }, 'Scraper snippet copied — paste it on your X profile') }, 'Copy stats scraper'),
+      h('button', { class: 'btn', disabled: running, onclick: () => job({ tool: 'x-stats', report: true }, 'Building the report…') }, 'Report + update insights'),
+      h('span', { class: 'meta' }, 'Scraper → paste on x.com/<you> (downloads elhellal-x-stats.json) → Report. The report writes insights.json, which the scheduler uses.')),
+    h('div', { class: 'toolbar', style: 'margin-top:8px' },
+      h('strong', {}, 'Latest plan'),
+      plan ? h('span', { class: 'meta' }, `${items.length} posts · ${items[0]?.at.replace('T', ' ')} → ${items.at(-1)?.at.replace('T', ' ')} · planned in ${plan.tz} · ${editable ? 'not on X yet — editable' : 'already reported back from X'}`) : h('span', { class: 'meta' }, xp.loading ? 'Loading…' : 'None yet.'),
+      plan ? h('button', { class: 'btn', onclick: () => { xp.open = !xp.open; renderSocial(); } }, xp.open ? 'Hide' : 'Show calendar') : null,
+      h('button', { class: 'btn', onclick: () => xLoadPlan() }, 'Reload'),
+      xp.open && editable ? h('button', { class: 'btn primary', disabled: running || !dirty, onclick: save }, dirty ? `Save ${xp.drop.size ? `(−${xp.drop.size}) ` : ''}& rebuild snippet` : 'No changes') : null),
+    xp.open && plan ? h('div', { style: 'display:flex;flex-direction:column;gap:14px;margin-top:10px' }, Object.entries(days).map(([day, list]) =>
+      h('div', {},
+        h('h3', { style: 'margin:0 0 6px' }, new Date(day + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short' })),
+        h('div', { style: 'display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:8px' }, list.map((q) => {
+          const e = xp.edits[q.id] ?? {};
+          const text = e.text ?? q.text;
+          const w = xWeight(text);
+          const dropped = xp.drop.has(q.id);
+          const card = q.media?.find((m) => m.startsWith('cards/'));
+          return h('div', { class: 'card', style: `padding:8px;${dropped ? 'opacity:.4' : ''}` },
+            h('div', { class: 'toolbar', style: 'gap:6px' },
+              h('span', {}, KIND_ICON[q.kind] ?? '•'),
+              h('input', { type: 'datetime-local', value: e.at ?? q.at, disabled: !editable || dropped, style: 'font-size:12px', onchange: (ev) => { (xp.edits[q.id] ??= {}).at = ev.target.value.slice(0, 16); renderSocial(); } }),
+              h('span', { class: 'meta' }, [q.category, q.style].filter(Boolean).join(' · ')),
+              editable ? h('button', { class: 'btn' + (dropped ? '' : ' danger'), style: 'margin-inline-start:auto;padding:2px 8px', onclick: () => { dropped ? xp.drop.delete(q.id) : xp.drop.add(q.id); renderSocial(); } }, dropped ? 'Keep' : 'Drop') : null),
+            card ? h('img', { src: '/api/social/x-card?name=' + encodeURIComponent(card), loading: 'lazy', style: 'width:100%;max-height:180px;object-fit:cover;border-radius:6px;margin:6px 0' }) : null,
+            h('textarea', { dir: 'auto', rows: 6, disabled: !editable || dropped, style: 'width:100%;font-size:13px', oninput: (ev) => { (xp.edits[q.id] ??= {}).text = ev.target.value; const c = ev.target.nextSibling; c.textContent = xWeight(ev.target.value) + '/280'; c.style.color = xWeight(ev.target.value) > 280 ? 'var(--danger, #c00)' : ''; } }, text),
+            h('div', { class: 'meta', style: w > 280 ? 'color:var(--danger, #c00)' : '' }, `${w}/280`));
+        }))))) : null,
+  );
 }
 
 // Tumblr (Social tab): connection, the blog's queue, best posts by notes.

@@ -1072,6 +1072,10 @@ function rewriteCatalog() {
 
 const SOCIAL = {
     x: { script: 'x-schedule.ts', snippet: '.x-schedule/snippet.js', post: 'https://x.com/home' },
+    // X helpers: one-click runner / verify, the edited-plan rebuild, the stats scraper + report
+    'x-run': { script: 'x-run.ts' },
+    'x-rebuild': { script: 'x-schedule.ts' },
+    'x-stats': { script: 'x-stats.ts' },
     linkedin: { script: 'linkedin-schedule.ts', snippet: '.linkedin-schedule/snippet.js', post: 'https://www.linkedin.com/company/84134110/admin/page-posts/published/' },
     tumblr: { script: 'tumblr-schedule.ts' },
     'tiktok-slides': { script: 'generate-tiktok-slideshow.ts', out: 'tiktok-slides' },
@@ -1119,7 +1123,29 @@ function socialArgs(tool: SocialTool, body: Body): string[] {
             if (quotes === 0) args.push('--no-quotes');
             else if (quotes) args.push('--quotes', String(quotes));
         }
-        if (tool === 'x' && body.book === false) args.push('--no-book');
+        if (tool === 'x') {
+            if (body.book === false) args.push('--no-book');
+            const quotes = intArg(body, 'quotes', 0, 12);
+            if (quotes === 0) args.push('--no-quotes');
+            else if (quotes) args.push('--quotes', String(quotes));
+            for (const [key, off] of [['cards', '--no-cards'], ['bios', '--no-bio'], ['roundup', '--no-roundup'], ['recycle', '--no-recycle'], ['jitter', '--no-jitter']] as const) {
+                if (body[key] === false) args.push(off);
+            }
+            if (body.aiHooks) args.push('--ai-hooks');
+            if (body.autoTimes) args.push('--auto-times');
+            const share = intArg(body, 'noLinkShare', 0, 100);
+            if (share !== null) args.push('--no-link-share', String(share / 100));
+            const tz = str(body.tz);
+            if (tz) {
+                if (tz !== 'local' && !/^[A-Za-z]+\/[A-Za-z_]+$/.test(tz)) throw new HttpError(400, 'tz must be an IANA zone like Asia/Riyadh, or local');
+                args.push('--tz', tz);
+            }
+            const ramadan = str(body.ramadan);
+            if (ramadan) {
+                if (!['auto', 'on', 'off'].includes(ramadan)) throw new HttpError(400, 'ramadan must be auto, on or off');
+                args.push('--ramadan', ramadan);
+            }
+        }
         if (span === 'next') {
             const days = intArg(body, 'days', 1, 60);
             if (days) args.push('--days', String(days));
@@ -1158,6 +1184,19 @@ function socialArgs(tool: SocialTool, body: Body): string[] {
         }
         if (date && span !== 'month') args.push('--date', date);
         if (body.random) args.push('--random');
+    } else if (tool === 'x-run') {
+        if (body.verify) args.push('--verify');
+        if (body.fix) args.push('--verify', '--fix');
+        return [...new Set(args)];
+    } else if (tool === 'x-rebuild') {
+        return ['--rebuild'];
+    } else if (tool === 'x-stats') {
+        if (body.report) args.push('--report');
+        else {
+            const days = intArg(body, 'days', 1, 120);
+            if (days) args.push('--days', String(days));
+        }
+        return args;
     } else if (tool === 'tiktok-slides') {
         const count = intArg(body, 'count', 1, 12);
         if (count) args.push('--count', String(count));
@@ -1242,6 +1281,52 @@ function socialState(params: URLSearchParams) {
         snippets: { x: snippetInfo('x'), linkedin: snippetInfo('linkedin') },
         outputs: { 'tiktok-slides': socialOutputs('tiktok-slides'), 'tiktok-books': socialOutputs('tiktok-books') },
     };
+}
+
+// The latest X batch (.x-schedule/plan.json): shown as a calendar, editable until its snippet has run.
+const X_PLAN = path.join(ROOT, '.x-schedule/plan.json');
+const X_PENDING = path.join(ROOT, '.x-schedule/pending.json');
+type XPlanItem = { id: string; at: string; kind: string; text: string; media?: string[]; category?: string; author?: string; style?: string };
+
+function xPlan() {
+    if (!fs.existsSync(X_PLAN)) return { plan: null };
+    const plan = JSON.parse(fs.readFileSync(X_PLAN, 'utf-8')) as { batch: string; created: string; tz: string; items: XPlanItem[] };
+    const pending = fs.existsSync(X_PENDING) ? JSON.parse(fs.readFileSync(X_PENDING, 'utf-8')) : {};
+    return { plan, editable: !!pending[plan.batch] };
+}
+
+/** Saves edits (dropped posts, new text or time) and rewrites the snippet with `x-schedule --rebuild`. */
+function saveXPlan(body: Body) {
+    const { plan, editable } = xPlan();
+    if (!plan) throw new HttpError(404, 'No plan yet — run the X scheduler first');
+    if (!editable) throw new HttpError(409, 'This batch already reported back from X — plan a new one');
+    if (socialSlot.proc) throw new HttpError(409, 'A social job is already running');
+    const edits = Array.isArray(body.items) ? (body.items as { id?: unknown; at?: unknown; text?: unknown }[]) : null;
+    if (!edits) throw new HttpError(400, 'items must be a list');
+    const byId = new Map(plan.items.map((q) => [q.id, q]));
+    const items: XPlanItem[] = [];
+    const seenAt = new Set<string>();
+    for (const e of edits) {
+        const q = byId.get(str(e.id));
+        if (!q) throw new HttpError(400, `Unknown post ${str(e.id)}`);
+        const at = str(e.at) || q.at;
+        if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(at)) throw new HttpError(400, `Bad time ${at}`);
+        if (seenAt.has(at)) throw new HttpError(400, `Two posts at ${at.replace('T', ' ')} — X needs different minutes`);
+        seenAt.add(at);
+        const text = typeof e.text === 'string' && e.text.trim() ? e.text.trim() : q.text;
+        items.push({ ...q, at, text });
+    }
+    fs.writeFileSync(X_PLAN, JSON.stringify({ ...plan, items }, null, 2));
+    return startJob(socialSlot, fileURLToPath(new URL(SOCIAL['x-rebuild'].script, import.meta.url)), ['--rebuild'], { mode: 'x-rebuild', scopes: [] });
+}
+
+/** A card image from x-posts/cards/ for the plan preview. */
+function xCard(params: URLSearchParams) {
+    const name = params.get('name') ?? '';
+    if (!/^cards\/[^/\\]+\.jpg$/.test(name)) throw new HttpError(400, 'Bad card name');
+    const file = path.join(ROOT, 'x-posts', name);
+    if (!fs.existsSync(file)) throw new HttpError(404, 'No such card');
+    return new Response(Bun.file(file), { headers: { 'content-type': 'image/jpeg', 'cache-control': 'max-age=3600' } });
 }
 
 function socialSnippet(params: URLSearchParams) {
@@ -3069,6 +3154,7 @@ const POST: Record<string, (body: Body) => unknown | Promise<unknown>> = {
     '/api/social/stop': () => stopJob(socialSlot),
     '/api/social/open': openOutput,
     '/api/social/tiktok-chrome': tiktokPostInChrome,
+    '/api/social/x-plan': saveXPlan,
     '/api/tumblr/delete': tumblrDelete,
     '/api/tumblr/disconnect': () => (Tumblr.disconnect(), { ok: true }),
     '/api/media/delete': deleteMedia,
@@ -3119,6 +3205,8 @@ const GET: Record<string, (params: URLSearchParams) => unknown | Promise<unknown
     '/api/health': listHealth,
     '/api/social/job': socialState,
     '/api/social/snippet': socialSnippet,
+    '/api/social/x-plan': xPlan,
+    '/api/social/x-card': xCard,
     '/api/social/tiktok-prompt': tiktokPrompt,
     '/api/tumblr/connect': tumblrConnect,
     '/api/tumblr/callback': tumblrCallback,
