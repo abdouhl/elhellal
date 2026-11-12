@@ -14,7 +14,7 @@ import { isRecentlyAdded } from '../utils/dates';
 // links per category/tag/author hub page, not just the first screenful.
 const ITEMS_PER_PAGE = 100;
 // One ad slotted in per 12 articles — frequent enough to matter, sparse enough to stay out of the way.
-const AD_INTERVAL = 12;
+const AD_INTERVAL = 10;
 
 const fuseOptions = {
     keys: [

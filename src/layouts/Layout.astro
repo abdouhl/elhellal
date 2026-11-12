@@ -253,6 +253,11 @@ const CLARITY_ID: string = import.meta.env.PUBLIC_CLARITY_ID ?? "";
         </script>
         <script is:inline>
             (function () {
+                // Noindex pages (thin tag/author listings, /saved, /me, 404…) are
+                // low-value content for AdSense: flag them before first paint so
+                // their slots never take space (CSS below, loadAds skips them).
+                var robots = document.querySelector('meta[name="robots"]');
+                if (robots && /noindex/i.test(robots.content)) document.documentElement.setAttribute("data-no-ads", "");
                 if (window.__elhellalAdsBoot) return;
                 window.__elhellalAdsBoot = true;
                 var events = ["scroll", "pointerdown", "keydown", "touchstart"];
@@ -272,7 +277,14 @@ const CLARITY_ID: string = import.meta.env.PUBLIC_CLARITY_ID ?? "";
                         window.removeEventListener(e, start, { passive: true });
                     });
                     inject("https://fundingchoicesmessages.google.com/i/pub-3610150616518651?ers=1", false, function () {
-                        inject("https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3610150616518651", true);
+                        inject("https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3610150616518651", true, function (ev) {
+                            // Blocked or failed: no slot can ever fill, so drop the
+                            // reserved boxes instead of leaving empty "إعلان" frames.
+                            if (ev && ev.type === "error") {
+                                window.__elhellalAdsBlocked = true;
+                                document.documentElement.setAttribute("data-ads-blocked", "");
+                            }
+                        });
                     });
                 }
                 events.forEach(function (e) {
@@ -1324,13 +1336,26 @@ const CLARITY_ID: string = import.meta.env.PUBLIC_CLARITY_ID ?? "";
                     continue;
                 }
                 ins.dataset.adRequested = "1";
-                (window.adsbygoogle = window.adsbygoogle || []).push({});
+                // push() throws once the library is loaded (e.g. a zero-width
+                // slot); one bad slot must not stop the ones after it.
+                try {
+                    (window.adsbygoogle = window.adsbygoogle || []).push({});
+                } catch (e) {}
             }
         };
 
         let adObserver = null;
         const loadAds = () => {
             try {
+                // View transitions swap <html>'s attributes, so re-flag each page.
+                if (window.__elhellalAdsBlocked) {
+                    document.documentElement.setAttribute("data-ads-blocked", "");
+                    return;
+                }
+                const robots = document.querySelector('meta[name="robots"]');
+                const noAds = !!robots && /noindex/i.test(robots.content);
+                document.documentElement.toggleAttribute("data-no-ads", noAds);
+                if (noAds) return;
                 const waiting = document.querySelectorAll(
                     "ins.adsbygoogle:not([data-ad-requested]):not([data-adsbygoogle-status])",
                 );
@@ -1441,6 +1466,12 @@ const CLARITY_ID: string = import.meta.env.PUBLIC_CLARITY_ID ?? "";
     })();
 </script>
 <style is:global>
+    /* The AdSense script was blocked or failed to load (see the ad loader in
+       <head>): collapse every slot wrapper rather than keep empty reserved boxes. */
+    html:is([data-ads-blocked], [data-no-ads]) :is(.ad-unit, .adsense-slot, .top-ad, .ad-card, .masonry-cell:has(> .ad-card)) {
+        display: none;
+    }
+
     /* Installed app (src/scripts/pwa.ts). viewport-fit=cover lets the page run
        under the notch and the iOS status bar, so pad for them. */
     body {

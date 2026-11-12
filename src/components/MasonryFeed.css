@@ -93,6 +93,12 @@
   padding: 0;
 }
 
+/* An unfilled ad hides its card (CardsContainer.css); hide the wrapping cell
+   too, or the column keeps a doubled gap where the ad was. */
+.masonry-cell:has(ins.adsbygoogle[data-ad-status="unfilled"]) {
+  display: none;
+}
+
 /* content-visibility: auto lets the browser guess card sizes, which jitters
    columns — layout-only override, the card's look is unchanged. */
 .masonry .link-card {

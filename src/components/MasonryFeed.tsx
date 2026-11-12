@@ -27,7 +27,7 @@ import {
 //    `initialCards` ship with the page and the rest is fetched as the reader
 //    scrolls or searches.
 const ITEMS_PER_PAGE = 100;
-const AD_INTERVAL = 12;
+const AD_INTERVAL = 10;
 const NEW_DAYS = 3;
 /** Feed files fetched at once while scanning for search matches. */
 const SCAN_CONCURRENCY = 4;

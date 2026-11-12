@@ -15,7 +15,7 @@ const { adSlot = "2951250905" } = Astro.props;
 ---
 
 <div class="top-ad">
-  <AdUnit slot={adSlot} minHeight={90} mobileMinHeight={250} />
+  <AdUnit slot={adSlot} format="horizontal" minHeight={90} mobileMinHeight={100} />
 </div>
 
 <button type="button" class="to-top" aria-label="العودة إلى الأعلى">
@@ -89,6 +89,12 @@ const { adSlot = "2951250905" } = Astro.props;
 
   .top-ad:has(ins.adsbygoogle[data-ad-status="unfilled"]) {
     display: none;
+  }
+
+  /* A mobile anchor ad (Auto ads overlay) sits at the bottom edge: lift the
+     pill above it. No-op when there is no anchor. */
+  :global(html:has(ins.adsbygoogle[data-anchor-status="displayed"])) .to-top {
+    bottom: 96px;
   }
 
   /* Back to top pill */

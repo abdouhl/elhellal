@@ -954,9 +954,13 @@ import InstallCard from "../../components/InstallCard.astro";
     /* ── In-article ad ─────────────────────────────────── */
     /* :global() needed — className is forwarded into the AdUnit.astro child,
        whose scoped styles don't share this page's scope hash. */
+    /* Divided from the "read the original" button below it on both sides, so
+       a tap aimed at the button can't land on the ad (AdSense placement policy). */
     :global(.article-ad) {
-      padding-top: var(--spacing-05);
+      padding-block: var(--spacing-05);
+      margin-bottom: var(--spacing-05);
       border-top: 0.5px solid rgba(255,255,255,0.08);
+      border-bottom: 0.5px solid rgba(255,255,255,0.08);
     }
 
     /* ── Core Structure ───────────────────────────────── */
