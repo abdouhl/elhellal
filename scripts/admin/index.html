@@ -895,6 +895,12 @@ async function renderPublish() {
         h('button', { class: 'btn', disabled: running || !toCommit, onclick: () => commit(false) }, 'Commit only'),
         h('button', { class: 'btn', disabled: running || !notPushed, onclick: () => publish.start('/api/publish/run', { step: 'push' }, 'Pushing to GitHub…') },
           notPushed ? `Push ${notPushed} commit(s)` : 'Push'),
+        h('button', { class: 'btn primary', disabled: running, title: 'elhellal + quotes, books, biographies, quiz and abderahmane: commit each repo\'s changes with this message, then push it',
+          onclick: () => {
+            if (!confirm(`Commit & push ALL sites (elhellal, quotes, books, biographies, quiz, abderahmane)?\n\n${gitInfo.all ? 'Every change in each repo, code included.' : 'Only each repo\'s data files.'}\nMessage: ${msg.value}\n\nPushing abderahmane's main deploys it.`)) return;
+            gitInfo.message = '';
+            publish.start('/api/publish/commit-all', { message: msg.value, all: gitInfo.all }, 'Committing & pushing every site — see the log below');
+          } }, 'Commit & push all sites'),
         h('span', { class: 'meta' },
           g.ahead == null ? 'No upstream yet — Push sets it.' : g.behind ? `⚠️ ${g.behind} commit(s) behind GitHub — pull in a terminal before pushing.` : notPushed ? `${notPushed} commit(s) not on GitHub yet.` : 'GitHub is up to date.')),
     );
@@ -1589,6 +1595,7 @@ async function quotesSection() {
   const author = data.authors.find((a) => a.slug === sites.author);
   // The saved Goodreads list is a local file read: refresh it every render so "Have" follows imports.
   await loadGoodreadsList();
+  maybeAutoFill();
   return h('div', {},
     goodreadsAuthorsCard(),
     h('h2', {}, 'Quotes'),
@@ -1637,6 +1644,52 @@ async function scanGoodreads(more) {
     gr.scanMsg = `Scanned ${r.pages} page(s)${r.tags ? ` of ${r.tags.length} Arabic tags` : ''}: ${r.found} author(s), ${r.added} new to the list`;
     await loadGoodreadsList();
   } catch (e) { gr.error = e.message; }
+  gr.scanning = false; render();
+}
+
+// Auto-fill: when Popular or Arabic has fewer than GR_FILL_TARGET authors left to import, scan one page deeper
+// at a time (earlier pages are cached on the server) until the target is reached or the pages run out.
+// It doesn't retry at the same count: only once the count has dropped since (an import, dismissing authors).
+const GR_FILL_TARGET = 100;
+const grPendingFor = (source) => (gr.list?.authors ?? []).filter((a) => a.have == null && a.sources.includes(source)).length;
+const grAutoTried = new Map(); // source → pending count when the last auto-fill ended
+
+function maybeAutoFill() {
+  const source = gr.source;
+  if (!gr.list || gr.scanning || siteJob.job?.running || !['popular', 'arabic'].includes(source)) return;
+  const n = grPendingFor(source);
+  if (n >= GR_FILL_TARGET) { grAutoTried.delete(source); return; }
+  if (grAutoTried.has(source) && n >= grAutoTried.get(source)) return;
+  grAutoTried.set(source, n);
+  setTimeout(() => autoFillGoodreads(source).then(() => grAutoTried.set(source, grPendingFor(source))), 0);
+}
+
+async function autoFillGoodreads(source) {
+  const max = gr.list?.maxPages?.[source] ?? 20;
+  const step = source === 'arabic' ? 1 : 2;
+  gr.open = true; gr.scanning = true; gr.error = '';
+  let pages = gr.pages[source];
+  let retries = 0; // Goodreads sometimes drops requests: a depth with failed pages is read again (cached pages are free)
+  const label = source === 'arabic' ? 'Arabic' : 'famous';
+  for (;;) {
+    gr.scanMsg = `Auto-filling ${label} authors: ${grPendingFor(source)}/${GR_FILL_TARGET} · reading ${pages} page(s)${source === 'arabic' ? ' of each Arabic tag' : ''}${retries ? ` (retry ${retries})` : ''}…`;
+    render();
+    let failed = 0;
+    try { failed = (await api('/api/quotes/goodreads-scan', { source, pages })).failed ?? 0; }
+    catch (e) { failed = 1; gr.error = e.message; }
+    await loadGoodreadsList();
+    const n = grPendingFor(source);
+    if (failed && retries < 4) { retries++; await new Promise((r) => setTimeout(r, 5000)); continue; }
+    if (failed) gr.error = `Auto-fill: Goodreads kept failing at ${pages} page(s) — scan again later to continue`;
+    else gr.error = '';
+    retries = 0;
+    gr.pages[source] = pages;
+    if (failed || n >= GR_FILL_TARGET || pages >= max || gr.source !== source) {
+      gr.scanMsg = `Auto-fill: ${n} ${label} author(s) ready to import (scanned ${pages} page(s))${!failed && n < GR_FILL_TARGET && pages >= max ? ' — Goodreads has no more pages' : ''}`;
+      break;
+    }
+    pages = Math.min(max, pages + step);
+  }
   gr.scanning = false; render();
 }
 
@@ -1704,7 +1757,7 @@ function goodreadsAuthorsCard() {
 
   const setAll = h('input', { type: 'number', min: 1, max: 9999, value: gr.count, style: 'width:80px', oninput: (e) => { gr.count = Math.min(9999, Math.max(1, Number(e.target.value) || 1)); } });
   // The list shows the authors found by the selected source (or all of them, from the filter select).
-  const source = h('select', { disabled: gr.scanning, onchange: (e) => { gr.source = e.target.value; render(); } },
+  const source = h('select', { disabled: gr.scanning, onchange: (e) => { gr.source = e.target.value; render(); maybeAutoFill(); } },
     [['popular', 'Popular quotes'], ['arabic', 'Arabic authors'], ['tag', 'A tag…']].map(([v, l]) => h('option', { value: v, selected: v === gr.source }, l)));
   const tag = gr.source === 'tag' ? h('input', { type: 'search', placeholder: 'tag, e.g. wisdom or حب', value: gr.tag, dir: 'auto', style: 'width:200px',
     oninput: (e) => { gr.tag = e.target.value.trim(); }, onkeydown: (e) => { if (e.key === 'Enter') scanGoodreads(false); } }) : null;
@@ -1717,7 +1770,7 @@ function goodreadsAuthorsCard() {
       h('button', { class: 'btn', disabled: gr.scanning, title: `Reads ${p} page(s) and adds new authors to the list`, onclick: () => scanGoodreads(false) }, `Scan ${p} page(s)`),
       p < (gr.list?.maxPages?.[gr.source] ?? 20) ? h('button', { class: 'btn', disabled: gr.scanning, onclick: () => scanGoodreads(true) }, 'Scan more pages') : null,
       h('span', { class: 'meta' }, gr.scanning
-        ? (gr.source === 'arabic' ? `Reading ${p} page(s) of each Arabic tag (about ${p * 30}s)…` : `Reading Goodreads (${p} pages)…`)
+        ? gr.scanMsg || (gr.source === 'arabic' ? `Reading ${p} page(s) of each Arabic tag (about ${p * 30}s)…` : `Reading Goodreads (${p} pages)…`)
         : gr.scanMsg),
       gr.error ? h('span', { class: 'bad' }, gr.error) : null),
     gr.list ? h('div', { class: 'toolbar' },
@@ -1734,7 +1787,7 @@ function goodreadsAuthorsCard() {
         await api('/api/quotes/goodreads-set', { slugs: [...gr.picks.keys()], dismissed: true }); gr.picks.clear(); await loadGoodreadsList(); render(); } }, 'Dismiss ticked'),
       h('span', { class: 'meta' }, `Showing ${shown.length} of ${all.length}`),
       importBtn, importPending) : null,
-    gr.list && !all.length ? h('div', { class: 'empty' }, 'The list is empty — scan popular quotes, the Arabic tags or a tag to fill it.') : null,
+    gr.list && !all.length ? h('div', { class: 'empty' }, 'The list is empty — Popular and Arabic fill themselves up to 100 authors when selected; or scan a tag.') : null,
     gr.list && all.length && !shown.length ? h('div', { class: 'empty' }, gr.filter && !sources.includes(gr.filter) ? `Nothing from ${grSourceLabel(gr.filter)} on the list yet — click Scan.` : 'No listed author matches these filters — scan more pages or another tag.') : null,
     shown.length ? h('div', { class: 'list', style: 'max-height:460px;overflow:auto' }, h('table', {},
       h('tr', {}, h('th', {}, ''), h('th', {}, ''), h('th', {}, 'Author'), h('th', {}, 'Found in'), h('th', {}, 'Added'), h('th', { class: 'num', title: 'Their quotes on the scanned pages' }, 'Popular'),

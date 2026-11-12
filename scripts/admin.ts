@@ -974,6 +974,42 @@ function commitData(body: Body) {
     return { ok: true, output: commit.out.trim(), pushing: !!body.push };
 }
 
+/** POSIX single-quoting for the generated shell script. */
+const sq = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
+
+/**
+ * Commits and pushes this repo and every sibling site's repo in one job (the publish slot's log).
+ * Data paths only (each repo's own), or with `all` every change. Each repo is pushed even with
+ * nothing new to commit, so earlier unpushed commits go up too. A failing repo doesn't stop the rest.
+ */
+function commitAllSites(body: Body) {
+    const message = str(body.message).trim();
+    if (!message) throw new HttpError(400, 'Write a commit message');
+    if (publishSlot.proc) throw new HttpError(409, 'A publish step is running — wait for it to finish');
+    if (importSlot.proc || otherImports().length) throw new HttpError(409, 'An import is running — commit when it has finished');
+    if (sitesSlot.proc) throw new HttpError(409, `${sitesSlot.job?.mode} is running on a site — commit when it has finished`);
+    const all = !!body.all;
+    const repos = [
+        { title: 'elhellal', dir: ROOT, data: DATA_PATHS },
+        ...Object.values(SITES).map((s) => ({ title: s.title, dir: s.dir, data: s.data })),
+    ];
+    const blocks = repos.map(({ title, dir, data }) => {
+        const head = `echo; echo ${sq(`━━ ${title} — ${dir}`)}`;
+        if (!fs.existsSync(path.join(dir, '.git'))) return `${head}; echo 'not a git repo — skipped'`;
+        // Pathspecs that match nothing make git add fail: keep the ones on disk or known to git.
+        const paths = data.filter((p) => fs.existsSync(path.join(dir, p)) || gitIn(dir, 'ls-files', '--', p).out.trim());
+        const commit = all
+            ? `git add -A && { git diff --cached --quiet && echo 'nothing to commit' || git commit -m "$MSG"; }`
+            : paths.length
+              ? `git add -A -- ${paths.map(sq).join(' ')} && { git diff --cached --quiet -- ${paths.map(sq).join(' ')} && echo 'no data changes' || git commit -m "$MSG" -- ${paths.map(sq).join(' ')}; }`
+              : `echo 'no data paths'`;
+        const push = `if git rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then git push; else git push -u origin "$(git branch --show-current)"; fi`;
+        return `${head}\n(cd ${sq(dir)} && ${commit} && ${push}) || { echo '✗ ${title.replace(/'/g, '')} failed'; fail=1; }`;
+    });
+    const script = ['fail=0', ...blocks, 'echo', '[ $fail = 0 ] && echo "✓ All repos committed and pushed" || echo "✗ Some repos failed — see above"', 'exit $fail'].join('\n');
+    return startCommand(publishSlot, ['sh', '-c', script], `commit & push ${repos.length} repos${all ? ' (all changes)' : ' (data)'}`, { mode: 'push-all', scopes: [] }, ROOT, { MSG: message });
+}
+
 // ─── Data health ──────────────────────────────────────────────────────────────
 // check-data's checks, per article, so they can be fixed from the page.
 
@@ -1933,8 +1969,10 @@ function listQuotes(params: URLSearchParams) {
 // who to import and how many of their quotes. Pages are cached for the session; each new page waits a bit (be polite).
 // A scan adds what it finds to a saved list (.goodreads-discovery/authors.json), which is what the card shows.
 const GR_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
-const GR_MAX_PAGES = 20; // Goodreads serves up to 100; 20 × 30 quotes is plenty to find the famous authors
-const GR_ARABIC_MAX_PAGES = 5; // per tag, so up to tags × 5 fetches
+// Goodreads serves up to 100 pages. A manual scan is usually a few pages; the card's auto-fill (when the list
+// has no one left to import) steps up a page at a time until it has 100 new authors, so these are only ceilings.
+const GR_MAX_PAGES = 50;
+const GR_ARABIC_MAX_PAGES = 15; // per tag, so up to tags × 15 fetches (exhausted tags stop early)
 /** Goodreads tags Arabic quotes collect under; Arabic mode reads page N of each. */
 const GR_ARABIC_TAGS = ['arabic', 'اقتباسات', 'حب', 'الحب', 'الحياة', 'حياة', 'حكمة', 'الحكمة', 'أدب', 'الأدب', 'شعر', 'الوطن', 'الحرية', 'الموت', 'الله', 'الإنسان', 'السعادة', 'الأمل', 'الحزن', 'فلسفة'];
 interface GrPageAuthor { quote: string; slug: string; name: string; image?: string | undefined; likes: number; arabic: boolean }
@@ -1944,15 +1982,32 @@ const isArabic = (s: string) => (s.match(/[؀-ۿ]/g) ?? []).length > (s.match(/[
 const foldName = (s: string) => s.replace(/[ً-ْـ]/g, '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[\s,،.\-_]+/g, ' ').trim().toLowerCase()
     .split(' ').map((w) => (w.length > 3 && w.startsWith('ال') ? w.slice(2) : w)).join(' ');
 
-async function goodreadsPage(tag: string, page: number): Promise<GrPageAuthor[]> {
+/** A Goodreads page's HTML ('' for a 404), retried on timeouts, 429 and 5xx; null when it still fails. */
+async function fetchGoodreads(url: string): Promise<string | null> {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+            const res = await fetch(url, { headers: { 'User-Agent': GR_UA }, signal: AbortSignal.timeout(20_000) });
+            if (res.ok) return await res.text();
+            if (res.status === 404) return '';
+            if (res.status !== 429 && res.status < 500) return null;
+        } catch {
+            // timeout / network error: retry
+        }
+        await new Promise((r) => setTimeout(r, attempt * 2000));
+    }
+    return null;
+}
+
+/** One page's quotes; null when Goodreads didn't answer (not cached, so the next scan retries it). */
+async function goodreadsPage(tag: string, page: number): Promise<GrPageAuthor[] | null> {
     const key = `${tag}|${page}`;
     const hit = grPages.get(key);
     if (hit) return hit;
     const url = `https://www.goodreads.com/quotes${tag ? `/tag/${encodeURIComponent(tag)}` : ''}?page=${page}`;
-    const res = await fetch(url, { headers: { 'User-Agent': GR_UA }, signal: AbortSignal.timeout(30_000) });
-    if (!res.ok && res.status !== 404) throw new HttpError(502, `Goodreads ${res.status} for ${url}`);
+    const html = await fetchGoodreads(url);
+    if (html === null) return null;
     const { parse } = await import('node-html-parser');
-    const root = parse(res.ok ? await res.text() : '');
+    const root = parse(html);
     const rows: GrPageAuthor[] = [];
     for (const block of root.querySelectorAll('.quoteDetails')) {
         // Only quotes whose avatar links to an author page name a Goodreads author (some carry a quote image).
@@ -2036,9 +2091,12 @@ async function scanGoodreads(body: Body) {
     const tags = arabic ? GR_ARABIC_TAGS : [tag];
     const byslug = new Map<string, Omit<GrPageAuthor, 'quote' | 'arabic'> & { popular: number; arabicQuotes: number }>();
     const seen = new Set<string>();
+    let failed = 0;
     for (const t of tags) {
         for (let p = 1; p <= pages; p++) {
             const rows = await goodreadsPage(t, p);
+            // A page Goodreads didn't serve: skip the rest of this tag for now (a later scan retries it).
+            if (rows === null) { failed++; break; }
             if (!rows.length) break;
             for (const r of rows) {
                 // Arabic tags list the same quote under several tags: count it once.
@@ -2101,7 +2159,8 @@ async function scanGoodreads(body: Body) {
         }
     }
     saveGrList(list);
-    return { source, pages, maxPages, tags: arabic ? GR_ARABIC_TAGS : undefined, found: people.size, added, updated };
+    if (failed && !people.size) throw new HttpError(502, `Goodreads didn't answer (${failed} page(s) failed) — try again in a minute`);
+    return { source, pages, maxPages, tags: arabic ? GR_ARABIC_TAGS : undefined, found: people.size, added, updated, failed };
 }
 
 /** The listed authors, each with what the site already has of them. */
@@ -3149,6 +3208,7 @@ const POST: Record<string, (body: Body) => unknown | Promise<unknown>> = {
     '/api/publish/run': runPublish,
     '/api/publish/stop': () => stopJob(publishSlot),
     '/api/publish/commit': commitData,
+    '/api/publish/commit-all': commitAllSites,
     '/api/health/rewrite': rewriteCatalog,
     '/api/social/run': runSocial,
     '/api/social/stop': () => stopJob(socialSlot),
