@@ -190,5 +190,9 @@
   {
     "category": "sports",
     "title": "الرياضة"
+  },
+  {
+    "category": "reviews",
+    "title": "المراجعات والنقد"
   }
 ]
