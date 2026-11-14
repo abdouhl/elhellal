@@ -895,11 +895,11 @@ async function renderPublish() {
         h('button', { class: 'btn', disabled: running || !toCommit, onclick: () => commit(false) }, 'Commit only'),
         h('button', { class: 'btn', disabled: running || !notPushed, onclick: () => publish.start('/api/publish/run', { step: 'push' }, 'Pushing to GitHub…') },
           notPushed ? `Push ${notPushed} commit(s)` : 'Push'),
-        h('button', { class: 'btn primary', disabled: running, title: 'elhellal + quotes, books, biographies, quiz and abderahmane: commit each repo\'s changes with this message, then push it',
+        h('button', { class: 'btn primary', disabled: running, title: 'elhellal + quotes, books, biographies, quiz and abderahmane: commit every change in each repo (new files and code too) with this message, then push it',
           onclick: () => {
-            if (!confirm(`Commit & push ALL sites (elhellal, quotes, books, biographies, quiz, abderahmane)?\n\n${gitInfo.all ? 'Every change in each repo, code included.' : 'Only each repo\'s data files.'}\nMessage: ${msg.value}\n\nPushing abderahmane's main deploys it.`)) return;
+            if (!confirm(`Commit & push ALL sites (elhellal, quotes, books, biographies, quiz, abderahmane)?\n\nEvery change in each repo — new files, code and data.\nMessage: ${msg.value}\n\nPushing abderahmane's main deploys it.`)) return;
             gitInfo.message = '';
-            publish.start('/api/publish/commit-all', { message: msg.value, all: gitInfo.all }, 'Committing & pushing every site — see the log below');
+            publish.start('/api/publish/commit-all', { message: msg.value }, 'Committing & pushing every site — see the log below');
           } }, 'Commit & push all sites'),
         h('span', { class: 'meta' },
           g.ahead == null ? 'No upstream yet — Push sets it.' : g.behind ? `⚠️ ${g.behind} commit(s) behind GitHub — pull in a terminal before pushing.` : notPushed ? `${notPushed} commit(s) not on GitHub yet.` : 'GitHub is up to date.')),

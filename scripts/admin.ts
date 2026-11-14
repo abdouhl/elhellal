@@ -979,7 +979,7 @@ const sq = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
 
 /**
  * Commits and pushes this repo and every sibling site's repo in one job (the publish slot's log).
- * Data paths only (each repo's own), or with `all` every change. Each repo is pushed even with
+ * Always every change in each repo (new files, code, data — `git add -A`). Each repo is pushed even with
  * nothing new to commit, so earlier unpushed commits go up too. A failing repo doesn't stop the rest.
  */
 function commitAllSites(body: Body) {
@@ -988,26 +988,19 @@ function commitAllSites(body: Body) {
     if (publishSlot.proc) throw new HttpError(409, 'A publish step is running — wait for it to finish');
     if (importSlot.proc || otherImports().length) throw new HttpError(409, 'An import is running — commit when it has finished');
     if (sitesSlot.proc) throw new HttpError(409, `${sitesSlot.job?.mode} is running on a site — commit when it has finished`);
-    const all = !!body.all;
     const repos = [
-        { title: 'elhellal', dir: ROOT, data: DATA_PATHS },
-        ...Object.values(SITES).map((s) => ({ title: s.title, dir: s.dir, data: s.data })),
+        { title: 'elhellal', dir: ROOT },
+        ...Object.values(SITES).map((s) => ({ title: s.title, dir: s.dir })),
     ];
-    const blocks = repos.map(({ title, dir, data }) => {
+    const blocks = repos.map(({ title, dir }) => {
         const head = `echo; echo ${sq(`━━ ${title} — ${dir}`)}`;
         if (!fs.existsSync(path.join(dir, '.git'))) return `${head}; echo 'not a git repo — skipped'`;
-        // Pathspecs that match nothing make git add fail: keep the ones on disk or known to git.
-        const paths = data.filter((p) => fs.existsSync(path.join(dir, p)) || gitIn(dir, 'ls-files', '--', p).out.trim());
-        const commit = all
-            ? `git add -A && { git diff --cached --quiet && echo 'nothing to commit' || git commit -m "$MSG"; }`
-            : paths.length
-              ? `git add -A -- ${paths.map(sq).join(' ')} && { git diff --cached --quiet -- ${paths.map(sq).join(' ')} && echo 'no data changes' || git commit -m "$MSG" -- ${paths.map(sq).join(' ')}; }`
-              : `echo 'no data paths'`;
+        const commit = `git add -A && { git diff --cached --quiet && echo 'nothing to commit' || git commit -m "$MSG"; }`;
         const push = `if git rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then git push; else git push -u origin "$(git branch --show-current)"; fi`;
         return `${head}\n(cd ${sq(dir)} && ${commit} && ${push}) || { echo '✗ ${title.replace(/'/g, '')} failed'; fail=1; }`;
     });
     const script = ['fail=0', ...blocks, 'echo', '[ $fail = 0 ] && echo "✓ All repos committed and pushed" || echo "✗ Some repos failed — see above"', 'exit $fail'].join('\n');
-    return startCommand(publishSlot, ['sh', '-c', script], `commit & push ${repos.length} repos${all ? ' (all changes)' : ' (data)'}`, { mode: 'push-all', scopes: [] }, ROOT, { MSG: message });
+    return startCommand(publishSlot, ['sh', '-c', script], `commit & push ${repos.length} repos (all changes)`, { mode: 'push-all', scopes: [] }, ROOT, { MSG: message });
 }
 
 // ─── Data health ──────────────────────────────────────────────────────────────
