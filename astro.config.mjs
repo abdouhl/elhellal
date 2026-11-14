@@ -3,6 +3,7 @@ import react from "@astrojs/react";
 import cloudflare from "@astrojs/cloudflare";
 import partytown from "@astrojs/partytown";
 import sitemap from "@astrojs/sitemap";
+import rehypeUgcLinks from "./src/lib/rehype-ugc-links.mjs";
 
 export default defineConfig({
   site: 'https://elhellal.com',
@@ -24,6 +25,9 @@ export default defineConfig({
     '/layla/[slug]': '/articles/[slug]',
     '/omar/[slug]': '/articles/[slug]',
     '/youssef/[slug]': '/articles/[slug]',
+  },
+  markdown: {
+    rehypePlugins: [rehypeUgcLinks],
   },
   build: {
     // Inline every stylesheet (~66 KB raw / ~10 KB gzipped shared + small

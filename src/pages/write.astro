@@ -1,0 +1,379 @@
+---
+// /write/ — readers write an article for الهلال. It goes to the push Worker
+// (POST /api/push/submit → D1 submissions); the admin panel's Submissions
+// queue approves it into src/content/community/<slug>.md, published with the
+// next build. Turnstile shows only when PUBLIC_TURNSTILE_SITEKEY is set at
+// build (the Worker checks it only when its TURNSTILE_SECRET is set).
+import fs from "node:fs";
+import path from "node:path";
+import Layout from "../layouts/Layout.astro";
+
+const categories = JSON.parse(
+    fs.readFileSync(path.join(process.cwd(), "src/data/catalog/categories.json"), "utf8")
+) as Array<{ category: string; title: string }>;
+const sitekey = import.meta.env.PUBLIC_TURNSTILE_SITEKEY ?? "";
+---
+
+<Layout
+    site="الهلال"
+    title="اكتب مقالاً"
+    tagline="انشر مقالك على الهلال"
+    pageTitle="اكتب مقالاً على الهلال"
+    pageDescription="اكتب مقالك بالعربية وأرسله إلى الهلال. نراجع كل مقال وننشر الجيد منها."
+    canonicalUrl="https://elhellal.com/write/"
+>
+    <main id="main-content" class="write-page">
+        <h1>اكتب مقالاً</h1>
+        <p class="write-muted">
+            اكتب مقالك هنا وأرسله. نراجع كل مقال يدوياً قبل نشره، وننشر المقالات الأصيلة المفيدة.
+            لا يُنشر بريدك أبداً.
+        </p>
+
+        <form class="write-form" data-form novalidate>
+            <label>
+                <span>اسمك كما سيظهر</span>
+                <input name="author" required minlength="2" maxlength="60" autocomplete="name" />
+            </label>
+            <label>
+                <span>عنوان المقال</span>
+                <input name="title" required minlength="5" maxlength="150" />
+            </label>
+            <label>
+                <span>وصف قصير (سطر أو سطران)</span>
+                <textarea name="description" rows="2" required minlength="20" maxlength="300"></textarea>
+            </label>
+            <label>
+                <span>التصنيف</span>
+                <select name="category" required>
+                    <option value="">اختر تصنيفاً</option>
+                    {categories.map((c) => <option value={c.category}>{c.title}</option>)}
+                </select>
+            </label>
+
+            <div class="write-editor">
+                <div class="write-toolbar" role="toolbar" aria-label="تنسيق">
+                    <button type="button" data-md="h2" title="عنوان فرعي">عنوان</button>
+                    <button type="button" data-md="bold" title="غامق"><b>غامق</b></button>
+                    <button type="button" data-md="quote" title="اقتباس">اقتباس</button>
+                    <button type="button" data-md="list" title="قائمة">قائمة</button>
+                    <button type="button" data-md="link" title="رابط">رابط</button>
+                    <button type="button" class="write-preview-toggle" data-preview-toggle aria-pressed="false">معاينة</button>
+                </div>
+                <textarea name="body" dir="rtl" rows="18" required placeholder="اكتب مقالك هنا… افصل بين الفقرات بسطر فارغ."></textarea>
+                <div class="write-preview article-prose" data-preview hidden></div>
+                <p class="write-count" data-count></p>
+            </div>
+
+            <details class="write-more">
+                <summary>اختياري</summary>
+                <label>
+                    <span>بريدك (للتواصل معك فقط، لا يُنشر)</span>
+                    <input name="email" type="email" dir="ltr" maxlength="200" autocomplete="email" />
+                </label>
+                <label>
+                    <span>رابطك (موقعك أو حسابك)</span>
+                    <input name="authorUrl" type="url" dir="ltr" placeholder="https://…" maxlength="500" />
+                </label>
+                <label>
+                    <span>رابط صورة الغلاف (صورة تملك حق نشرها)</span>
+                    <input name="cover" type="url" dir="ltr" placeholder="https://…" maxlength="500" />
+                </label>
+            </details>
+
+            <input class="write-hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
+
+            <label class="write-check">
+                <input type="checkbox" name="rights" required />
+                <span>أؤكد أن المقال من كتابتي، وأوافق على نشره على الهلال وفق <a href="/terms/">الشروط</a>.</span>
+            </label>
+
+            {sitekey && <div class="cf-turnstile" data-sitekey={sitekey} data-language="ar"></div>}
+
+            <button type="submit" class="write-btn">أرسل المقال للمراجعة</button>
+            <p class="write-status" data-status role="status"></p>
+        </form>
+    </main>
+    {sitekey && <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>}
+</Layout>
+
+<script>
+    const DRAFT_KEY = "elhellal:write-draft";
+    const FIELDS = ["author", "title", "description", "category", "body", "email", "authorUrl", "cover"];
+    const MIN_BODY = 1500;
+
+    function escapeHtml(s: string): string {
+        return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+    }
+
+    function inline(s: string): string {
+        return s
+            .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+            .replace(/\*(.+?)\*/g, "<em>$1</em>")
+            .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" rel="nofollow ugc noopener" target="_blank">$1</a>');
+    }
+
+    /** Just enough markdown for the preview: the build renders the real thing. */
+    function renderMarkdown(md: string): string {
+        return escapeHtml(md)
+            .split(/\n{2,}/)
+            .map((block) => {
+                const b = block.trim();
+                if (!b) return "";
+                if (/^###\s/.test(b)) return `<h3>${inline(b.slice(4))}</h3>`;
+                if (/^##\s/.test(b)) return `<h2>${inline(b.slice(3))}</h2>`;
+                if (/^&gt;\s?/.test(b)) return `<blockquote><p>${inline(b.replace(/^&gt;\s?/gm, ""))}</p></blockquote>`;
+                if (/^[-*]\s/.test(b)) return `<ul>${b.split("\n").map((l) => `<li>${inline(l.replace(/^[-*]\s/, ""))}</li>`).join("")}</ul>`;
+                if (/^\d+[.)]\s/.test(b)) return `<ol>${b.split("\n").map((l) => `<li>${inline(l.replace(/^\d+[.)]\s/, ""))}</li>`).join("")}</ol>`;
+                return `<p>${inline(b).replace(/\n/g, "<br>")}</p>`;
+            })
+            .join("");
+    }
+
+    function setup() {
+        if (location.pathname !== "/write/") return;
+        const form = document.querySelector<HTMLFormElement>("[data-form]")!;
+        const body = form.elements.namedItem("body") as HTMLTextAreaElement;
+        const preview = document.querySelector<HTMLElement>("[data-preview]")!;
+        const toggle = document.querySelector<HTMLButtonElement>("[data-preview-toggle]")!;
+        const count = document.querySelector<HTMLElement>("[data-count]")!;
+        const status = document.querySelector<HTMLElement>("[data-status]")!;
+        const openedAt = Date.now();
+        const field = (name: string) => form.elements.namedItem(name) as HTMLInputElement;
+
+        try {
+            const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "{}");
+            for (const name of FIELDS) if (typeof draft[name] === "string") field(name).value = draft[name];
+        } catch {}
+
+        const updateCount = () => {
+            const n = body.value.trim().length;
+            const words = body.value.trim().split(/\s+/).filter(Boolean).length;
+            count.textContent = n < MIN_BODY ? `${words} كلمة — يحتاج المقال ${MIN_BODY - n} حرفاً أخرى على الأقل` : `${words} كلمة`;
+        };
+        updateCount();
+
+        let saveTimer: number | undefined;
+        form.addEventListener("input", () => {
+            updateCount();
+            clearTimeout(saveTimer);
+            saveTimer = window.setTimeout(() => {
+                try {
+                    localStorage.setItem(DRAFT_KEY, JSON.stringify(Object.fromEntries(FIELDS.map((n) => [n, field(n).value]))));
+                } catch {}
+            }, 500);
+        });
+
+        const wrap = (before: string, after = "", placeholder = "") => {
+            const { selectionStart: a, selectionEnd: b, value } = body;
+            const selected = value.slice(a, b) || placeholder;
+            body.setRangeText(before + selected + after, a, b, "end");
+            body.focus();
+            body.dispatchEvent(new Event("input", { bubbles: true }));
+        };
+        const linePrefix = (prefix: string) => {
+            const { selectionStart: a, selectionEnd: b, value } = body;
+            const start = value.lastIndexOf("\n", a - 1) + 1;
+            const lines = value.slice(start, b).split("\n").map((l) => prefix + l).join("\n");
+            body.setRangeText(lines, start, b, "end");
+            body.focus();
+            body.dispatchEvent(new Event("input", { bubbles: true }));
+        };
+        form.querySelectorAll<HTMLButtonElement>("[data-md]").forEach((btn) => {
+            btn.onclick = () => {
+                const kind = btn.dataset.md;
+                if (kind === "h2") linePrefix("## ");
+                else if (kind === "bold") wrap("**", "**", "نص غامق");
+                else if (kind === "quote") linePrefix("> ");
+                else if (kind === "list") linePrefix("- ");
+                else if (kind === "link") {
+                    const url = prompt("الرابط (https://…)");
+                    if (url && /^https?:\/\//.test(url)) wrap("[", `](${url})`, "نص الرابط");
+                }
+            };
+        });
+
+        toggle.onclick = () => {
+            const showing = preview.hidden;
+            preview.hidden = !showing;
+            body.hidden = showing;
+            toggle.setAttribute("aria-pressed", String(showing));
+            toggle.textContent = showing ? "تحرير" : "معاينة";
+            if (showing) preview.innerHTML = renderMarkdown(body.value) || "<p>لا شيء بعد.</p>";
+        };
+
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            const v = (n: string) => field(n).value.trim();
+            const problem =
+                v("author").length < 2 ? "اكتب اسمك." :
+                v("title").length < 5 ? "اكتب عنواناً للمقال." :
+                v("description").length < 20 ? "اكتب وصفاً قصيراً (20 حرفاً على الأقل)." :
+                !v("category") ? "اختر تصنيفاً." :
+                body.value.trim().length < MIN_BODY ? "المقال قصير جداً." :
+                !(form.elements.namedItem("rights") as HTMLInputElement).checked ? "أكّد أن المقال من كتابتك." :
+                "";
+            if (problem) {
+                status.textContent = problem;
+                return;
+            }
+            const button = form.querySelector<HTMLButtonElement>("button[type=submit]")!;
+            button.disabled = true;
+            status.textContent = "جارٍ الإرسال…";
+            const turnstile = (form.querySelector<HTMLInputElement>("[name='cf-turnstile-response']")?.value) ?? "";
+            try {
+                const res = await fetch("/api/push/submit", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        ...Object.fromEntries(FIELDS.map((n) => [n, v(n)])),
+                        body: body.value.trim(),
+                        website: v("website"),
+                        ms: Date.now() - openedAt,
+                        turnstile,
+                    }),
+                });
+                if (res.ok) {
+                    try { localStorage.removeItem(DRAFT_KEY); } catch {}
+                    form.reset();
+                    updateCount();
+                    status.textContent = "شكراً! وصل مقالك، وسنراجعه قبل النشر.";
+                } else if (res.status === 429) {
+                    status.textContent = "أرسلت مقالات كثيرة اليوم. حاول غداً.";
+                } else if (res.status === 403) {
+                    status.textContent = "لم يكتمل التحقق. أعد المحاولة.";
+                } else {
+                    status.textContent = "تعذّر الإرسال. راجع الحقول وحاول مجدداً.";
+                }
+            } catch {
+                status.textContent = "لا اتصال الآن. مسودتك محفوظة؛ حاول حين تتصل.";
+            } finally {
+                button.disabled = false;
+                (window as any).turnstile?.reset?.();
+            }
+        };
+    }
+
+    document.addEventListener("astro:page-load", setup);
+</script>
+
+<style>
+    .write-page {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: var(--spacing-06, 24px) 16px var(--spacing-10, 48px);
+        color: var(--content-primary);
+    }
+    .write-page h1 {
+        margin: 0 0 8px;
+    }
+    .write-form {
+        display: grid;
+        gap: 14px;
+        margin-top: 16px;
+    }
+    .write-form label {
+        display: grid;
+        gap: 6px;
+        font-size: 14px;
+        color: var(--content-secondary);
+    }
+    .write-form input,
+    .write-form select,
+    .write-form textarea {
+        padding: 12px 14px;
+        border: 0.5px solid var(--border-muted);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--content-primary);
+        font: inherit;
+        font-size: 16px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .write-form textarea[name="body"] {
+        line-height: 1.9;
+        resize: vertical;
+        min-height: 320px;
+    }
+    .write-editor {
+        display: grid;
+        gap: 8px;
+    }
+    .write-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+    .write-toolbar button {
+        min-height: 36px;
+        padding: 6px 12px;
+        border: 0.5px solid var(--border-muted);
+        border-radius: 999px;
+        background: transparent;
+        color: var(--content-primary);
+        font: inherit;
+        font-size: 14px;
+        cursor: pointer;
+    }
+    .write-preview-toggle {
+        margin-inline-start: auto;
+    }
+    .write-preview {
+        min-height: 320px;
+        padding: 12px 16px;
+        border: 0.5px dashed var(--border-muted);
+        border-radius: 12px;
+        line-height: 1.9;
+    }
+    .write-preview[hidden],
+    .write-form textarea[hidden] {
+        display: none;
+    }
+    .write-count,
+    .write-muted,
+    .write-status {
+        color: var(--content-secondary);
+        font-size: 14px;
+        margin: 0;
+    }
+    .write-more summary {
+        cursor: pointer;
+        color: var(--content-secondary);
+        font-size: 14px;
+        margin-bottom: 10px;
+    }
+    .write-more label + label {
+        margin-top: 10px;
+    }
+    .write-check {
+        display: flex !important;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    .write-check input {
+        width: 20px;
+        height: 20px;
+        flex: none;
+        margin-top: 2px;
+    }
+    .write-hp {
+        position: absolute;
+        left: -9999px;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+    }
+    .write-btn {
+        padding: 14px;
+        border: 0;
+        border-radius: 999px;
+        background: DarkOrange;
+        color: #111;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+    }
+    .write-btn:disabled {
+        opacity: 0.6;
+    }
+</style>

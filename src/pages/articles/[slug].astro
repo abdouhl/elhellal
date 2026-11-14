@@ -14,6 +14,7 @@ import { HERO_SIZES, HERO_WIDTHS, RELATED_WIDTH, resizeImage, responsiveImage } 
 import SisterStrip, { type SisterTile } from "../../components/SisterStrip.astro";
 import { buildSisterIndex, sisterStrip, sisterTiles, type SisterSnapshot } from "../../lib/sister-sites";
 import sisterSnapshot from "../../data/sister-sites.json";
+import { categoryTitle, COMMUNITY_ACCENT, COMMUNITY_TAGLINE } from "../../lib/community";
 
 // This page renders in two modes:
 // - Personal-blog posts (src/content/*) prerender as ordinary static pages.
@@ -28,7 +29,8 @@ export async function getStaticPaths() {
   const personalPostLists = await Promise.all(
     PERSONAL_COLLECTIONS.map((c) => getCollection(c))
   );
-  const personalPaths = personalPostLists.flat().map((post) => ({
+  const communityPosts = await getCollection("community");
+  const personalPaths = [...personalPostLists.flat(), ...communityPosts].map((post) => ({
     params: { slug: post.slug },
   }));
 
@@ -91,6 +93,8 @@ interface ArticleView {
 }
 
 let isPersonalPost = false;
+/** A reader-written article (src/content/community/) */
+let isCommunity = false;
 let person: PersonalBlogPerson | undefined;
 let PersonContent: any;
 let v: ArticleView;
@@ -204,6 +208,76 @@ if (isShell) {
         sister: sisterTiles(sisterStrip(buildSisterIndex(sisterSnapshot as SisterSnapshot), [], found.slug)),
       };
       break;
+    }
+  }
+  if (!found) {
+    const posts = await getCollection("community");
+    found = posts.find((p) => p.slug === slug);
+    if (found) {
+      isPersonalPost = true;
+      isCommunity = true;
+      const d = found.data;
+      person = {
+        slug: "community" as any,
+        collection: "community" as any,
+        nameAr: d.author,
+        nameLatin: d.author,
+        tagline: COMMUNITY_TAGLINE,
+        bio: "",
+        accent: COMMUNITY_ACCENT,
+      };
+      PersonContent = (await found.render()).Content;
+      const sameCategory = posts
+        .filter((p) => p.slug !== slug)
+        .sort((a, b) => Number(b.data.category === d.category) - Number(a.data.category === d.category) || b.data.pubDate.valueOf() - a.data.pubDate.valueOf())
+        .slice(0, 3);
+      const canonicalUrl = `https://elhellal.com/articles/${encodeURIComponent(found.slug)}/`;
+      const categoryHref = `/${d.category}/`;
+      const catTitle = categoryTitle(d.category);
+      const encodedShareText = encodeURIComponent(`اكتشف "${d.title}" — مقالة رائعة وجدتها على الهلال! ${canonicalUrl}`);
+      const encodedCanonicalUrl = encodeURIComponent(canonicalUrl);
+      const coverUrl = d.large || d.thumb;
+      const cover = coverUrl ? responsiveImage(coverUrl, HERO_WIDTHS) : undefined;
+      v = {
+        seoTitle: d.title,
+        seoDescription: d.description,
+        canonicalUrl,
+        ogImage: coverUrl,
+        slug: found.slug,
+        title: d.title,
+        preview_text: d.description,
+        original_img_url: coverUrl,
+        coverSrc: cover?.src,
+        coverSrcset: cover?.srcset,
+        screen_name: "community",
+        created_at: d.pubDate.toISOString().slice(0, 10),
+        dateAr: d.pubDate.toLocaleDateString("ar", { year: "numeric", month: "long", day: "numeric" }),
+        category: d.category,
+        categoryHref,
+        categoryTitle: catTitle,
+        fallbackPath: categoryHref,
+        authorHref: d.authorUrl || "/write/",
+        authorDisplayName: d.author,
+        authorUrl: d.authorUrl || "/write/",
+        authorSubLabel: COMMUNITY_TAGLINE,
+        isSubstack: false,
+        whoItems: [],
+        faqItems: [],
+        hasCore: false,
+        keywords: [],
+        xShareUrl: `https://x.com/intent/post?text=${encodedShareText}&url=${encodedCanonicalUrl}`,
+        linkedinShareUrl: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedCanonicalUrl}`,
+        redditShareUrl: `https://www.reddit.com/submit?url=${encodedCanonicalUrl}&title=${encodedShareText}`,
+        related: sameCategory.map((p) => ({
+          href: `/articles/${encodeURIComponent(p.slug)}/`,
+          image: resizeImage(p.data.large || p.data.thumb || getPlaceholderImage(), RELATED_WIDTH),
+          title: p.data.title,
+          author: p.data.author,
+          category: categoryTitle(p.data.category),
+        })),
+        relatedHeading: "مقالات أخرى من القرّاء",
+        sister: sisterTiles(sisterStrip(buildSisterIndex(sisterSnapshot as SisterSnapshot), [], found.slug)),
+      };
     }
   }
   if (!found) {
@@ -362,6 +436,7 @@ import InstallCard from "../../components/InstallCard.astro";
                     href={v.authorHref}
                     class="meta-author"
                     itemprop="author"
+                    {...(isCommunity && /^https?:/.test(v.authorHref) ? { rel: "nofollow ugc noopener", target: "_blank" } : {})}
                   >
                     {v.authorDisplayName}
                   </a>
@@ -425,6 +500,12 @@ import InstallCard from "../../components/InstallCard.astro";
             <div class="article-prose" itemprop="articleBody">
               <PersonContent />
             </div>
+          )}
+          {isCommunity && (
+            <p class="community-note">
+              كتب هذا المقالَ أحدُ قرّاء الهلال، ونُشر بعد مراجعته. لديك ما تقوله؟
+              <a href="/write/">اكتب مقالك</a>
+            </p>
           )}
 
           <!-- Core Structure — renders only when fields are present -->
@@ -579,11 +660,12 @@ import InstallCard from "../../components/InstallCard.astro";
               <a
                 href={v.authorHref}
                 class="author-handle"
+                {...(isCommunity && /^https?:/.test(v.authorHref) ? { rel: "nofollow ugc noopener", target: "_blank" } : {})}
               >
                 {v.authorDisplayName}
               </a>
               {isPersonalPost ? (
-                <a href={v.authorHref} class="author-sub">
+                <a href={isCommunity ? "/write/" : v.authorHref} class="author-sub">
                   {v.authorSubLabel}
                 </a>
               ) : (
@@ -605,7 +687,7 @@ import InstallCard from "../../components/InstallCard.astro";
           <p class="sidebar-label">تفاصيل</p>
           <dl class="detail-list">
             <div class="detail-row">
-              <dt>{isPersonalPost ? 'الكاتب' : 'التصنيف'}</dt>
+              <dt>{isPersonalPost && !isCommunity ? 'الكاتب' : 'التصنيف'}</dt>
               <dd><a href={v.categoryHref} class="detail-link">{v.categoryTitle}</a></dd>
             </div>
             <div class="detail-row">
@@ -916,6 +998,20 @@ import InstallCard from "../../components/InstallCard.astro";
       font-size: var(--desktop-body-sm);
       line-height: 1.7;
       color: rgba(255,255,255,0.5);
+    }
+
+    .community-note {
+      margin: 24px 0 0;
+      padding: 12px 16px;
+      border-radius: 12px;
+      border: 0.5px solid var(--border-muted);
+      color: var(--content-secondary);
+      font-size: 14px;
+    }
+    .community-note a {
+      color: DarkOrange;
+      font-weight: 700;
+      margin-inline-start: 4px;
     }
 
     /* ── Personal-blog full article body ──────────────── */

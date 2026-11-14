@@ -176,6 +176,7 @@ const TABS = [
   ]],
   ['Add content', [
     ['import', '⇣', 'Import', 'Find Substack authors and import their articles, or import external blogs.'],
+    ['submissions', '✍', 'Submissions', 'Articles readers wrote on /write/ — edit, approve into src/content/community/, or reject. Approved ones ship with the next Publish.'],
   ]],
   ['Share', [
     ['publish', '⇡', 'Publish', 'Commit & push to GitHub, then build and deploy the site.'],
@@ -236,7 +237,7 @@ function render() {
   document.getElementById('pagetitle').textContent = info.label;
   document.getElementById('pagedesc').textContent = info.desc;
   document.title = `${info.label} · elhellal admin`;
-  ({ articles: renderArticles, authors: renderAuthors, review: renderReview, blocked: renderBlocked, pins: renderPins, import: renderImport, health: renderHealth, publish: renderPublish, social: renderSocial, stats: renderStats, sites: renderSites, leads: renderLeads, push: renderPush })[state.tab]();
+  ({ articles: renderArticles, authors: renderAuthors, review: renderReview, blocked: renderBlocked, pins: renderPins, import: renderImport, health: renderHealth, publish: renderPublish, social: renderSocial, stats: renderStats, sites: renderSites, leads: renderLeads, push: renderPush, submissions: renderSubmissions })[state.tab]();
 }
 const view = () => document.getElementById('view');
 /** Fills the page for `tab` — unless the user has switched tabs while it was loading. */
@@ -1367,7 +1368,7 @@ async function renderStats() {
 // ─── Push notifications (workers/push) ───
 const PUSH_FORM = { title: '', body: '', url: '/', image: '', category: '', audience: '', service: '' };
 const push = { stats: null, error: null, loading: false, days: 14, form: { ...PUSH_FORM }, reach: null };
-const EVENT_LABELS = { 'new-install': 'New installs', 'app-open': 'App opens', installed: 'Installed (Chrome)', 'install-accepted': 'Install accepted', 'install-dismissed': 'Install declined', 'banner-shown': 'Banner shown', 'banner-shown-ios': 'Banner shown (iOS)', 'banner-clicked': 'Banner tapped', 'banner-dismissed': 'Banner dismissed', 'cta-clicked': 'Install button', 'link-clicked': 'Install link', 'card-clicked': 'Install card', 'app-page': '/app/ views', 'quiz-answered': 'Quiz of the day answered', 'app-page-quotes': '/app/ from quotes', 'app-page-books': '/app/ from books', 'app-page-biographies': '/app/ from biographies', 'app-page-quiz': '/app/ from quiz', 'app-clicked': '/app/ button', 'guide-shown': 'Steps shown', 'inapp-shown': 'In-app browser', 'inapp-opened': 'Left in-app browser', 'new-sub': 'New subscribers', subscribed: 'Subscribed', unsubscribed: 'Unsubscribed', 'notify-dismissed': 'Notify banner dismissed', sent: 'Sent', click: 'Clicks', failed: 'Failed', gone: 'Expired', read: 'Articles read (subscribers)', suggested: 'Links suggested' };
+const EVENT_LABELS = { 'new-install': 'New installs', 'app-open': 'App opens', installed: 'Installed (Chrome)', 'install-accepted': 'Install accepted', 'install-dismissed': 'Install declined', 'banner-shown': 'Banner shown', 'banner-shown-ios': 'Banner shown (iOS)', 'banner-clicked': 'Banner tapped', 'banner-dismissed': 'Banner dismissed', 'cta-clicked': 'Install button', 'link-clicked': 'Install link', 'card-clicked': 'Install card', 'app-page': '/app/ views', 'quiz-answered': 'Quiz of the day answered', 'app-page-quotes': '/app/ from quotes', 'app-page-books': '/app/ from books', 'app-page-biographies': '/app/ from biographies', 'app-page-quiz': '/app/ from quiz', 'app-clicked': '/app/ button', 'guide-shown': 'Steps shown', 'inapp-shown': 'In-app browser', 'inapp-opened': 'Left in-app browser', 'new-sub': 'New subscribers', subscribed: 'Subscribed', unsubscribed: 'Unsubscribed', 'notify-dismissed': 'Notify banner dismissed', sent: 'Sent', click: 'Clicks', failed: 'Failed', gone: 'Expired', read: 'Articles read (subscribers)', suggested: 'Links suggested', submitted: 'Articles submitted (/write/)' };
 const PLATFORM_LABELS = { ios: 'iPhone / iPad', android: 'Android', desktop: 'Desktop', other: 'Other' };
 const SERVICE_LABELS = { apple: 'Apple (Safari / iOS)', fcm: 'Chrome / Edge / Android', mozilla: 'Firefox', windows: 'Windows', other: 'Other' };
 
@@ -1495,6 +1496,57 @@ async function renderPush() {
       d.broadcasts.map((b) => h('tr', {}, h('td', {}, new Date(b.created_at).toLocaleString()), h('td', { dir: 'auto', title: b.body }, b.title), h('td', {}, b.target), h('td', { class: 'num' }, b.queued)))))
       : h('div', { class: 'empty' }, 'Nothing sent yet'),
   );
+}
+
+// ─── Submissions (reader-written articles from /write/) ───
+const subs = { status: 'pending', data: null, error: null, open: null, edits: {} };
+
+async function loadSubmissions() {
+  try { subs.data = await api(`/api/submissions?status=${subs.status}`); subs.error = null; }
+  catch (e) { subs.error = e.message; }
+}
+
+async function renderSubmissions() {
+  if (!subs.data && !subs.error) { paint('submissions', h('div', { class: 'empty' }, 'Reading the push database…')); await loadSubmissions(); if (state.tab !== 'submissions') return; }
+  const reload = () => { subs.data = null; subs.error = null; renderSubmissions(); };
+  const counts = subs.data?.counts ?? {};
+  const toolbar = h('div', { class: 'toolbar' },
+    ['pending', 'approved', 'rejected'].map((st) => h('button', { class: 'btn' + (subs.status === st ? ' primary' : ''), onclick: () => { subs.status = st; subs.open = null; reload(); } }, `${st} (${counts[st] ?? 0})`)),
+    h('button', { class: 'btn', onclick: reload }, 'Refresh'));
+  if (subs.error) {
+    return paint('submissions', toolbar, h('div', { class: 'card bad' }, subs.error),
+      h('div', { class: 'card' }, h('p', {}, 'A "no such table: submissions" error means the migration is not applied yet (from workers/push):'),
+        h('pre', {}, 'bunx wrangler d1 migrations apply elhellal-push --remote\nbunx wrangler deploy')));
+  }
+  const list = subs.data.submissions;
+  const catTitle = (c) => stats.categories.find((x) => x.category === c)?.title ?? c;
+  paint('submissions', toolbar,
+    h('p', { class: 'meta' }, 'Before approving: search a distinctive sentence on Google (plagiarism), and check the topic is AdSense-safe. Approve writes src/content/community/<slug>.md — Publish commits and deploys it.'),
+    list.length ? h('div', { class: 'list' }, list.map((x) => {
+      const isOpen = subs.open === x.id;
+      const e = subs.edits[x.id] ??= { title: x.title, description: x.description, category: x.category, author: x.author_name, authorUrl: x.author_url, cover: x.cover_url, body: x.body };
+      const words = x.body.trim().split(/\s+/).length;
+      const head = h('div', { class: 'row' },
+        h('div', { class: 'body' },
+          h('div', { class: 'title', dir: 'auto' }, x.title),
+          h('div', { class: 'meta', dir: 'auto' }, `${x.author_name}${x.author_email ? ' · ' + x.author_email : ''} · ${catTitle(x.category)} · ${words} words · ${new Date(x.created_at).toLocaleString()}`),
+          x.slug ? h('a', { href: `https://elhellal.com/articles/${encodeURIComponent(x.slug)}/`, target: '_blank', rel: 'noopener', class: 'meta' }, x.slug) : null),
+        h('button', { class: 'btn', onclick: () => { subs.open = isOpen ? null : x.id; renderSubmissions(); } }, isOpen ? 'Close' : 'Review'));
+      if (!isOpen) return head;
+      const inp = (key, props = {}) => h(props.rows ? 'textarea' : 'input', { ...props, value: props.rows ? null : e[key], dir: props.dir ?? 'auto', style: 'width:100%;box-sizing:border-box' + (props.rows ? ';font-family:inherit;line-height:1.8' : ''), oninput: (ev) => { e[key] = ev.target.value; } }, props.rows ? e[key] : null);
+      const fields = [
+        inp('title', { placeholder: 'Title' }), inp('description', { placeholder: 'Description', rows: 2 }),
+        h('select', { onchange: (ev) => { e.category = ev.target.value; } }, stats.categories.map((c) => h('option', { value: c.category, selected: c.category === e.category }, c.title))),
+        inp('author', { placeholder: 'Author name' }), inp('authorUrl', { placeholder: 'Author link (https://…, optional)', dir: 'ltr' }), inp('cover', { placeholder: 'Cover image URL (optional)', dir: 'ltr' }),
+        inp('body', { rows: 22 }),
+      ];
+      return h('div', {}, head, h('div', { class: 'card', style: 'display:grid;gap:8px' }, fields,
+        x.status === 'pending' ? h('div', { class: 'toolbar' },
+          h('button', { class: 'btn primary', onclick: () => act(async () => { const r = await api('/api/submissions/approve', { id: x.id, ...e }); subs.data = null; subs.open = null; return r; }, (r) => `Approved → ${r.file}`) }, 'Approve & write file'),
+          h('a', { class: 'btn', href: 'https://www.google.com/search?q=' + encodeURIComponent('"' + (x.body.match(/[^.!؟\n]{40,120}/)?.[0] ?? x.title).trim() + '"'), target: '_blank', rel: 'noopener' }, 'Google a sentence'),
+          h('button', { class: 'btn', onclick: () => { if (confirm('Reject this submission?')) act(async () => { await api('/api/submissions/reject', { id: x.id }); subs.data = null; subs.open = null; }, 'Rejected'); } }, 'Reject'))
+          : null));
+    })) : h('div', { class: 'empty' }, `No ${subs.status} submissions`));
 }
 
 // ─── Sites (quotes / books / biographies / quiz) ───

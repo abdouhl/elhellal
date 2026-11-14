@@ -837,7 +837,7 @@ function discoverState(params: URLSearchParams) {
 // git summary of the changes, a commit (data paths, or everything) and git push.
 
 /** What the admin and the importers change. Commits only ever include these. */
-const DATA_PATHS = ['src/data/catalog', 'src/data/moderation', 'src/data/author-names.json', 'src/data/external-blogs.ts', 'public/llms.txt'];
+const DATA_PATHS = ['src/content/community', 'src/data/catalog', 'src/data/moderation', 'src/data/author-names.json', 'src/data/external-blogs.ts', 'public/llms.txt'];
 const BUN = process.execPath;
 const PUBLISH_STEPS: Record<string, { cmd: string[]; display: string }> = {
     check: { cmd: [BUN, 'run', 'check-data'], display: 'bun run check-data' },
@@ -3180,6 +3180,112 @@ async function pushClearOutbox() {
     return { ok: true };
 }
 
+// ─── Reader-written articles (/write/) ───────────────────────────────────────
+// Queued in the push Worker's D1 (submissions, POST /api/push/submit). Approve
+// writes src/content/community/<slug>.md, which ships with the next Publish.
+
+const COMMUNITY_DIR = path.join(ROOT, 'src', 'content', 'community');
+
+function communitySlug(title: string): string {
+    let slug = title
+        .replace(/[ً-ٟؐ-ؚۖ-ۜ]/g, '')
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, '-')
+        .replace(/[^\wء-ي٠-٩-]+/g, '')
+        .replace(/--+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    while (Buffer.byteLength(slug, 'utf-8') > 120) slug = slug.slice(0, -1);
+    slug = slug.replace(/-+$/, '') || `article-${Date.now()}`;
+    const taken = (s: string) => {
+        if (fs.existsSync(path.join(COMMUNITY_DIR, `${s}.md`))) return true;
+        for (const dir of fs.readdirSync(path.join(ROOT, 'src', 'content'), { withFileTypes: true })) {
+            if (dir.isDirectory() && fs.existsSync(path.join(ROOT, 'src', 'content', dir.name, `${s}.md`))) return true;
+        }
+        const map = path.join(ROOT, 'src', 'data', 'slug-map.json');
+        try {
+            return s in readJson<Record<string, unknown>>(map);
+        } catch {
+            return false;
+        }
+    };
+    let out = slug;
+    for (let i = 2; taken(out); i++) out = `${slug}-${i}`;
+    return out;
+}
+
+/** Markdown with no raw HTML (the build would render it) and tidy spacing. */
+function cleanMarkdown(md: string): string {
+    return md
+        .replace(/\r\n?/g, '\n')
+        .replace(/<!--[\s\S]*?-->/g, '')
+        .replace(/<\/?[a-zA-Z][^>]*>/g, '')
+        .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+}
+
+const yamlString = (v: string) => JSON.stringify(v.replace(/\s+/g, ' ').trim());
+
+async function listSubmissions(params: URLSearchParams) {
+    const status = params.get('status') || 'pending';
+    if (!['pending', 'approved', 'rejected'].includes(status)) throw new HttpError(400, 'Invalid status');
+    const [rows] = await pushD1(
+        `SELECT id, title, description, body, category, author_name, author_email, author_url, cover_url, status, slug, created_at FROM submissions WHERE status = ${sqlText(status)} ORDER BY created_at DESC LIMIT 100`
+    );
+    const [counts] = await pushD1("SELECT status, COUNT(*) AS n FROM submissions GROUP BY status");
+    return { submissions: rows ?? [], counts: Object.fromEntries((counts ?? []).map((r) => [r.status, r.n])) };
+}
+
+async function approveSubmission(body: Body) {
+    const id = Number(body.id);
+    if (!Number.isInteger(id) || id <= 0) throw new HttpError(400, 'Invalid id');
+    const [rows] = await pushD1(`SELECT * FROM submissions WHERE id = ${id}`);
+    const row = rows?.[0];
+    if (!row) throw new HttpError(404, 'Submission not found');
+    if (row.status === 'approved') throw new HttpError(409, `Already approved as ${row.slug}`);
+    // The panel can correct fields before approving.
+    const pick = (key: string, fallback: string) => (typeof body[key] === 'string' ? String(body[key]).trim() : fallback);
+    const title = pick('title', row.title);
+    const description = pick('description', row.description);
+    const category = pick('category', row.category);
+    const author = pick('author', row.author_name);
+    const authorUrl = pick('authorUrl', row.author_url);
+    const cover = pick('cover', row.cover_url);
+    const markdown = cleanMarkdown(pick('body', row.body));
+    if (!title || !description || !author || !markdown) throw new HttpError(400, 'Title, description, author and body are required');
+    if (!readArticles().articles.some((c) => c.category === category)) throw new HttpError(400, `Unknown category: ${category}`);
+    for (const [k, v] of [['authorUrl', authorUrl], ['cover', cover]] as const) {
+        if (v && !/^https:\/\/\S+$/.test(v)) throw new HttpError(400, `${k} must be an https URL`);
+    }
+
+    const slug = communitySlug(title);
+    const front = [
+        '---',
+        `title: ${yamlString(title)}`,
+        `description: ${yamlString(description)}`,
+        `pubDate: ${new Date().toISOString().slice(0, 10)}`,
+        `author: ${yamlString(author)}`,
+        ...(authorUrl ? [`authorUrl: ${yamlString(authorUrl)}`] : []),
+        `category: ${yamlString(category)}`,
+        ...(cover ? [`large: ${yamlString(cover)}`] : []),
+        '---',
+        '',
+    ];
+    fs.mkdirSync(COMMUNITY_DIR, { recursive: true });
+    const file = path.join(COMMUNITY_DIR, `${slug}.md`);
+    fs.writeFileSync(file, `${front.join('\n')}${markdown}\n`);
+    await pushD1(`UPDATE submissions SET status = 'approved', slug = ${sqlText(slug)} WHERE id = ${id}`);
+    return { ok: true, slug, file: path.relative(ROOT, file), url: `https://elhellal.com/articles/${encodeURIComponent(slug)}/` };
+}
+
+async function rejectSubmission(body: Body) {
+    const id = Number(body.id);
+    if (!Number.isInteger(id) || id <= 0) throw new HttpError(400, 'Invalid id');
+    await pushD1(`UPDATE submissions SET status = 'rejected' WHERE id = ${id} AND status = 'pending'`);
+    return { ok: true };
+}
+
 const POST: Record<string, (body: Body) => unknown | Promise<unknown>> = {
     '/api/remove': removeAction,
     '/api/authors/block': blockAuthor,
@@ -3240,6 +3346,8 @@ const POST: Record<string, (body: Body) => unknown | Promise<unknown>> = {
     '/api/leads/publish': publishLead,
     '/api/push/send': pushSend,
     '/api/push/clear': pushClearOutbox,
+    '/api/submissions/approve': approveSubmission,
+    '/api/submissions/reject': rejectSubmission,
 };
 
 const GET: Record<string, (params: URLSearchParams) => unknown | Promise<unknown>> = {
@@ -3286,6 +3394,7 @@ const GET: Record<string, (params: URLSearchParams) => unknown | Promise<unknown
     '/api/leads/article': readBlogArticle,
     '/api/push/stats': pushStats,
     '/api/push/audience': pushAudience,
+    '/api/submissions': listSubmissions,
 };
 
 Bun.serve({

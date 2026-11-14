@@ -17,6 +17,10 @@
  *   POST /api/push/follows        { endpoint, follows: ['author:x', 'tag:y'] }
  *   POST /api/push/suggest        { url, title } → a link suggested for the
  *                                 directory (the app's share target, /share/)
+ *   POST /api/push/submit         { title, description, body, category, author,
+ *                                 email?, authorUrl?, cover?, turnstile?, website, ms }
+ *                                 → an article a reader wrote on /write/, queued
+ *                                 for the admin panel (submissions)
  *
  * The cron trigger (every 5 minutes) sends:
  *   1. digests: each subscription is due at SEND_HOUR_UTC daily, or on
@@ -73,6 +77,8 @@ interface Env {
     MORNING_HOUR_UTC?: string;
     QUOTE_HOUR_UTC?: string;
     QUIZ_HOUR_UTC?: string;
+    /** Secret, optional: Cloudflare Turnstile's, checked on /write/ submissions when set. */
+    TURNSTILE_SECRET?: string;
 }
 
 /** One item of the quiz site's /app-feed.json (../elhellal-quiz). */
@@ -193,9 +199,9 @@ function json(data: unknown, status: number, origin: string | null, headers: Hea
     });
 }
 
-async function readBody(request: Request): Promise<Record<string, unknown>> {
+async function readBody(request: Request, max = MAX_BODY): Promise<Record<string, unknown>> {
     const text = await request.text();
-    if (text.length > MAX_BODY) throw new HttpError(413, 'body too large');
+    if (text.length > max) throw new HttpError(413, 'body too large');
     try {
         const body = JSON.parse(text);
         if (body && typeof body === 'object') return body;
@@ -681,6 +687,80 @@ async function handleSuggest(request: Request, env: Env) {
     return { ok: true };
 }
 
+// ─── Reader-written articles (/write/) ───────────────────────────────────────
+
+const SUBMIT_MAX_BODY = 120_000;
+const SUBMITS_PER_DAY = 3;
+/** Fewer seconds than this between opening /write/ and sending is a bot. */
+const SUBMIT_MIN_MS = 20_000;
+
+function text(value: unknown, field: string, min: number, max: number): string {
+    const v = typeof value === 'string' ? value.replace(/\r\n?/g, '\n').trim() : '';
+    if (v.length < min || v.length > max) throw new HttpError(400, `invalid ${field}`);
+    return v;
+}
+
+function optionalUrl(value: unknown, field: string): string {
+    if (value === undefined || value === null || value === '') return '';
+    try {
+        const url = new URL(String(value));
+        if (url.protocol === 'https:' && url.href.length <= 500) return url.href;
+    } catch {
+        // fall through
+    }
+    throw new HttpError(400, `invalid ${field}`);
+}
+
+async function sha256(value: string): Promise<string> {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+    return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function verifyTurnstile(env: Env, token: unknown, ip: string): Promise<boolean> {
+    if (!env.TURNSTILE_SECRET) return true;
+    if (typeof token !== 'string' || !token || token.length > 2048) return false;
+    const form = new FormData();
+    form.append('secret', env.TURNSTILE_SECRET);
+    form.append('response', token);
+    if (ip) form.append('remoteip', ip);
+    const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', body: form });
+    const data = (await res.json().catch(() => ({}))) as { success?: boolean };
+    return data.success === true;
+}
+
+async function handleSubmit(request: Request, env: Env) {
+    const body = await readBody(request, SUBMIT_MAX_BODY);
+    // Honeypot (a field people never see) and time on the page: answer "ok" so bots don't learn.
+    if (body.website || !(typeof body.ms === 'number' && body.ms >= SUBMIT_MIN_MS)) return { ok: true };
+    const title = text(body.title, 'title', 5, 150);
+    const description = text(body.description, 'description', 20, 300);
+    const article = text(body.body, 'body', 1500, 40_000);
+    const author = text(body.author, 'author', 2, 60);
+    const category = typeof body.category === 'string' && CATEGORY_RE.test(body.category) ? body.category : '';
+    if (!category) throw new HttpError(400, 'invalid category');
+    const email = typeof body.email === 'string' ? body.email.trim().slice(0, 200) : '';
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new HttpError(400, 'invalid email');
+    const authorUrl = optionalUrl(body.authorUrl, 'authorUrl');
+    const cover = optionalUrl(body.cover, 'cover');
+
+    const ip = request.headers.get('CF-Connecting-IP') ?? '';
+    const ipHash = ip ? await sha256(`elhellal-submit:${env.VAPID_SUBJECT}:${ip}`) : '';
+    if (ipHash) {
+        const row = await env.DB.prepare('SELECT COUNT(*) AS n FROM submissions WHERE ip_hash = ? AND created_at > ?')
+            .bind(ipHash, Date.now() - DAY_MS)
+            .first<{ n: number }>();
+        if ((row?.n ?? 0) >= SUBMITS_PER_DAY) throw new HttpError(429, 'too many submissions');
+    }
+    if (!(await verifyTurnstile(env, body.turnstile, ip))) throw new HttpError(403, 'captcha failed');
+
+    await env.DB.prepare(
+        `INSERT INTO submissions (title, description, body, category, author_name, author_email, author_url, cover_url, ip_hash, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(title, description, article, category, author, email, authorUrl, cover, ipHash, Date.now()).run();
+    await countEvent(env, 'submitted');
+    return { ok: true };
+}
+
 async function run(env: Env) {
     const now = Date.now();
     const batch = Math.max(1, Math.min(45, Number(env.PUSH_BATCH) || 40));
@@ -903,6 +983,8 @@ export default {
                     return json(await handleFollows(request, env), 200, origin);
                 case 'POST /api/push/suggest':
                     return json(await handleSuggest(request, env), 200, origin);
+                case 'POST /api/push/submit':
+                    return json(await handleSubmit(request, env), 200, origin);
                 default:
                     return json({ error: 'not found' }, 404, origin);
             }

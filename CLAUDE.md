@@ -107,6 +107,7 @@ interface Category {
 - **`/articles/[slug]`**, **`/tags/[tag]`**, **`/authors/[author]`** - Article, tag and author pages (rendered by the site Worker from shells; see above)
 - **`/saved`** - Bookmarked articles (client-side)
 - **`/today`**, **`/me`**, **`/random`**, **`/share`** - The reading habit, all client-side from `src/lib/reading.ts` (localStorage): today's five articles dealt from `dist/_data/push-digest.json`, the reader's streak/stats/achievements/follows, a random article from `dist/_data/random.json`, and the app's share target (suggestions go to the push Worker). `src/scripts/reading.ts` records reads on article pages and drives the streak chip, follow buttons, home rows and app badge
+- **`/write`** - Readers write an article (textarea + markdown preview, draft in localStorage) → `POST /api/push/submit` (push Worker; honeypot, time-on-page, 3/day per hashed IP, Turnstile when `TURNSTILE_SECRET` / `PUBLIC_TURNSTILE_SITEKEY` are set) → D1 `submissions` → admin **Submissions** tab edits/approves into `src/content/community/<slug>.md` (frontmatter `author`, `authorUrl?`, `category`) → next Publish. Community posts render on `/articles/<slug>/` with a reader note, appear in their category's feed, and their links get `rel="nofollow ugc"` (`src/lib/rehype-ugc-links.mjs`)
 - **`/about`**, **`/privacy`**, **`/terms`**, **`/cookies`** - Static pages
 
 ## Adding a New Article

@@ -36,5 +36,20 @@ export async function getPersonalBlogFeedArticles(): Promise<ArticleWithCategory
         })
     );
 
-    return results.flat();
+    // Reader-written articles sit in the category the writer picked.
+    const community = (await getCollection('community')).map((post): ArticleWithCategory => ({
+        id_str: post.slug,
+        title: post.data.title,
+        preview_text: post.data.description,
+        original_img_url: post.data.thumb || post.data.large || getPlaceholderImage(),
+        screen_name: 'community',
+        created_at: post.data.pubDate.toISOString().slice(0, 10),
+        slug: post.slug,
+        authorName: post.data.author,
+        // No author pages for readers yet: the name opens the article.
+        authorHref: `/articles/${encodeURIComponent(post.slug)}/`,
+        category: post.data.category,
+    }));
+
+    return [...results.flat(), ...community];
 }
