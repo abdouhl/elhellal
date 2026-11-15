@@ -16,7 +16,14 @@ const communitySchema = personalBlogSchema.extend({
     category: z.string(),
 });
 
+// Posts by house personas added since the first four (src/data/personas.json), drafted
+// with AI from the admin panel's Personas tab and approved there.
+const houseSchema = personalBlogSchema.extend({
+    persona: z.string(),
+});
+
 export const collections = {
+    house: defineCollection({ type: 'content', schema: houseSchema }),
     omar: defineCollection({ type: 'content', schema: personalBlogSchema }),
     layla: defineCollection({ type: 'content', schema: personalBlogSchema }),
     youssef: defineCollection({ type: 'content', schema: personalBlogSchema }),

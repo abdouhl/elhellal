@@ -1,0 +1,69 @@
+---
+import Layout from "../layouts/Layout.astro";
+import MasonryFeed from "../components/MasonryFeed";
+import FeedChrome from "../components/FeedChrome.astro";
+import "../components/MasonryFeed.css";
+import BreadcrumbSchema from "../components/schema/BreadcrumbSchema.astro";
+import { getFeeds, getCategoryTitles } from "../lib/feed-data";
+import { FEED_INITIAL } from "../lib/feed";
+import { NATIVE_BADGE, articlesCountAr } from "../lib/native";
+
+// Everything written on elhellal itself: reader articles from /write/ and the
+// house writers. Feed scope "native" (src/lib/feed-data.ts).
+const feed = (await getFeeds()).get("native")!;
+const categoryTitles = getCategoryTitles();
+const title = `${NATIVE_BADGE} — مقالات كُتبت على الهلال`;
+const description =
+  "مقالات عربية كتبها قرّاء الهلال وفريق تحريره على الموقع نفسه. لديك ما تقوله؟ اكتب مقالك وانشره على الهلال.";
+---
+
+<Layout
+  site="الهلال"
+  title="الهلال"
+  pageTitle={`${title} | الهلال`}
+  pageDescription={description}
+  tagline="دليل منتقى لأفضل المقالات العربية على الإنترنت"
+  showSearch={true}
+  searchPlaceholder="ابحث في مقالات الهلال..."
+>
+  <BreadcrumbSchema items={[{ name: "الرئيسية", url: "https://elhellal.com" }, { name: NATIVE_BADGE }]} />
+  <main id="main-content">
+    <FeedChrome />
+    <header class="written-head">
+      <h1>{NATIVE_BADGE}</h1>
+      <p>
+        {articlesCountAr(feed.newest.length)} كُتبت على الهلال: مقالات القرّاء، ومقالات فريق التحرير المكتوبة بمساعدة الذكاء الاصطناعي.
+        <a href="/write/">اكتب مقالك</a>
+      </p>
+    </header>
+    <MasonryFeed
+      client:idle
+      scope="native"
+      total={feed.newest.length}
+      initialCards={feed.newest.slice(0, FEED_INITIAL)}
+      categoryTitles={categoryTitles}
+    />
+  </main>
+</Layout>
+
+<style>
+  .written-head {
+    max-width: 1200px;
+    margin: var(--spacing-06, 24px) auto 0;
+    padding-inline: 16px;
+  }
+  .written-head h1 {
+    margin: 0 0 6px;
+    font-size: 24px;
+  }
+  .written-head p {
+    margin: 0;
+    color: var(--content-secondary);
+    line-height: 1.7;
+  }
+  .written-head a {
+    color: DarkOrange;
+    font-weight: 700;
+    margin-inline-start: 4px;
+  }
+</style>

@@ -1,0 +1,98 @@
+---
+// "مكتوب على الهلال": the newest articles written on this site (reader
+// submissions, house writers), above the curated feed. Static cards, no island.
+import Card from "./Card";
+import "./Card.css";
+import type { FeedCard } from "../lib/feed";
+import { NATIVE_BADGE, articlesCountAr } from "../lib/native";
+
+interface Props {
+  cards: FeedCard[];
+  total: number;
+  categoryTitles: Record<string, string>;
+}
+
+const { cards, total, categoryTitles } = Astro.props;
+---
+
+{cards.length > 0 && (
+  <section class="native-rail" aria-labelledby="native-rail-heading">
+    <div class="native-rail-head">
+      <h2 id="native-rail-heading">{NATIVE_BADGE}</h2>
+      <span class="native-rail-count">{articlesCountAr(total)}</span>
+      <a href="/write/" class="native-rail-cta">اكتب مقالك</a>
+      <a href="/written/" class="native-rail-all">الكل</a>
+    </div>
+    <ul role="list">
+      {cards.map((c) => (
+        <Card
+          href={c.url || ""}
+          title={c.title}
+          body=""
+          screen_name={c.author}
+          dateAdded={c.date}
+          slug={c.slug}
+          internalHref={c.internalHref}
+          category={categoryTitles[c.category] || c.category}
+          image={c.img}
+          minutes={c.min}
+          authorHref={c.authorHref}
+          authorLabel={c.authorName}
+          native
+          ai={!!c.ai}
+        />
+      ))}
+    </ul>
+  </section>
+)}
+
+<style>
+  .native-rail {
+    max-width: 1200px;
+    margin: var(--spacing-06, 24px) auto 0;
+    padding-inline: 16px;
+  }
+  .native-rail-head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: var(--spacing-03, 12px);
+  }
+  .native-rail-head h2 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--content-primary, #f0f0f0);
+  }
+  .native-rail-count {
+    font-size: 13px;
+    color: var(--content-secondary);
+  }
+  .native-rail-cta {
+    margin-inline-start: auto;
+    color: DarkOrange;
+    font-weight: 700;
+    font-size: 14px;
+    text-decoration: none;
+    padding: 4px 0;
+  }
+  .native-rail-all {
+    color: var(--content-secondary);
+    font-size: 14px;
+    text-decoration: none;
+    padding: 4px 0;
+  }
+  .native-rail ul {
+    list-style: none;
+    margin: 0;
+    padding: 0 0 6px;
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+  }
+  .native-rail :global(.link-card) {
+    flex: 0 0 260px;
+    scroll-snap-align: start;
+  }
+</style>

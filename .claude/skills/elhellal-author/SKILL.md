@@ -19,17 +19,11 @@ license: MIT
 - Each author is an Astro content collection: `src/content/<slug>/*.md`. The
   filename (kebab-case, English) is the slug — there is no add-slugs step like
   the article catalog (`src/data/catalog/`) has.
-- An author is registered in exactly three places:
-  1. `src/data/personal-blogs.ts` — identity (`nameAr`, `nameLatin`, `tagline`,
-     `bio`, `accent`), the `PersonalBlogPerson.slug`/`.collection` union type,
-     and the `PERSONAL_COLLECTIONS` array.
-  2. `src/content/config.ts` — the collection definition (shared
-     `personalBlogSchema`: `title`, `description`, `pubDate`, optional `thumb`,
-     optional `large`).
-  3. `src/utils/personalBlogFeed.ts` — `CATEGORY_BY_PERSON`, which maps the
-     author onto an existing (thin) category in the catalog (`src/data/catalog/categories.json`) so
-     their posts surface in the homepage feed under a nav tab that already
-     exists.
+- Authors ("personas") are defined in `src/data/personas.json`, which `src/data/personal-blogs.ts`
+  loads. The first four (omar, layla, youssef, yacine) each have a collection
+  `src/content/<slug>/`; personas added since share `src/content/house/`, each post
+  naming its writer in `persona:` frontmatter. `src/utils/personPosts.ts`
+  (`getPersonPosts`) hides the difference.
 - Routing (`/articles/<slug>`), author pages (`/authors/<slug>`), and the
   homepage feed all *auto-derive* from those three files. Adding a `.md` file
   for an existing author is the entire job — no per-article registration.
@@ -53,7 +47,9 @@ license: MIT
    favor 2025-2026 data. This site cites sources inline and by name, so vague or
    uncited claims stand out.
 4. Write following the house style below, in the author's persona.
-5. Save to `src/content/<slug>/<english-kebab-slug>.md`.
+5. Save to `src/content/<slug>/<english-kebab-slug>.md` for the first four
+   personas, or `src/content/house/<english-kebab-slug>.md` with `persona: <slug>`
+   in the frontmatter for the others (check `collection` in `src/data/personas.json`).
 6. Only set `thumb` if an actual image already exists at
    `public/thumbs/<slug>.png` (as `/thumbs/<slug>.png`). Don't invent a path to
    an image that doesn't exist — omit the field and let the placeholder handle it.
@@ -98,38 +94,23 @@ If a new author was created via Command 2, use their bio/tagline the same way.
 
 ## Command 2: create a new author
 
+Personas are data now: the admin panel (`bun run admin` → **Personas**) creates and
+edits them, generates drafts headlessly and approves them. Prefer pointing the user
+there. To do it by hand:
+
 1. Ask for anything not given: Arabic full name, Latin name (caps, for byline),
-   slug (English, lowercase — becomes the folder/collection name, e.g. `sara`),
-   tagline (2-4 words, matches existing style like "الاقتصاد · السياسات العامة"),
-   bio (2-3 sentences matching the tone of existing bios), accent hex.
-   For the accent, check `src/data/personal-blogs.ts` for colors already taken
-   (currently blue `#2563eb`, green `#16a34a`, amber `#b45309`) and suggest
-   something visually distinct — e.g. purple `#7c3aed`, rose `#dc2626`, teal
-   `#0d9488`.
-2. Edit `src/data/personal-blogs.ts`:
-   - add the new slug to the `slug`/`collection` union type on
-     `PersonalBlogPerson`
-   - add it to the `PERSONAL_COLLECTIONS` array
-   - add the new entry to the `personalBlogs` record
-3. Edit `src/content/config.ts`: add
-   `<slug>: defineCollection({ type: 'content', schema: personalBlogSchema })`
-   to the exported `collections` object.
-4. Edit `src/utils/personalBlogFeed.ts`: add the new slug to the
-   `CATEGORY_BY_PERSON` type and mapping. Check current per-category article
-   counts in `src/data/articles.json` and point at a thin, topically-relevant
-   category that isn't already claimed by an existing author. (The `collections`
-   list this file iterates over now imports `PERSONAL_COLLECTIONS` directly from
-   `personal-blogs.ts` — it used to be a second hardcoded array that silently
-   fell out of sync and dropped new authors from the homepage feed; that's fixed,
-   so this step is now just the `CATEGORY_BY_PERSON` map.)
-5. Create `src/content/<slug>/` and write the first post there (Command 1
-   flow). Don't leave the collection empty without reason.
-6. Nothing else needs to change — `src/pages/authors/[author].astro`,
-   `src/utils/authors.ts`, and `src/pages/articles/[slug].astro` already derive
-   authors generically from `personalBlogs`/`PERSONAL_COLLECTIONS`.
-7. Sanity-check with `bun run dev` before wrapping up. A bad edit to
-   `PERSONAL_COLLECTIONS` or the Zod schema throws at build time, not just at
-   runtime — this has broken a Cloudflare build before.
+   slug (English, lowercase, e.g. `sara`), tagline (2-4 words, like
+   "الاقتصاد · السياسات العامة"), bio (2-3 sentences matching existing bios),
+   voice notes, topics, a feed category (a thin, topically relevant one from
+   `src/data/catalog/categories.json`), and an accent hex distinct from those
+   already in `src/data/personas.json`.
+2. Append it to `personas` in `src/data/personas.json` with
+   `"collection": "house"` and `"active": true`. That is the only registration:
+   routing, author pages and feeds all derive from this file.
+3. Write its posts to `src/content/house/<english-kebab-slug>.md` with
+   `persona: <slug>` in the frontmatter (Command 1 flow otherwise). The first four
+   personas keep their own collections (`src/content/<slug>/`, no `persona:`).
+4. Sanity-check with `bun run dev`; a bad Zod schema edit throws at build time.
 
 Never touch `src/data/articles.json` or run `add-slugs`/`check-data`/
 `split-data` for this workflow — it is a fully separate content system.

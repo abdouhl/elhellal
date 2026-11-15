@@ -1,11 +1,13 @@
 ---
 import Layout from "../../layouts/Layout.astro";
 import ArticleSchema from "../../components/schema/ArticleSchema.astro";
+import { HOUSE_LABEL, HOUSE_NOTE } from "../../lib/native";
 import BreadcrumbSchema from "../../components/schema/BreadcrumbSchema.astro";
 import BookmarkButton from "../../components/BookmarkButton";
 import AdUnit from "../../components/AdUnit.astro";
 import { getCollection } from "astro:content";
-import { personalBlogs, PERSONAL_COLLECTIONS, type PersonalBlogPerson } from "../../data/personal-blogs";
+import { PERSONAS, type PersonalBlogPerson } from "../../data/personal-blogs";
+import { getPersonPosts } from "../../utils/personPosts";
 import { getPlaceholderImage } from "../../utils/placeholderImage";
 import { ARTICLE_SHELL_SLUG } from "../../lib/article-page";
 import { shellMarkers } from "../../lib/shell-template";
@@ -26,9 +28,7 @@ import { categoryTitle, COMMUNITY_ACCENT, COMMUNITY_TAGLINE } from "../../lib/co
 //   Their data derivations live in articleTemplateData()
 //   (src/lib/article-page.ts) — keep it in sync with the markup below.
 export async function getStaticPaths() {
-  const personalPostLists = await Promise.all(
-    PERSONAL_COLLECTIONS.map((c) => getCollection(c))
-  );
+  const personalPostLists = await Promise.all(PERSONAS.map((p) => getPersonPosts(p)));
   const communityPosts = await getCollection("community");
   const personalPaths = [...personalPostLists.flat(), ...communityPosts].map((post) => ({
     params: { slug: post.slug },
@@ -145,12 +145,12 @@ if (isShell) {
   };
 } else {
   let found: any;
-  for (const key of PERSONAL_COLLECTIONS) {
-    const posts = await getCollection(key);
+  for (const writer of PERSONAS) {
+    const posts = await getPersonPosts(writer);
     found = posts.find((p) => p.slug === slug);
     if (found) {
       isPersonalPost = true;
-      person = personalBlogs[key]!;
+      person = writer;
       PersonContent = (await found.render()).Content;
       const otherPosts = posts
         .filter((p) => p.slug !== slug)
@@ -188,7 +188,7 @@ if (isShell) {
         authorHref,
         authorDisplayName: person.nameAr,
         authorUrl: authorHref,
-        authorSubLabel: person.tagline,
+        authorSubLabel: HOUSE_LABEL,
         isSubstack: false,
         whoItems: [],
         faqItems: [],
@@ -218,8 +218,9 @@ if (isShell) {
       isCommunity = true;
       const d = found.data;
       person = {
-        slug: "community" as any,
-        collection: "community" as any,
+        slug: "community",
+        collection: "community",
+        category: d.category,
         nameAr: d.author,
         nameLatin: d.author,
         tagline: COMMUNITY_TAGLINE,
@@ -341,6 +342,7 @@ import InstallCard from "../../components/InstallCard.astro";
         datePublished={v.created_at}
         authorName={v.authorDisplayName}
         authorUrl={`https://elhellal.com${v.authorHref}`}
+        authorIsOrganization={isPersonalPost && !isCommunity}
       />
       <BreadcrumbSchema items={breadcrumbs} />
     </Fragment>
@@ -500,6 +502,9 @@ import InstallCard from "../../components/InstallCard.astro";
             <div class="article-prose" itemprop="articleBody">
               <PersonContent />
             </div>
+          )}
+          {isPersonalPost && !isCommunity && (
+            <p class="community-note">{HOUSE_NOTE}</p>
           )}
           {isCommunity && (
             <p class="community-note">

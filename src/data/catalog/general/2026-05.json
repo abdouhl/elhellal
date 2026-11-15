@@ -107,7 +107,8 @@
     "screen_name": "gershonbaskin",
     "created_at": "2026-05-18",
     "url": "https://gershonbaskin.substack.com/p/126",
-    "minutes": 7
+    "minutes": 7,
+    "slug": "إسرائيل-على-بعد-انتخابات-واحدة-من-السلام"
   },
   {
     "id_str": "4048173824742432009",
@@ -126,7 +127,8 @@
     "screen_name": "fati0ma",
     "created_at": "2026-05-13",
     "url": "https://fati0ma.substack.com/p/b72",
-    "minutes": 1
+    "minutes": 1,
+    "slug": "إلى-الجميلة-كما-هي"
   },
   {
     "id_str": "3371739223248756871",
@@ -167,7 +169,8 @@
     "created_at": "2026-05-06",
     "url": "https://sharaki.substack.com/p/d2c",
     "original_img_url": "https://substack-post-media.s3.amazonaws.com/public/images/cbacc8d8-d5d0-458f-a9d4-e4f6fa8cfa40_675x422.jpeg",
-    "minutes": 8
+    "minutes": 8,
+    "slug": "الإحصاء-عاريا"
   },
   {
     "id_str": "4322878493919359382",
@@ -298,7 +301,8 @@
     "screen_name": "naifalbaiz",
     "created_at": "2026-05-21",
     "url": "https://naifalbaiz.substack.com/p/27c",
-    "minutes": 5
+    "minutes": 5,
+    "slug": "الشاعر-الذي-عرى-الوطن-من-خطابه-محمد-الماغوط-وتجربة-الوجع"
   },
   {
     "id_str": "8927542112683917354",
@@ -308,7 +312,8 @@
     "created_at": "2026-05-22",
     "url": "https://mohabmurad.substack.com/p/62e",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!kfk5!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F7e69f11c-eeb4-4824-afa3-3db8c0b379f4_1536x1024.png",
-    "minutes": 12
+    "minutes": 12,
+    "slug": "الشريعة-بين-التحكيم-والتطبيق"
   },
   {
     "id_str": "1169444199458743470",
@@ -432,7 +437,8 @@
     "created_at": "2026-05-17",
     "url": "https://khadijah629853.substack.com/p/258",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!NJGT!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F266b10a0-f088-4ffe-8807-d619e5a9b2af_736x991.jpeg",
-    "minutes": 4
+    "minutes": 4,
+    "slug": "الكتابة-استنوني-أنا-مش-جاي"
   },
   {
     "id_str": "8379811429428338441",
@@ -608,7 +614,8 @@
     "created_at": "2026-05-22",
     "url": "https://arrushd.substack.com/p/b4b",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!3eyY!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F2a75156a-a5fc-475a-abb6-e41f97f6c149_1521x1024.jpeg",
-    "minutes": 26
+    "minutes": 26,
+    "slug": "تفسير-سورة-الحمد-الفاتحة"
   },
   {
     "id_str": "9044241468374955885",
@@ -654,7 +661,8 @@
     "screen_name": "ttozeur280",
     "created_at": "2026-05-30",
     "url": "https://ttozeur280.substack.com/p/b9f",
-    "minutes": 5
+    "minutes": 5,
+    "slug": "حين-تغلق-الضحية-عينيها"
   },
   {
     "id_str": "5160243112334779463",
@@ -695,7 +703,8 @@
     "screen_name": "moussaferalarabi",
     "created_at": "2026-05-06",
     "url": "https://moussaferalarabi.substack.com/p/2026",
-    "minutes": 3
+    "minutes": 3,
+    "slug": "دليل-2026-لاختيار-افضل-شاليه-في-الساحل-مواقع-مميزة-واسعار-تنافسية-وأنظمة-سداد-مرنة"
   },
   {
     "id_str": "7470676656849721502",
@@ -822,7 +831,8 @@
     "created_at": "2026-05-18",
     "url": "https://alya798292.substack.com/p/c92",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!Rbe7!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F4164055f-0b1b-4b98-96f1-62f20fc67ff7_736x1313.jpeg",
-    "minutes": 5
+    "minutes": 5,
+    "slug": "عن-التدوين-ومقاومة-تلاشي-الأيام-داخل-الذاكرة"
   },
   {
     "id_str": "6394492094881432108",
@@ -946,7 +956,8 @@
     "screen_name": "amlaki",
     "created_at": "2026-05-01",
     "url": "https://amlaki.substack.com/p/177",
-    "minutes": 1
+    "minutes": 1,
+    "slug": "قصة-مالك-عقار-سعودي-انتقل-من-الدفتر-إلى-التطبيق"
   },
   {
     "id_str": "2043754068880125215",
@@ -1157,7 +1168,8 @@
     "created_at": "2026-05-13",
     "url": "https://mabdelrasoul.substack.com/p/8a3",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!938t!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F47d852eb-62be-4a57-b487-e94646360804_2992x2992.jpeg",
-    "minutes": 2
+    "minutes": 2,
+    "slug": "متي-نزهر"
   },
   {
     "id_str": "8836104059645772230",
@@ -1167,7 +1179,8 @@
     "created_at": "2026-05-17",
     "url": "https://sharaki.substack.com/p/45e",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!juxq!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F88d3ba27-d69d-4c11-82d9-54d94555e05a_2474x1354.png",
-    "minutes": 4
+    "minutes": 4,
+    "slug": "مثلا-كيف-لرقم-بين-السالب-واحد-والموجب-واحد-يمكنه-أن-يحكي-لنا-الكثير"
   },
   {
     "id_str": "8214134043052632096",
@@ -1251,7 +1264,8 @@
     "created_at": "2026-05-03",
     "url": "https://taujih.substack.com/p/840",
     "original_img_url": "https://substack-post-media.s3.amazonaws.com/public/images/fc1fa328-3d0a-4688-b192-14802b795334_1168x784.jpeg",
-    "minutes": 8
+    "minutes": 8,
+    "slug": "من-الفوضى-للوضوح-حول-أفكارك-المبعثرة-لخريطة-بصرية-لا-تنساها"
   },
   {
     "id_str": "3493368376260109448",
@@ -1260,7 +1274,8 @@
     "screen_name": "kareemmohamed627206",
     "created_at": "2026-05-24",
     "url": "https://kareemmohamed627206.substack.com/p/9ad",
-    "minutes": 2
+    "minutes": 2,
+    "slug": "مول-إيست-كانيون-العاصمة-الإدارية"
   },
   {
     "id_str": "2365913280394092347",
@@ -1269,7 +1284,8 @@
     "screen_name": "kareemmohamed627206",
     "created_at": "2026-05-24",
     "url": "https://kareemmohamed627206.substack.com/p/de8",
-    "minutes": 1
+    "minutes": 1,
+    "slug": "مول-جراند-كانيون-العاصمة-الإدارية"
   },
   {
     "id_str": "1789131102930326197",
@@ -1278,7 +1294,8 @@
     "screen_name": "kareemmohamed627206",
     "created_at": "2026-05-24",
     "url": "https://kareemmohamed627206.substack.com/p/30",
-    "minutes": 2
+    "minutes": 2,
+    "slug": "مول-لينك-30-العاصمة-الإدارية"
   },
   {
     "id_str": "8865145784284123368",

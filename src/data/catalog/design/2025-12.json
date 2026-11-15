@@ -20,7 +20,8 @@
       "الرفاهية اليومية",
       "ديكور منزلي"
     ],
-    "minutes": 17
+    "minutes": 17,
+    "slug": "a-wood-nerds-guide-to-everyday-luxury-دليل-عشاق-الخشب-إلى-الرفاهية-اليومية"
   },
   {
     "id_str": "7642083248214709354",
@@ -43,7 +44,8 @@
       "Deep Teal",
       "هوية بصرية"
     ],
-    "minutes": 20
+    "minutes": 20,
+    "slug": "cloud-dancer-vs-transformative-teal-who-really-owns-2026-من-يملك-عام-٢٠٢٦-من-الألوان"
   },
   {
     "id_str": "1825970098407826179",
@@ -66,7 +68,8 @@
       "أزياء مستدامة",
       "إلهام التصميم"
     ],
-    "minutes": 25
+    "minutes": 25,
+    "slug": "subway-couture-and-squirrel-bags-a-mtiers-dart-survival-guide-for-design-nerds-أزياء-المترو-وحقائب-السناجب-دليل-ميتيي"
   },
   {
     "id_str": "5376275172063994240",
@@ -89,6 +92,7 @@
       "تصميم المساحات",
       "المنزل كمرآة للذات"
     ],
-    "minutes": 13
+    "minutes": 13,
+    "slug": "the-closet-to-couch-theory-why-your-home-might-be-wearing-the-wrong-outfit-نظرية-من-الخزانة-إلى-الأريكة-لماذا-قد-يرت"
   }
 ]

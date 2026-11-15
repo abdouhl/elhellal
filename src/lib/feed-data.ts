@@ -1,6 +1,6 @@
 import { loadArticles } from './articles-data';
 import { getPersonalBlogFeedArticles } from '../utils/personalBlogFeed';
-import { compareAlpha, compareNewest, toFeedCard, type FeedCard } from './feed';
+import { compareAlpha, compareNativeFirst, toFeedCard, type FeedCard } from './feed';
 
 /**
  * Build-time feed scopes: "all" plus one per category, each in the two
@@ -30,11 +30,16 @@ async function build(): Promise<Map<string, FeedScope>> {
     for (const cat of data.articles) scopes.set(cat.category, []);
     for (const card of all) scopes.get(card.category)?.push(card);
 
+    // Everything written on elhellal, its own feed (/written/).
+    scopes.set('native', all.filter((c) => c.n));
+
+    // "Newest" puts recent native posts first (see compareNativeFirst).
+    const newestFirst = compareNativeFirst();
     const result = new Map<string, FeedScope>();
     for (const [scope, cards] of scopes) {
         result.set(scope, {
             scope,
-            newest: [...cards].sort(compareNewest),
+            newest: [...cards].sort(newestFirst),
             alpha: [...cards].sort(compareAlpha),
         });
     }

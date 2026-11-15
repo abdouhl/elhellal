@@ -27,7 +27,8 @@
     "created_at": "2026-07-01",
     "url": "https://gani2015.substack.com/p/8f9",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!iC_l!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F11e6244e-f6ac-438b-8806-f71c61701886_735x401.jpeg",
-    "minutes": 2
+    "minutes": 2,
+    "slug": "لقد-مات-الإله-و-نحن-من-قتلناه-فريدريك-نيتشه"
   },
   {
     "id_str": "7588735917842449615",
@@ -341,7 +342,8 @@
     "screen_name": "emtnaan",
     "created_at": "2026-07-30",
     "url": "https://emtnaan.substack.com/p/e88",
-    "minutes": 3
+    "minutes": 3,
+    "slug": "أثر-لا-يزول"
   },
   {
     "id_str": "4648542881469971467",
@@ -372,7 +374,8 @@
     "created_at": "2026-07-16",
     "url": "https://samii090.substack.com/p/8a3",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!xk61!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F9060973f-77da-414b-a697-f28ecd11547c_736x900.jpeg",
-    "minutes": 3
+    "minutes": 3,
+    "slug": "أن-تكون-ولادتك-غلطة"
   },
   {
     "id_str": "8734781659201495146",
@@ -390,7 +393,8 @@
     "screen_name": "yara6688",
     "created_at": "2026-07-20",
     "url": "https://yara6688.substack.com/p/5a8",
-    "minutes": 3
+    "minutes": 3,
+    "slug": "أنا-و-الإكتئاب"
   },
   {
     "id_str": "8909874702636046005",
@@ -410,7 +414,8 @@
     "created_at": "2026-07-22",
     "url": "https://agamil3.substack.com/p/d45",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!WzLF!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F3a521ae3-cc68-4a43-a005-2af8d6568f8c_1600x2417.jpeg",
-    "minutes": 6
+    "minutes": 6,
+    "slug": "أنظمة-موازية"
   },
   {
     "id_str": "5063718859382702792",
@@ -462,7 +467,18 @@
     "created_at": "2026-07-31",
     "url": "https://emtnaan.substack.com/p/fb8",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!WHb_!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fc3a175dd-b899-4858-a052-fca3ea6a8baa_736x684.jpeg",
-    "minutes": 3
+    "minutes": 3,
+    "slug": "إلى-الذي-لم-أدر-ما-غربة-الأوطان-وهو-معي"
+  },
+  {
+    "id_str": "8117423538664014059",
+    "title": "إلى شام، الحنين إلى المجهول.",
+    "preview_text": "هناك أشياء لم نزُرها يومًا، ومع ذلك نقضي عمرًا كاملًا في الحنين إليها. تقول نِن، الشخصية العابرة في رواية هُناك أنهار في السماء للكاتبة إليف شفق، إن شوقها إلى بلاد الرافدين قبل قديم الأزل أمرٌ لا تستطيع التعبير عنه؛ لأنها لم تحيى فيها يومًا، ومع ذلك تعلّق قلبها بحقبةٍ تحوّلت إلى ملاذٍ لها في الحزن، وفي اليأس، وكثيرًا ما كانت ملاذًا في الفرح أيضًا. وليس هذا الشعور غريبًا عن عشقي الأبدي للشام، وحضور",
+    "screen_name": "lunarwhispers8",
+    "created_at": "2026-07-06",
+    "url": "https://lunarwhispers8.substack.com/p/2de",
+    "original_img_url": "https://substackcdn.com/image/fetch/$s_!tVbX!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F09221723-53ae-42fd-9942-c972cc8e1524_736x736.jpeg",
+    "minutes": 4
   },
   {
     "id_str": "1315645011683964089",
@@ -491,7 +507,8 @@
     "created_at": "2026-07-22",
     "url": "https://mohd10.substack.com/p/823",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!Uhy9!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F009baaa3-3c7f-4d84-8e0c-11c3d77c341f_736x715.jpeg",
-    "minutes": 10
+    "minutes": 10,
+    "slug": "اعتراف-طويل-عند-عتبة-السرداب"
   },
   {
     "id_str": "8948530401038762686",
@@ -558,7 +575,8 @@
     "screen_name": "di08b",
     "created_at": "2026-07-26",
     "url": "https://di08b.substack.com/p/684",
-    "minutes": 1
+    "minutes": 1,
+    "slug": "الانتظار"
   },
   {
     "id_str": "8684399536054435713",
@@ -578,7 +596,8 @@
     "created_at": "2026-07-12",
     "url": "https://mennasa177.substack.com/p/313",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!nXdF!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F747dffa8-9b70-4198-b768-4af7921d4e72_2560x1920.jpeg",
-    "minutes": 2
+    "minutes": 2,
+    "slug": "البونسيانا-وأشياء-من-هذا-القبيل"
   },
   {
     "id_str": "7776027322527646723",
@@ -860,7 +879,8 @@
     "created_at": "2026-07-29",
     "url": "https://kk001.substack.com/p/c58",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!6wul!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F4bde50e4-0ee8-470f-894b-441b7777f0c9_1080x1795.jpeg",
-    "minutes": 16
+    "minutes": 16,
+    "slug": "الزمن-طبيب-ام-شاهد"
   },
   {
     "id_str": "7031861078691141702",
@@ -931,7 +951,8 @@
     "created_at": "2026-07-25",
     "url": "https://roryurd.substack.com/p/a08",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!xVJE!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Ff3f5eafc-e7f5-403b-ae85-a03ccb0d7e14_720x513.jpeg",
-    "minutes": 2
+    "minutes": 2,
+    "slug": "الطريق-إلي"
   },
   {
     "id_str": "5870568274336946102",
@@ -982,7 +1003,8 @@
     "created_at": "2026-07-29",
     "url": "https://yroo.substack.com/p/af9",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!wcvh!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F8f8372d8-524d-4e80-90b9-3309a2a24809_548x425.jpeg",
-    "minutes": 1
+    "minutes": 1,
+    "slug": "العيش-والمعيشه"
   },
   {
     "id_str": "5844536113308878803",
@@ -1090,7 +1112,8 @@
     "created_at": "2026-07-26",
     "url": "https://gilgameshnabeel.substack.com/p/bc3",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!BfZF!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F11e40075-b2c1-4635-b554-aea06acde172_3524x1599.jpeg",
-    "minutes": 6
+    "minutes": 6,
+    "slug": "المحدودية-العقلية-والجغرافية-في-ميثولوجيا-الخلق-التوراتية"
   },
   {
     "id_str": "2361273437503394178",
@@ -1182,7 +1205,8 @@
     "created_at": "2026-07-26",
     "url": "https://re3iol.substack.com/p/a95",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!uiIr!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F3c531b68-ed81-4524-9719-11b727fa99f9_736x736.jpeg",
-    "minutes": 3
+    "minutes": 3,
+    "slug": "النسيان-الرحيم-لماذا-خلق-الله-خاصية-النسيان-في-قلوبنا"
   },
   {
     "id_str": "8497478486428382738",
@@ -1304,7 +1328,8 @@
       "ألعاب المغامرات المجانية",
       "ألعاب قراصنة أندرويد"
     ],
-    "minutes": 2
+    "minutes": 2,
+    "slug": "تحميل-لعبة-claw-للاندرويد"
   },
   {
     "id_str": "3291433494905396558",
@@ -1327,7 +1352,8 @@
       "لعبة ماكس باين",
       "أكشن وغموض"
     ],
-    "minutes": 2
+    "minutes": 2,
+    "slug": "تحميل-لعبة-max-payne-للاندرويد"
   },
   {
     "id_str": "2968080570978956431",
@@ -1551,7 +1577,8 @@
     "created_at": "2026-07-16",
     "url": "https://ep6v.substack.com/p/682",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!yXqQ!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F69741aeb-e44b-422f-9019-7d4f967f981b_1200x675.jpeg",
-    "minutes": 2
+    "minutes": 2,
+    "slug": "حين-يصبح-القلب-سجينا-لمن-لا-يشعر-به"
   },
   {
     "id_str": "5917427190610712709",
@@ -1581,7 +1608,8 @@
     "screen_name": "naifalbaiz",
     "created_at": "2026-07-06",
     "url": "https://naifalbaiz.substack.com/p/461",
-    "minutes": 5
+    "minutes": 5,
+    "slug": "خراب-الأيديولوجيا-سيرة-الأحزاب-العربية-من-صناعة-الأمة-إلى-صناعة-الخيبة"
   },
   {
     "id_str": "2222536144945893356",
@@ -1612,7 +1640,8 @@
     "created_at": "2026-07-29",
     "url": "https://justlookslikeadream.substack.com/p/4ab",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!WHia!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F79f8a4e4-45e5-4177-a044-9284eb6cd918_735x563.jpeg",
-    "minutes": 4
+    "minutes": 4,
+    "slug": "خلايا-أمك-ما-زالت-تعيش-داخل-جسدك"
   },
   {
     "id_str": "8893253401470146820",
@@ -1622,7 +1651,8 @@
     "created_at": "2026-07-13",
     "url": "https://duuja20.substack.com/p/110",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!iPJh!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F00b8bfb1-703b-4047-8214-d0ba9a401684_800x1200.jpeg",
-    "minutes": 2
+    "minutes": 2,
+    "slug": "خلـف-الملامـح"
   },
   {
     "id_str": "6836763404853939635",
@@ -1671,7 +1701,8 @@
     "created_at": "2026-07-28",
     "url": "https://rahaly.substack.com/p/480",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!aT52!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F1e06bc66-1357-4f30-9c8e-bdfd94bb8c65_4284x5712.jpeg",
-    "minutes": 6
+    "minutes": 6,
+    "slug": "رحلة-الساعة-الخامسة-وعشر-دقائق"
   },
   {
     "id_str": "6335789462765635733",
@@ -1908,7 +1939,8 @@
     "screen_name": "di08b",
     "created_at": "2026-07-12",
     "url": "https://di08b.substack.com/p/9f3",
-    "minutes": 1
+    "minutes": 1,
+    "slug": "عزيزتي-التي-هي-أنا-1"
   },
   {
     "id_str": "7094863540903141469",
@@ -2043,7 +2075,8 @@
     "created_at": "2026-07-21",
     "url": "https://tasniimabdikariim9.substack.com/p/0bb",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!x9NQ!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fc1375323-df61-4fa4-ba30-f1dcaf8f93a9_736x1104.jpeg",
-    "minutes": 2
+    "minutes": 2,
+    "slug": "عندما-قال-مريضي-أنا-قاتل-الجزء-الأول"
   },
   {
     "id_str": "4360790514257264137",
@@ -2175,7 +2208,8 @@
     "screen_name": "rahfghanem",
     "created_at": "2026-07-08",
     "url": "https://rahfghanem.substack.com/p/b4c",
-    "minutes": 2
+    "minutes": 2,
+    "slug": "قال-لي-قطعة-بين-مسار-وصورة"
   },
   {
     "id_str": "8438353411223182521",
@@ -2240,7 +2274,8 @@
     "created_at": "2026-07-03",
     "url": "https://gilgameshnabeel.substack.com/p/420",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!3SMo!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F84216e57-b9ca-4591-bbde-0a2d4c2260a8_800x530.heic",
-    "minutes": 9
+    "minutes": 9,
+    "slug": "قصة-أصحاب-الفيل-بين-التاريخ-والأسطورة-تفكيك-الرواية-التقليدية"
   },
   {
     "id_str": "9194685262388350176",
@@ -2396,7 +2431,8 @@
     "created_at": "2026-07-28",
     "url": "https://maymalaz.substack.com/p/99b",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!f6we!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F2ac650bf-9a28-407d-bb75-793b2f6735cb_736x414.jpeg",
-    "minutes": 3
+    "minutes": 3,
+    "slug": "كيف-تعلمنا-الفيزياء-فلسفة-إيجاد-الحلول"
   },
   {
     "id_str": "8509983821366959831",
@@ -2521,7 +2557,8 @@
     "created_at": "2026-07-30",
     "url": "https://nsa045611.substack.com/p/bcc",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!7Pow!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fc18a6b44-102c-4688-9692-8afa7fef0ab7_736x1308.jpeg",
-    "minutes": 2
+    "minutes": 2,
+    "slug": "لا-تعش-حياتك-بعقل-شخص-آخر"
   },
   {
     "id_str": "5576931423137707909",
@@ -2562,7 +2599,8 @@
     "created_at": "2026-07-04",
     "url": "https://reoe.substack.com/p/470",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!ajHB!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F57556fef-a3c0-4aae-9051-a9ad6ec9ffe2_736x920.jpeg",
-    "minutes": 2
+    "minutes": 2,
+    "slug": "لم-أعد-الشخص-الذي-عرفته"
   },
   {
     "id_str": "8272093314191216742",
@@ -2581,7 +2619,8 @@
     "screen_name": "moussaferalarabi",
     "created_at": "2026-07-15",
     "url": "https://moussaferalarabi.substack.com/p/12a",
-    "minutes": 3
+    "minutes": 3,
+    "slug": "لماذا-أصبحت-التشيك-من-أفضل-وجهات-العلاج-الطبيعي-في-أوروبا"
   },
   {
     "id_str": "7592113779481829548",
@@ -2739,7 +2778,8 @@
     "created_at": "2026-07-17",
     "url": "https://njad1.substack.com/p/625",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!77TL!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fc5b41e3c-889c-428f-b2af-18d07377407d_735x664.jpeg",
-    "minutes": 2
+    "minutes": 2,
+    "slug": "ليش-نخاف-ان-نكون-ضعفاء"
   },
   {
     "id_str": "8013793497263752751",
@@ -2904,7 +2944,8 @@
     "created_at": "2026-07-24",
     "url": "https://wor7r.substack.com/p/fbc",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!m7hx!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F06b4bba3-a128-4c03-bf30-d1c806ab5bb4_1448x1086.png",
-    "minutes": 12
+    "minutes": 12,
+    "slug": "مشكلة-الوحي-و-فشل-جمع-القران-الجزء-الثاني"
   },
   {
     "id_str": "4890693502230071060",
@@ -3008,7 +3049,8 @@
     "screen_name": "naifalbaiz",
     "created_at": "2026-07-19",
     "url": "https://naifalbaiz.substack.com/p/5d6",
-    "minutes": 24
+    "minutes": 24,
+    "slug": "من-التقنية-المالية-إلى-الذكاء-المالي-كيف-تعيد-البنوك-السعودية-تشكيل-علاقتها-بالشب"
   },
   {
     "id_str": "4413962480075865165",
@@ -3027,7 +3069,8 @@
     "screen_name": "naifalbaiz",
     "created_at": "2026-07-09",
     "url": "https://naifalbaiz.substack.com/p/8a5",
-    "minutes": 7
+    "minutes": 7,
+    "slug": "من-جيولوجيا-الطاقة-إلى-إبستمولوجيا-الطاقة-كيف-أعاد-الذكاء-الاصطناعي-تعريف-الأمن-و"
   },
   {
     "id_str": "3863700565075723806",

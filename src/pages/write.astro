@@ -7,11 +7,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import Layout from "../layouts/Layout.astro";
+import { getFeeds } from "../lib/feed-data";
+import { articlesCountAr } from "../lib/native";
 
 const categories = JSON.parse(
     fs.readFileSync(path.join(process.cwd(), "src/data/catalog/categories.json"), "utf8")
 ) as Array<{ category: string; title: string }>;
 const sitekey = import.meta.env.PUBLIC_TURNSTILE_SITEKEY ?? "";
+const nativeCount = (await getFeeds()).get("native")!.newest.length;
 ---
 
 <Layout
@@ -28,6 +31,11 @@ const sitekey = import.meta.env.PUBLIC_TURNSTILE_SITEKEY ?? "";
             اكتب مقالك هنا وأرسله. نراجع كل مقال يدوياً قبل نشره، وننشر المقالات الأصيلة المفيدة.
             لا يُنشر بريدك أبداً.
         </p>
+        {nativeCount > 0 && (
+            <p class="write-muted">
+                <a href="/written/">{articlesCountAr(nativeCount)} كُتبت على الهلال حتى الآن</a>
+            </p>
+        )}
 
         <form class="write-form" data-form novalidate>
             <label>

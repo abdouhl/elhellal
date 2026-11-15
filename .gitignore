@@ -71,3 +71,6 @@ src/data/articles.json
 
 # IndexNow: URLs already submitted (scripts/indexnow.ts)
 .cache/
+
+# AI persona drafts (admin Personas tab), reviewed before they reach src/content/
+.drafts/

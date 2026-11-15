@@ -7,9 +7,11 @@ interface Props {
     datePublished?: string;
     authorName?: string;
     authorUrl?: string;
+    /** House (AI-assisted) writers: credit الهلال, not a person */
+    authorIsOrganization?: boolean;
 }
 
-const { headline, description, url, image, datePublished, authorName, authorUrl } = Astro.props;
+const { headline, description, url, image, datePublished, authorName, authorUrl, authorIsOrganization } = Astro.props;
 
 const schema: any = {
     "@context": "https://schema.org",
@@ -21,7 +23,9 @@ const schema: any = {
 
 if (image) schema.image = image;
 if (datePublished) schema.datePublished = datePublished;
-if (authorName) {
+if (authorIsOrganization) {
+    schema.author = { "@type": "Organization", name: "الهلال", url: "https://elhellal.com" };
+} else if (authorName) {
     schema.author = {
         "@type": "Person",
         name: authorName,

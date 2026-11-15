@@ -13,6 +13,8 @@ import { getCategoryTitles } from "../../lib/feed-data";
 import { toFeedCard, type FeedCard } from "../../lib/feed";
 import { LISTING_SHELL_SLUG, authorDescription } from "../../lib/listing-page";
 import { shellMarkers } from "../../lib/shell-template";
+import { HOUSE_LABEL, HOUSE_AUTHOR_NOTE } from "../../lib/native";
+import OrganizationSchema from "../../components/schema/OrganizationSchema.astro";
 
 // This page renders in two modes:
 // - Personal-blog (and dev-only WriteFreely) writers prerender as ordinary
@@ -34,6 +36,7 @@ export async function getStaticPaths() {
       tagline: author.tagline,
       bio: author.bio,
       accent: author.accent,
+      isHouse: author.isHouse,
     },
   }));
   return [{ params: { author: LISTING_SHELL_SLUG }, props: {} }, ...personal];
@@ -54,6 +57,7 @@ interface AuthorView {
   tiles: ExploreTile[];
   // Personal writers: initial avatar in their accent color, tagline and bio.
   isPersonal: boolean;
+  isHouse?: boolean | undefined;
   accent?: string | undefined;
   initial?: string | undefined;
   tagline?: string | undefined;
@@ -84,13 +88,14 @@ if (isShell) {
     profileLinkLabel: "{{profileLinkLabel}}",
   };
 } else {
-  const { screen_name, articles, displayName, tagline, bio, accent } = Astro.props as {
+  const { screen_name, articles, displayName, tagline, bio, accent, isHouse } = Astro.props as {
     screen_name: string;
     articles: AuthorArticle[];
     displayName?: string;
     tagline?: string;
     bio?: string;
     accent?: string;
+    isHouse?: boolean;
   };
   const categoryTitleMap = getCategoryTitles();
 
@@ -122,6 +127,7 @@ if (isShell) {
     topCategories: topCategories.map(([label, count]) => ({ label, count })),
     tiles: categoryTiles(articles),
     isPersonal: true,
+    isHouse,
     accent,
     initial: displayName?.trim().charAt(0),
     tagline,
@@ -157,7 +163,7 @@ const breadcrumbs = [
     </Fragment>
   ) : (
     <Fragment>
-      <PersonSchema name={v.authorLabel} url={v.canonicalUrl} description={v.bio} />
+      {v.isHouse ? <OrganizationSchema /> : <PersonSchema name={v.authorLabel} url={v.canonicalUrl} description={v.bio} />}
       <ItemListSchema items={personal!.sorted} listName={`@${personal!.screen_name} Articles`} />
       <BreadcrumbSchema items={breadcrumbs} />
     </Fragment>
@@ -191,6 +197,7 @@ const breadcrumbs = [
         <div class="author-identity">
           <h1 style={v.isPersonal ? `color:${v.accent}` : ""} dir={v.nameDir}>{v.authorLabel}</h1>
           {v.isPersonal && v.tagline && <p class="author-tagline">{v.tagline}</p>}
+          {v.isHouse && <p class="author-house-chip">{HOUSE_LABEL}</p>}
           <div class="author-stats">
             <span class="author-stat">{v.total} مقالة</span>
             {v.latestDate && (
@@ -213,7 +220,7 @@ const breadcrumbs = [
         )}
       </div>
 
-      {v.isPersonal && v.bio && <p class="author-bio">{v.bio}</p>}
+      {v.isPersonal && v.bio && <p class="author-bio">{v.bio}{v.isHouse && <> {HOUSE_AUTHOR_NOTE}</>}</p>}
 
       {v.topCategories.length > 0 && (
         <>
@@ -332,6 +339,15 @@ const breadcrumbs = [
       margin: 4px 0 0;
       font-size: var(--desktop-body-sm);
       color: var(--content-secondary);
+    }
+    .author-house-chip {
+      display: inline-block;
+      margin: 6px 0 0;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: var(--desktop-caption);
+      color: #0d9488;
+      border: 0.5px solid currentColor;
     }
     .author-stats {
       display: flex;

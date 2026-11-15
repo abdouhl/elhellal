@@ -1,24 +1,15 @@
 import { getCollection } from 'astro:content';
-import { personalBlogs, PERSONAL_COLLECTIONS } from '../data/personal-blogs';
+import { PERSONAS } from '../data/personal-blogs';
 import { getPlaceholderImage } from './placeholderImage';
+import { getPersonPosts, personOrigin } from './personPosts';
 import type { ArticleWithCategory } from '../types';
 
-// Personal blog topics map onto existing (otherwise thin) catalog categories
-// so they surface in the feed under nav tabs that already exist — no new category needed.
-const CATEGORY_BY_PERSON: Record<'omar' | 'layla' | 'youssef' | 'yacine', string> = {
-    omar: 'technology',
-    layla: 'environment',
-    youssef: 'economics',
-    yacine: 'investing',
-};
-
+// Persona posts sit in the persona's catalog category (src/data/personas.json), usually a
+// thin one, so they surface in the feed under nav tabs that already exist.
 export async function getPersonalBlogFeedArticles(): Promise<ArticleWithCategory[]> {
-    const collections = PERSONAL_COLLECTIONS;
-
     const results = await Promise.all(
-        collections.map(async (collection) => {
-            const person = personalBlogs[collection];
-            const posts = await getCollection(collection);
+        PERSONAS.map(async (person) => {
+            const posts = await getPersonPosts(person);
 
             return posts.map((post): ArticleWithCategory => ({
                 id_str: post.slug,
@@ -30,8 +21,9 @@ export async function getPersonalBlogFeedArticles(): Promise<ArticleWithCategory
                 created_at: post.data.pubDate.toISOString().slice(0, 10),
                 slug: post.slug,
                 authorName: person.nameAr,
-                authorHref: `/authors/${collection}/`,
-                category: CATEGORY_BY_PERSON[collection],
+                authorHref: `/authors/${person.slug}/`,
+                category: person.category,
+                origin: personOrigin(person),
             }));
         })
     );
@@ -49,6 +41,7 @@ export async function getPersonalBlogFeedArticles(): Promise<ArticleWithCategory
         // No author pages for readers yet: the name opens the article.
         authorHref: `/articles/${encodeURIComponent(post.slug)}/`,
         category: post.data.category,
+        origin: 'write',
     }));
 
     return [...results.flat(), ...community];

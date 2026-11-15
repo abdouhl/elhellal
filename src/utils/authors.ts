@@ -1,5 +1,5 @@
-import { getCollection } from 'astro:content';
 import { personalBlogs } from '../data/personal-blogs';
+import { getPersonPosts, personOrigin } from './personPosts';
 import { buildAuthorIndex, type AuthorArticle, type AuthorEntry } from './author-index';
 
 export { buildAuthorIndex, type AuthorArticle, type AuthorEntry } from './author-index';
@@ -121,7 +121,7 @@ async function getWriteFreelyAuthorEntries(): Promise<AuthorEntry[]> {
 async function getPersonalAuthorEntries(): Promise<AuthorEntry[]> {
     const entries = await Promise.all(
         Object.values(personalBlogs).map(async (person): Promise<AuthorEntry> => {
-            const posts = await getCollection(person.collection);
+            const posts = await getPersonPosts(person);
             return {
                 screen_name: person.slug,
                 displayName: person.nameAr,
@@ -129,6 +129,7 @@ async function getPersonalAuthorEntries(): Promise<AuthorEntry[]> {
                 bio: person.bio,
                 accent: person.accent,
                 isPersonal: true,
+                isHouse: true,
                 articles: posts.map((post): AuthorArticle => ({
                     id_str: post.slug,
                     screen_name: person.slug,
@@ -138,6 +139,7 @@ async function getPersonalAuthorEntries(): Promise<AuthorEntry[]> {
                     slug: post.slug,
                     original_img_url: post.data.large || post.data.thumb,
                     category: person.tagline,
+                    origin: personOrigin(person),
                 })),
             };
         })

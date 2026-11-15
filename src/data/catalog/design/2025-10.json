@@ -20,7 +20,8 @@
       "الجماليات المعمارية",
       "فن السينما"
     ],
-    "minutes": 26
+    "minutes": 26,
+    "slug": "beyond-the-red-carpet-cinemas-secret-style-school-وراء-السجادة-الحمراء-مدرسة-السينما-السرية-للأناقة"
   },
   {
     "id_str": "3497330164129523245",
@@ -43,7 +44,8 @@
       "ديكورات بيضاء",
       "الطلاء المثالي"
     ],
-    "minutes": 15
+    "minutes": 15,
+    "slug": "warm-whites-at-five-finding-hues-that-dont-turn-yellow-when-the-sun-starts-to-set-البحث-عن-درجات-طلاء-ابيض-لا-تتحول-إلى"
   },
   {
     "id_str": "8496469997441847469",
@@ -66,6 +68,7 @@
       "تجديد المنزل",
       "تصميم داخلي عصري"
     ],
-    "minutes": 8
+    "minutes": 8,
+    "slug": "من-ممرات-الازياء-إلى-ممرات-مساحاتك"
   }
 ]

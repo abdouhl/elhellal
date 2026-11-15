@@ -15,6 +15,7 @@
  */
 
 import { fnv1a } from './hash';
+import { isAiAssisted, isNative, NATIVE_BOOST_DAYS, type Origin } from './native';
 
 export type FeedSort = 'newest' | 'alpha';
 
@@ -44,6 +45,10 @@ export interface FeedCard {
     internalHref?: string | undefined;
     /** Reading time in minutes, when known */
     min?: number | undefined;
+    /** Written on elhellal (see src/lib/native.ts) */
+    n?: 1 | undefined;
+    /** Written by the house team with AI help */
+    ai?: 1 | undefined;
 }
 
 interface CardSource {
@@ -58,6 +63,7 @@ interface CardSource {
     authorName?: string | undefined;
     internalHref?: string | undefined;
     minutes?: number | undefined;
+    origin?: Origin | undefined;
 }
 
 export function toFeedCard(a: CardSource, category: string): FeedCard {
@@ -70,6 +76,8 @@ export function toFeedCard(a: CardSource, category: string): FeedCard {
     if (a.authorName) card.authorName = a.authorName;
     if (a.internalHref) card.internalHref = a.internalHref;
     if (a.minutes) card.min = a.minutes;
+    if (isNative(a.origin)) card.n = 1;
+    if (isAiAssisted(a.origin)) card.ai = 1;
     return card;
 }
 
@@ -116,6 +124,21 @@ export function feedPageCount(total: number): number {
 /** Same ordering as the old client-side comparators (utils/sorting.ts). */
 export function compareNewest(a: FeedCard, b: FeedCard): number {
     return new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime();
+}
+
+/**
+ * Newest first, except native posts from the last NATIVE_BOOST_DAYS, which
+ * come before everything else (newest first among themselves).
+ */
+export function compareNativeFirst(now: number = Date.now()): (a: FeedCard, b: FeedCard) => number {
+    const cutoff = now - NATIVE_BOOST_DAYS * 86_400_000;
+    const boosted = (c: FeedCard) => (c.n && new Date(c.date || 0).getTime() >= cutoff ? 1 : 0);
+    return (a, b) => boosted(b) - boosted(a) || compareNewest(a, b);
+}
+
+/** True when a card sits at the top only because of the native boost. */
+export function isBoosted(card: FeedCard, now: number = Date.now()): boolean {
+    return !!card.n && new Date(card.date || 0).getTime() >= now - NATIVE_BOOST_DAYS * 86_400_000;
 }
 
 export function compareAlpha(a: FeedCard, b: FeedCard): number {

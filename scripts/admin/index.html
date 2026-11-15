@@ -177,6 +177,7 @@ const TABS = [
   ['Add content', [
     ['import', '⇣', 'Import', 'Find Substack authors and import their articles, or import external blogs.'],
     ['submissions', '✍', 'Submissions', 'Articles readers wrote on /write/ — edit, approve into src/content/community/, or reject. Approved ones ship with the next Publish.'],
+    ['personas', '☺', 'Personas', 'AI house writers: create characters, generate drafts in their voice (headless Claude, researched and cited), review and approve them. Approved articles ship with the next Publish.'],
   ]],
   ['Share', [
     ['publish', '⇡', 'Publish', 'Commit & push to GitHub, then build and deploy the site.'],
@@ -237,7 +238,7 @@ function render() {
   document.getElementById('pagetitle').textContent = info.label;
   document.getElementById('pagedesc').textContent = info.desc;
   document.title = `${info.label} · elhellal admin`;
-  ({ articles: renderArticles, authors: renderAuthors, review: renderReview, blocked: renderBlocked, pins: renderPins, import: renderImport, health: renderHealth, publish: renderPublish, social: renderSocial, stats: renderStats, sites: renderSites, leads: renderLeads, push: renderPush, submissions: renderSubmissions })[state.tab]();
+  ({ articles: renderArticles, authors: renderAuthors, review: renderReview, blocked: renderBlocked, pins: renderPins, import: renderImport, health: renderHealth, publish: renderPublish, social: renderSocial, stats: renderStats, sites: renderSites, leads: renderLeads, push: renderPush, submissions: renderSubmissions, personas: renderPersonas })[state.tab]();
 }
 const view = () => document.getElementById('view');
 /** Fills the page for `tab` — unless the user has switched tabs while it was loading. */
@@ -1320,6 +1321,7 @@ const tile = (label, value, sub) => h('div', { class: 'card', style: 'flex:1;min
 const viewAuthor = (name) => h('a', { class: 'link', onclick: () => { state.tab = 'articles'; state.author = name; state.q = ''; state.page = 1; syncTabs(); render(); } }, '@' + name);
 const SOURCE_LABELS = { substack: 'Substack (*.substack.com)', blogs: 'Registered external blogs', other: 'Other domains (custom-domain Substacks, etc.)' };
 
+const NATIVE_LABELS = { write: 'Readers (/write/)', persona: 'House personas', personal: 'Personal blogs' };
 async function renderStats() {
   if (!dash) { paint('stats', h('div', { class: 'empty' }, 'Crunching the catalog…')); dash = await api('/api/dashboard'); if (state.tab !== 'stats') return; }
   const d = dash;
@@ -1335,6 +1337,12 @@ async function renderStats() {
       tile('Published, last 30 days', last30.toLocaleString()),
       tile('This week', thisWeek.toLocaleString(), `week of ${d.weeks.at(-1)?.week}`),
       d.future ? tile('Future-dated', d.future.toLocaleString(), 'created_at after today — check Health') : null,
+    ),
+    h('h2', {}, 'Written on elhellal'),
+    h('p', { class: 'meta' }, 'Native articles (full text on the site): reader articles from /write/, house personas (AI-assisted), and the personal blogs. The public site shows the combined total ("مكتوب على الهلال").'),
+    h('div', { class: 'toolbar', style: 'align-items:stretch' },
+      tile('Native total', d.native.total.toLocaleString(), `${d.native.last30} in the last 30 days`),
+      ...['write', 'persona', 'personal'].map((o) => { const s = d.native.byOrigin[o] || { total: 0, last30: 0, last7: 0 }; return tile(NATIVE_LABELS[o], s.total.toLocaleString(), `${s.last7} this week · ${s.last30} last 30 days`); }),
     ),
     h('h2', {}, 'Published per week'),
     h('div', { class: 'card' }, weeklyChart(d.weeks)),
@@ -1547,6 +1555,216 @@ async function renderSubmissions() {
           h('button', { class: 'btn', onclick: () => { if (confirm('Reject this submission?')) act(async () => { await api('/api/submissions/reject', { id: x.id }); subs.data = null; subs.open = null; }, 'Rejected'); } }, 'Reject'))
           : null));
     })) : h('div', { class: 'empty' }, `No ${subs.status} submissions`));
+}
+
+// ─── Personas (AI house writers) ───
+const per = { data: null, editing: null, isNew: false, gen: {}, draft: null, draftText: '', force: false, model: '', trends: null, trendsLoading: false, pick: {}, more: {}, suggestCount: 3 };
+const personaJob = jobPoller('persona', '/api/personas/job', 'personas', async (r) => {
+  per.data = null;
+  if (r.job?.mode === 'persona:suggest' && per.trends) per.trends = await api('/api/personas/trends').catch(() => per.trends);
+  if (state.tab === 'personas') renderPersonas();
+});
+
+async function loadTrends(refresh) {
+  per.trendsLoading = true; renderPersonas();
+  try { per.trends = await api('/api/personas/trends' + (refresh ? '?refresh=1' : '')); }
+  catch (e) { toast(e.message, true); }
+  per.trendsLoading = false; renderPersonas();
+}
+
+/** The Trending panel: rising keywords → write as a persona; uncovered niches → suggested personas. */
+function trendsPanel(d, running) {
+  const t = per.trends;
+  const head = h('div', { class: 'toolbar' },
+    h('h2', { style: 'margin:0' }, 'Trending'),
+    h('button', { class: 'btn' + (t ? '' : ' primary'), disabled: per.trendsLoading, onclick: () => loadTrends(!!t) }, per.trendsLoading ? 'Loading…' : t ? 'Refresh' : 'Load trends'),
+    t ? h('span', { class: 'meta' }, `as of ${new Date(t.fetchedAt).toLocaleTimeString()}${t.errors.length ? ' · ' + t.errors.join('; ') : ''}`) : null);
+  if (!t) return h('div', { class: 'card' }, head, h('p', { class: 'meta' }, 'Keywords rising on Arabic Substack (from the catalog) and Google’s daily searches in SA, EG, AE, MA, DZ, IQ. Write an article on one with a persona, or let Claude suggest new personas for the niches nobody covers.'));
+  const name = (slug) => d.personas.find((p) => p.slug === slug)?.nameAr ?? slug;
+  const catTitle = (c) => d.categories.find((x) => x.category === c)?.title ?? c;
+  const active = d.personas.filter((p) => p.active !== false);
+
+  const writeRow = (key, defaultSlug, trend) => {
+    const slug = per.pick[key] ?? defaultSlug ?? '';
+    return [
+      h('select', { onchange: (e) => { per.pick[key] = e.target.value; renderPersonas(); } },
+        h('option', { value: '' }, 'persona…'), active.map((p) => h('option', { value: p.slug, selected: p.slug === slug }, p.nameAr + (p.slug === defaultSlug ? ' ★' : '')))),
+      h('button', { class: 'btn primary', disabled: !slug || running, title: 'Generate one draft on this keyword', onclick: () =>
+        personaJob.start('/api/personas/generate', { slug, topic: trend.keyword, count: 1, model: per.model, force: per.force, trend }, `${name(slug)} is writing on “${trend.keyword}”`) }, 'Write'),
+      h('button', { class: 'btn', disabled: !slug, title: 'Put it in the persona’s topic box below', onclick: () => { (per.gen[slug] ??= { topic: '', count: 1 }).topic = trend.keyword; renderPersonas(); toast(`Topic set on ${name(slug)}’s card`); } }, '→ topic'),
+    ];
+  };
+  const rows = (list, n, key) => (per.more[key] ? list : list.slice(0, n));
+  const moreBtn = (list, n, key) => list.length > n ? h('button', { class: 'btn', onclick: () => { per.more[key] = !per.more[key]; renderPersonas(); } }, per.more[key] ? 'Show fewer' : `Show all ${list.length}`) : null;
+
+  const catalog = h('div', { class: 'card', style: 'display:grid;gap:6px' },
+    h('strong', {}, `Rising on Arabic Substack (${t.catalog.length})`),
+    h('p', { class: 'meta' }, 'Writers using the keyword in the last 14 days vs the 90 before. ★ = best-fitting persona.'),
+    rows(t.catalog, 15, 'catalog').map((x) => h('div', { class: 'row' },
+      h('div', { class: 'body' },
+        h('div', { class: 'title', dir: 'auto' }, h('a', { href: `https://elhellal.com/tags/${encodeURIComponent(x.tagSlug)}/`, target: '_blank', rel: 'noopener' }, x.keyword)),
+        h('div', { class: 'meta', dir: 'auto' }, `${x.recent} writers now · ${x.before} before · ${x.categories.map((c) => catTitle(c.category)).join('، ')}${x.titles[0] ? ' · «' + x.titles[0] + '»' : ''}`)),
+      writeRow('c:' + x.keyword, x.persona, { keyword: x.keyword, source: 'catalog', context: x.titles }))),
+    moreBtn(t.catalog, 15, 'catalog'));
+
+  const google = h('div', { class: 'card', style: 'display:grid;gap:6px' },
+    h('strong', {}, `Google searches today (${t.google.length})`),
+    h('p', { class: 'meta' }, 'Mostly news. Claude skips anything not evergreen or AdSense-safe (war, politics, crime, celebrities, sports results).'),
+    rows(t.google, 10, 'google').map((x) => h('div', { class: 'row' },
+      h('div', { class: 'body' },
+        h('div', { class: 'title', dir: 'auto' }, x.term),
+        h('div', { class: 'meta', dir: 'auto' }, `${x.traffic.toLocaleString()}+ searches · ${x.geos.join(', ')}${x.news[0] ? ' · ' + x.news[0].title : ''}`)),
+      writeRow('g:' + x.term, x.persona, { keyword: x.term, source: 'google', geos: x.geos.join(', '), context: x.news.map((n) => n.title) }))),
+    moreBtn(t.google, 10, 'google'));
+
+  const suggest = (category) => personaJob.start('/api/personas/suggest', { count: per.suggestCount, model: per.model, category }, 'Claude is designing personas — follow the log below');
+  const gaps = h('div', { class: 'card', style: 'display:grid;gap:6px' },
+    h('div', { class: 'toolbar' },
+      h('strong', {}, 'Niches no persona covers'),
+      h('label', { class: 'meta' }, 'suggest ', h('input', { type: 'number', min: 1, max: 6, value: per.suggestCount, style: 'width:50px', oninput: (e) => { per.suggestCount = Number(e.target.value) || 3; } }), ' persona(s)'),
+      h('button', { class: 'btn primary', disabled: running, onclick: () => suggest('') }, running && personaJob.job?.mode === 'persona:suggest' ? 'Suggesting…' : 'Suggest from all trends')),
+    t.gaps.length ? t.gaps.slice(0, 8).map((g) => h('div', { class: 'row' },
+      h('div', { class: 'body' },
+        h('div', { class: 'title' }, `${g.title} · ${g.authors} writer-mentions`),
+        h('div', { class: 'meta', dir: 'auto' }, g.keywords.slice(0, 10).join('، '))),
+      h('button', { class: 'btn', disabled: running, onclick: () => suggest(g.category) }, 'Suggest for this'))) : h('p', { class: 'meta' }, 'Every rising keyword fits an existing persona.'));
+
+  const suggestions = t.suggestions.length ? h('div', { class: 'card', style: 'display:grid;gap:8px' },
+    h('strong', {}, `Suggested personas (${t.suggestions.length})`),
+    t.suggestions.map((s) => h('div', { class: 'row', style: `border-inline-start:4px solid ${s.accent || '#888'};padding-inline-start:8px` },
+      h('div', { class: 'body' },
+        h('div', { class: 'title', dir: 'auto' }, `${s.nameAr ?? ''} · ${s.nameLatin ?? ''} (${s.slug})`),
+        h('div', { class: 'meta', dir: 'auto' }, `${s.tagline ?? ''} · ${catTitle(s.category)}${s.why ? ' — ' + s.why : ''}`),
+        h('div', { class: 'meta', dir: 'auto' }, s.bio ?? ''),
+        Array.isArray(s.keywords) && s.keywords.length ? h('div', { class: 'meta', dir: 'auto' }, 'From: ' + s.keywords.join('، ')) : null),
+      h('button', { class: 'btn primary', onclick: () => {
+        per.editing = { ...PERSONA_BLANK, ...s, topics: Array.isArray(s.topics) ? s.topics : [], active: true };
+        delete per.editing.why; delete per.editing.keywords;
+        per.isNew = true; per.suggested = s.slug; renderPersonas(); scrollTo(0, 0);
+      } }, 'Review & create'),
+      h('button', { class: 'btn', onclick: () => act(async () => { await api('/api/personas/suggestions/remove', { slug: s.slug }); per.trends.suggestions = per.trends.suggestions.filter((x) => x.slug !== s.slug); }, 'Dismissed') }, 'Dismiss')))) : null;
+
+  return h('div', { style: 'display:grid;gap:10px' }, h('div', { class: 'card' }, head), suggestions, gaps, catalog, google);
+}
+const PERSONA_BLANK = { slug: '', nameAr: '', nameLatin: '', tagline: '', bio: '', accent: '#0d9488', category: '', voice: '', topics: [], active: true };
+
+async function renderPersonas() {
+  if (!personaJob.loaded) await personaJob.poll();
+  if (!per.data) {
+    try { per.data = await api('/api/personas'); }
+    catch (e) { return paint('personas', h('div', { class: 'card bad' }, e.message)); }
+    if (state.tab !== 'personas') return;
+  }
+  const d = per.data;
+  const running = !!personaJob.job?.running;
+  const reload = () => { per.data = null; renderPersonas(); };
+  const full = (style = '') => 'width:100%;box-sizing:border-box' + style;
+  const catTitle = (c) => d.categories.find((x) => x.category === c)?.title ?? c;
+
+  // Caps and global actions
+  const caps = { ...d.caps };
+  const top = h('div', { class: 'card' },
+    h('div', { class: 'toolbar' },
+      h('strong', {}, `This week: ${d.weekTotal}/${d.caps.total} approved · ${d.draftTotal} draft(s) waiting`),
+      h('label', { class: 'meta' }, 'per persona ', h('input', { type: 'number', min: 0, max: 100, value: caps.perPersona, style: 'width:60px', oninput: (e) => { caps.perPersona = e.target.value; } })),
+      h('label', { class: 'meta' }, 'total ', h('input', { type: 'number', min: 0, max: 100, value: caps.total, style: 'width:60px', oninput: (e) => { caps.total = e.target.value; } })),
+      h('button', { class: 'btn', onclick: () => act(async () => { await api('/api/personas/caps', caps); per.data = null; }, 'Caps saved') }, 'Save caps'),
+      h('label', { class: 'meta' }, h('input', { type: 'checkbox', checked: per.force, onchange: (e) => { per.force = e.target.checked; } }), ' ignore cap'),
+      h('label', { class: 'meta' }, 'model ', h('select', { onchange: (e) => { per.model = e.target.value; } }, d.models.map((m) => h('option', { value: m, selected: m === per.model }, m || 'default')))),
+      h('button', { class: 'btn primary', onclick: () => { per.editing = { ...PERSONA_BLANK, category: d.categories[0]?.category ?? '' }; per.isNew = true; renderPersonas(); } }, '+ New persona'),
+      h('button', { class: 'btn', onclick: reload }, 'Refresh')),
+    h('p', { class: 'meta' }, 'Caps count approved articles from the last 7 days; Generate also counts drafts still waiting. Every article shows the "AI-assisted, reviewed by an editor" note on the site.'));
+
+  // Persona editor
+  let editor = null;
+  if (per.editing) {
+    const e = per.editing;
+    const inp = (key, props = {}) => h(props.rows ? 'textarea' : 'input', {
+      ...props, value: props.rows ? null : e[key], dir: props.dir ?? 'auto', style: full(props.rows ? ';font-family:inherit;line-height:1.7' : ''),
+      oninput: (ev) => { e[key] = ev.target.value; },
+    }, props.rows ? e[key] : null);
+    const field = (label, el) => h('label', { style: 'display:grid;gap:4px' }, h('span', { class: 'meta' }, label), el);
+    editor = h('div', { class: 'card', style: 'display:grid;gap:10px' },
+      h('h2', {}, per.isNew ? 'New persona' : `Edit ${e.nameAr}`),
+      field('Slug (English, becomes /authors/<slug>/ — cannot change later)', inp('slug', { dir: 'ltr', placeholder: 'sara', disabled: !per.isNew })),
+      field('Arabic name', inp('nameAr', { placeholder: 'سارة العلي' })),
+      field('Latin name (byline)', inp('nameLatin', { dir: 'ltr', placeholder: 'SARA AL-ALI' })),
+      field('Tagline (2–4 words)', inp('tagline', { placeholder: 'علم النفس · الصحة النفسية' })),
+      field('Bio (shown on the author page)', inp('bio', { rows: 3 })),
+      field('Voice notes for the writer (English or Arabic — not shown on the site)', inp('voice', { rows: 3, placeholder: 'Opens with a research finding, then tests it against everyday life; calm, precise; closes on a practical implication.' })),
+      field('Topics (one per line or comma-separated)', h('textarea', { dir: 'auto', rows: 3, style: full(), oninput: (ev) => { e.topics = ev.target.value; } }, Array.isArray(e.topics) ? e.topics.join('\n') : e.topics)),
+      h('div', { class: 'toolbar' },
+        field('Feed category', h('select', { onchange: (ev) => { e.category = ev.target.value; } }, d.categories.map((c) => h('option', { value: c.category, selected: c.category === e.category }, c.title)))),
+        field('Accent', h('input', { type: 'color', value: e.accent, oninput: (ev) => { e.accent = ev.target.value; } })),
+        h('label', { class: 'meta' }, h('input', { type: 'checkbox', checked: e.active !== false, onchange: (ev) => { e.active = ev.target.checked; } }), ' active (gets new drafts)')),
+      h('div', { class: 'toolbar' },
+        h('button', { class: 'btn primary', onclick: () => act(async () => {
+          await api('/api/personas/save', { persona: e, isNew: per.isNew });
+          // A persona created from a suggestion leaves the suggestion list.
+          if (per.isNew && per.suggested) { await api('/api/personas/suggestions/remove', { slug: per.suggested }).catch(() => {}); if (per.trends) per.trends.suggestions = per.trends.suggestions.filter((x) => x.slug !== per.suggested); }
+          per.editing = null; per.suggested = null; per.data = null;
+        }, 'Persona saved — Publish to put its page live') }, 'Save'),
+        h('button', { class: 'btn', onclick: () => { per.editing = null; per.suggested = null; renderPersonas(); } }, 'Cancel'),
+        !per.isNew && e.collection === 'house' ? h('button', { class: 'btn', onclick: () => { if (confirm(`Delete persona ${e.slug}?`)) act(async () => { await api('/api/personas/remove', { slug: e.slug }); per.editing = null; per.data = null; }, 'Deleted'); } }, 'Delete') : null));
+  }
+
+  // Persona cards
+  const cards = h('div', { class: 'list' }, d.personas.map((p) => {
+    const g = per.gen[p.slug] ??= { topic: '', count: 1 };
+    const isRunning = running && personaJob.job?.mode === `persona:${p.slug}`;
+    const gen = (where) => {
+      const body = { slug: p.slug, topic: g.topic, count: g.count, model: per.model, force: per.force, where };
+      if (where === 'terminal') return act(() => api('/api/personas/generate', body), 'Opened in Terminal — drafts land in .drafts/house/');
+      personaJob.start('/api/personas/generate', body, 'Claude is writing — follow the log below');
+    };
+    return h('div', { class: 'card', style: `border-inline-start:4px solid ${p.accent};display:grid;gap:8px` },
+      h('div', { class: 'row' },
+        h('div', { class: 'body' },
+          h('div', { class: 'title', dir: 'auto' }, `${p.nameAr} · ${p.nameLatin}`, p.active === false ? h('span', { class: 'meta', style: 'display:inline' }, ' (inactive)') : null),
+          h('div', { class: 'meta', dir: 'auto' }, `${p.slug} · ${p.tagline} · ${catTitle(p.category)} · ${p.posts} published · ${p.week} this week · ${p.drafts} draft(s)`),
+          p.latest.length ? h('div', { class: 'meta', dir: 'auto' }, 'Latest: ', p.latest.slice(0, 3).map((x, i) => [i ? ' · ' : '', h('a', { href: `https://elhellal.com/articles/${encodeURIComponent(x.slug)}/`, target: '_blank', rel: 'noopener' }, x.title)])) : null),
+        h('a', { class: 'btn', href: `https://elhellal.com/authors/${p.slug}/`, target: '_blank', rel: 'noopener' }, 'Page'),
+        h('button', { class: 'btn', onclick: () => { per.editing = { ...p }; per.isNew = false; renderPersonas(); scrollTo(0, 0); } }, 'Edit')),
+      p.active === false ? null : h('div', { class: 'toolbar' },
+        h('input', { dir: 'auto', placeholder: 'Topic (empty = Claude picks from the persona’s topics)', value: g.topic, style: 'flex:1;min-width:220px', oninput: (e) => { g.topic = e.target.value; } }),
+        h('label', { class: 'meta' }, '× ', h('input', { type: 'number', min: 1, max: 5, value: g.count, style: 'width:50px', oninput: (e) => { g.count = Number(e.target.value) || 1; } })),
+        h('button', { class: 'btn primary', disabled: running, onclick: () => gen('panel') }, isRunning ? 'Writing…' : 'Generate'),
+        h('button', { class: 'btn', title: 'Interactive Claude Code session in Terminal', onclick: () => gen('terminal') }, 'In Terminal')));
+  }));
+
+  // Drafts
+  const drafts = d.drafts.length ? h('div', { class: 'list' }, d.drafts.map((x) => {
+    const p = d.personas.find((y) => y.slug === x.persona);
+    const isOpen = per.draft === x.file;
+    const head = h('div', { class: 'row' },
+      h('div', { class: 'body' },
+        h('div', { class: 'title', dir: 'auto' }, x.title || x.file),
+        h('div', { class: 'meta', dir: 'auto' }, `${p?.nameAr ?? x.persona}${x.topic ? ' · ' + x.topic : ''}${x.trend ? ' · 📈 ' + x.trend : ''} · ${x.words} words · ${x.citations} citations · ${new Date(x.modified).toLocaleString()}`),
+        x.warnings.length ? h('div', { class: 'meta bad' }, '⚠ ' + x.warnings.join(' · ')) : h('div', { class: 'meta ok' }, '✓ house style checks pass')),
+      h('button', { class: 'btn', onclick: async () => {
+        if (isOpen) { per.draft = null; return renderPersonas(); }
+        try { per.draftText = (await api('/api/personas/draft?file=' + encodeURIComponent(x.file))).content; per.draft = x.file; renderPersonas(); }
+        catch (e) { toast(e.message, true); }
+      } }, isOpen ? 'Close' : 'Review'));
+    if (!isOpen) return head;
+    const sentence = (per.draftText.replace(/^---[\s\S]*?---/, '').match(/[^.!؟\n(]{50,120}/)?.[0] ?? x.title).trim();
+    return h('div', {}, head, h('div', { class: 'card', style: 'display:grid;gap:8px' },
+      h('p', { class: 'meta' }, 'Check before approving: open 2–3 of the cited links and confirm the numbers; nothing presented as a personal experience; topic is AdSense-safe.'),
+      h('textarea', { dir: 'auto', rows: 28, style: full(';font-family:inherit;line-height:1.8'), oninput: (e) => { per.draftText = e.target.value; } }, per.draftText),
+      h('div', { class: 'toolbar' },
+        h('button', { class: 'btn primary', onclick: () => act(async () => { const r = await api('/api/personas/draft/approve', { file: x.file, content: per.draftText, force: per.force }); per.draft = null; per.data = null; return r; }, (r) => `Approved → ${r.file} — Publish to put it live`) }, 'Approve & publish file'),
+        h('button', { class: 'btn', onclick: () => act(async () => { await api('/api/personas/draft', { file: x.file, content: per.draftText }); per.data = null; }, 'Draft saved') }, 'Save draft'),
+        h('a', { class: 'btn', href: 'https://www.google.com/search?q=' + encodeURIComponent('"' + sentence + '"'), target: '_blank', rel: 'noopener' }, 'Google a sentence'),
+        h('button', { class: 'btn', onclick: () => { if (confirm('Delete this draft?')) act(async () => { await api('/api/personas/draft/remove', { file: x.file }); per.draft = null; per.data = null; }, 'Draft deleted'); } }, 'Delete'))));
+  })) : h('div', { class: 'empty' }, 'No drafts — Generate one from a persona above.');
+
+  paint('personas', top, editor,
+    trendsPanel(d, running),
+    h('h2', {}, `Drafts (${d.drafts.length})`), drafts,
+    h('h2', {}, `Personas (${d.personas.length})`), cards,
+    h('div', { class: 'toolbar' }, running ? h('button', { class: 'btn', onclick: () => act(() => api('/api/personas/stop', {}), 'Stopping…') }, 'Stop') : null),
+    personaJob.view());
+  personaJob.update(true);
 }
 
 // ─── Sites (quotes / books / biographies / quiz) ───

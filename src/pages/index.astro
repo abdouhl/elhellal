@@ -6,6 +6,7 @@ import MasonryFeed from "../components/MasonryFeed";
 import ExploreTiles from "../components/ExploreTiles.astro";
 import FeedChrome from "../components/FeedChrome.astro";
 import InstallCard from "../components/InstallCard.astro";
+import NativeRail from "../components/NativeRail.astro";
 import "../components/MasonryFeed.css";
 import OrganizationSchema from "../components/schema/OrganizationSchema.astro";
 import ItemListSchema from "../components/schema/ItemListSchema.astro";
@@ -18,7 +19,9 @@ const data = loadArticles();
 
 // Flatten all tools for the homepage ItemList
 const allTools = data.articles.flatMap((category: any) => category.content);
-const feed = (await getFeeds()).get("all")!;
+const feeds = await getFeeds();
+const feed = feeds.get("all")!;
+const native = feeds.get("native")!;
 const categoryTitles = getCategoryTitles();
 ---
 
@@ -74,6 +77,7 @@ const categoryTitles = getCategoryTitles();
       <h2 id="habit-following-heading">جديد من تتابعهم</h2>
       <ul></ul>
     </section>
+    <NativeRail cards={native.newest.slice(0, 8)} total={native.newest.length} categoryTitles={categoryTitles} />
     <MostRead client:idle categoryTitles={categoryTitles} />
     <InstallCard place="home" />
     <MasonryFeed

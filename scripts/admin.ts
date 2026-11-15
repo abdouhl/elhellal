@@ -43,6 +43,10 @@ import {
     saveOverrides,
 } from './lib/moderation.ts';
 import * as Tumblr from './lib/tumblr.ts';
+import { frontmatter, readNativePosts, type NativePost } from '../src/lib/native-posts.ts';
+import type { PersonalBlogPerson } from '../src/data/personal-blogs.ts';
+import { slugifyTag } from '../src/utils/tag-slug.ts';
+import { catalogTrends, googleTrends, matchPersona, type CatalogTrend, type GoogleTrend } from './lib/trends.ts';
 import { archivePages } from './lib/substack-archive.ts';
 
 const portArg = process.argv.indexOf('--port');
@@ -3031,8 +3035,24 @@ async function statsDashboard() {
         au.image ??= a.profile_image_url_https;
     }
 
+    // Written on elhellal: reader articles (/write/), house personas, personal blogs.
+    const native = { total: 0, last30: 0, byOrigin: {} as Record<string, { total: number; last30: number; last7: number }>, weeks: [...weeks.keys()].map((week) => ({ week, total: 0 })) };
+    const nativeWeeks = new Map(native.weeks.map((w) => [w.week, w]));
+    for (const p of readNativePosts(ROOT)) {
+        const valid = DATE_RE.test(p.pubDate);
+        const age = valid ? ago(p.pubDate) : Infinity;
+        const o = (native.byOrigin[p.origin] ??= { total: 0, last30: 0, last7: 0 });
+        o.total++;
+        native.total++;
+        if (age < 30) { o.last30++; native.last30++; }
+        if (age < 7) o.last7++;
+        const w = valid ? nativeWeeks.get(weekOf(p.pubDate)) : undefined;
+        if (w) w.total++;
+    }
+
     const authorList = [...authors.values()];
     return {
+        native,
         total: rows().length,
         future,
         weeks: [...weeks.values()],
@@ -3197,20 +3217,26 @@ function communitySlug(title: string): string {
         .replace(/^-+|-+$/g, '');
     while (Buffer.byteLength(slug, 'utf-8') > 120) slug = slug.slice(0, -1);
     slug = slug.replace(/-+$/, '') || `article-${Date.now()}`;
-    const taken = (s: string) => {
-        if (fs.existsSync(path.join(COMMUNITY_DIR, `${s}.md`))) return true;
-        for (const dir of fs.readdirSync(path.join(ROOT, 'src', 'content'), { withFileTypes: true })) {
-            if (dir.isDirectory() && fs.existsSync(path.join(ROOT, 'src', 'content', dir.name, `${s}.md`))) return true;
-        }
-        const map = path.join(ROOT, 'src', 'data', 'slug-map.json');
-        try {
-            return s in readJson<Record<string, unknown>>(map);
-        } catch {
-            return false;
-        }
-    };
+    return freeSlug(slug);
+}
+
+/** True when /articles/<s>/ is already used: any content collection or the catalog. */
+function slugTaken(s: string): boolean {
+    for (const dir of fs.readdirSync(path.join(ROOT, 'src', 'content'), { withFileTypes: true })) {
+        if (dir.isDirectory() && fs.existsSync(path.join(ROOT, 'src', 'content', dir.name, `${s}.md`))) return true;
+    }
+    const map = path.join(ROOT, 'src', 'data', 'slug-map.json');
+    try {
+        return s in readJson<Record<string, unknown>>(map);
+    } catch {
+        return false;
+    }
+}
+
+/** `slug`, or `slug-2`, `slug-3`… — the first one no article uses yet. */
+function freeSlug(slug: string): string {
     let out = slug;
-    for (let i = 2; taken(out); i++) out = `${slug}-${i}`;
+    for (let i = 2; slugTaken(out); i++) out = `${slug}-${i}`;
     return out;
 }
 
@@ -3286,7 +3312,449 @@ async function rejectSubmission(body: Body) {
     return { ok: true };
 }
 
+// ─── Personas (AI house writers) ─────────────────────────────────────────────
+// src/data/personas.json defines them (the site reads it at build). Generate runs a
+// headless Claude Code session (scripts/lib/claude-run.ts) that researches and writes
+// drafts into .drafts/house/ (gitignored); Approve moves one into the persona's
+// collection — src/content/house/ for new personas, src/content/<slug>/ for the first
+// four — which ships with the next Publish. Weekly caps count approved posts.
+
+const PERSONAS_JSON = path.join(ROOT, 'src/data/personas.json');
+const CONTENT_DIR = path.join(ROOT, 'src/content');
+const DRAFTS_DIR = path.join(ROOT, '.drafts/house');
+const HOUSE = 'house';
+const PERSONA_SLUG_RE = /^[a-z][a-z0-9-]{1,30}$/;
+/** Draft files are <persona>--<english-slug>.md. */
+const DRAFT_RE = /^([a-z][a-z0-9-]{1,30})--([a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
+const RESERVED_PERSONA_SLUGS = new Set([HOUSE, 'community', 'admin', 'write', 'written', 'me', 'today']);
+const personaSlot: Slot = { job: null, proc: null };
+
+interface PersonaFile { caps: { perPersona: number; total: number }; personas: PersonalBlogPerson[] }
+
+const readPersonas = () => readJson<PersonaFile>(PERSONAS_JSON);
+const isoDaysAgo = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+/** The persona a native post belongs to, or null for reader articles. */
+const postPersona = (p: NativePost) => (p.collection === HOUSE ? (p.persona ?? null) : p.origin === 'personal' ? p.collection : null);
+
+function personaPosts() {
+    const by = new Map<string, NativePost[]>();
+    for (const p of readNativePosts(ROOT)) {
+        const who = postPersona(p);
+        if (who) by.set(who, [...(by.get(who) ?? []), p]);
+    }
+    for (const list of by.values()) list.sort((a, b) => b.pubDate.localeCompare(a.pubDate));
+    return by;
+}
+
+/** Approved posts in the last 7 days, per persona and in all. */
+function weekCounts(by = personaPosts()) {
+    const since = isoDaysAgo(6);
+    const per = new Map<string, number>();
+    let total = 0;
+    for (const [who, list] of by) {
+        const n = list.filter((p) => p.pubDate >= since).length;
+        per.set(who, n);
+        total += n;
+    }
+    return { per, total };
+}
+
+interface Draft {
+    file: string;
+    persona: string;
+    slug: string;
+    title: string;
+    description: string;
+    topic: string;
+    trend: string;
+    words: number;
+    citations: number;
+    warnings: string[];
+    modified: number;
+}
+
+const draftBody = (text: string) => text.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '');
+
+function draftPath(v: unknown) {
+    const file = str(v);
+    if (!DRAFT_RE.test(file) || path.basename(file) !== file) throw new HttpError(400, 'Invalid draft file');
+    const full = path.join(DRAFTS_DIR, file);
+    if (!fs.existsSync(full)) throw new HttpError(404, 'Draft not found');
+    return full;
+}
+
+/** House-style checks (see .claude/skills/elhellal-author/SKILL.md). Warnings, not blockers. */
+function lintDraft(fm: Record<string, string>, body: string, personas: PersonalBlogPerson[]): Pick<Draft, 'words' | 'citations' | 'warnings'> {
+    const words = body.trim() ? body.trim().split(/\s+/).length : 0;
+    const citations = (body.match(/\]\(https?:\/\/[^)\s]+\)/g) ?? []).length;
+    const warnings: string[] = [];
+    if (!fm.title) warnings.push('no title');
+    if (!fm.description) warnings.push('no description');
+    if (!personas.some((p) => p.slug === fm.persona)) warnings.push(`unknown persona "${fm.persona ?? ''}"`);
+    if (words < 450) warnings.push(`short (${words} words)`);
+    if (words > 950) warnings.push(`long (${words} words)`);
+    if (citations < 3) warnings.push(`${citations} citation(s)`);
+    if (!/^## /m.test(body)) warnings.push('no ## sections');
+    if (/^# /m.test(body)) warnings.push('has an H1');
+    if (/<\/?[a-zA-Z][^>]*>/.test(body)) warnings.push('raw HTML (stripped on approve)');
+    if (/^\s*([-*]|\d+\.)\s/m.test(body)) warnings.push('has lists');
+    if (/^\|/m.test(body)) warnings.push('has a table');
+    if (/[a-zA-Z]{3,}/.test(fm.title ?? '') && !/[ء-ي]/.test(fm.title ?? '')) warnings.push('title is not Arabic');
+    return { words, citations, warnings };
+}
+
+function listDrafts(personas = readPersonas().personas): Draft[] {
+    if (!fs.existsSync(DRAFTS_DIR)) return [];
+    return fs
+        .readdirSync(DRAFTS_DIR)
+        .filter((f) => DRAFT_RE.test(f))
+        .map((file): Draft => {
+            const full = path.join(DRAFTS_DIR, file);
+            const text = fs.readFileSync(full, 'utf-8');
+            const fm = frontmatter(text);
+            const [, persona, slug] = DRAFT_RE.exec(file)!;
+            return {
+                file,
+                persona: fm.persona || persona!,
+                slug: slug!,
+                title: fm.title ?? '',
+                description: fm.description ?? '',
+                topic: fm.topic ?? '',
+                trend: fm.trend ?? '',
+                ...lintDraft(fm, draftBody(text), personas),
+                modified: fs.statSync(full).mtimeMs,
+            };
+        })
+        .sort((a, b) => b.modified - a.modified);
+}
+
+function personasOverview() {
+    const f = readPersonas();
+    const by = personaPosts();
+    const week = weekCounts(by);
+    const drafts = listDrafts(f.personas);
+    return {
+        caps: f.caps,
+        weekTotal: week.total,
+        draftTotal: drafts.length,
+        models: AI_MODELS,
+        categories: data.articles.map((c) => ({ category: c.category, title: c.title })),
+        personas: f.personas.map((p) => ({
+            ...p,
+            posts: by.get(p.slug)?.length ?? 0,
+            week: week.per.get(p.slug) ?? 0,
+            drafts: drafts.filter((d) => d.persona === p.slug).length,
+            latest: (by.get(p.slug) ?? []).slice(0, 5).map((x) => ({ slug: x.slug, title: x.title, pubDate: x.pubDate })),
+        })),
+        drafts,
+    };
+}
+
+function savePersona(body: Body) {
+    const f = readPersonas();
+    const i = (body.persona ?? {}) as Body;
+    const isNew = body.isNew === true;
+    const slug = str(i.slug).trim().toLowerCase();
+    if (!PERSONA_SLUG_RE.test(slug)) throw new HttpError(400, 'Slug: lowercase English letters, digits and dashes (2–31), starting with a letter');
+    const existing = f.personas.find((p) => p.slug === slug);
+    if (isNew) {
+        if (existing) throw new HttpError(409, `A persona "${slug}" already exists`);
+        if (RESERVED_PERSONA_SLUGS.has(slug) || fs.existsSync(path.join(CONTENT_DIR, slug))) throw new HttpError(409, `"${slug}" is reserved`);
+        const lower = slug.toLowerCase();
+        if (data.articles.some((c) => c.content.some((a) => a.screen_name.toLowerCase() === lower))) {
+            throw new HttpError(409, `A catalog author is already called "${slug}" (their page is /authors/${slug}/)`);
+        }
+    } else if (!existing) throw new HttpError(404, `No persona "${slug}"`);
+
+    const text = (k: string, max: number) => str(i[k]).replace(/\s+/g, ' ').trim().slice(0, max);
+    const p: PersonalBlogPerson = {
+        slug,
+        collection: existing?.collection ?? HOUSE,
+        nameAr: text('nameAr', 60),
+        nameLatin: text('nameLatin', 60).toUpperCase(),
+        tagline: text('tagline', 80),
+        bio: text('bio', 400),
+        accent: text('accent', 7).toLowerCase(),
+        category: text('category', 60),
+        voice: text('voice', 800),
+        topics: (Array.isArray(i.topics) ? i.topics.map(str) : str(i.topics).split(/[\n,،]/))
+            .map((t) => t.replace(/\s+/g, ' ').trim().slice(0, 80))
+            .filter(Boolean)
+            .slice(0, 20),
+        active: i.active !== false,
+    };
+    if (!p.nameAr || !p.nameLatin || !p.tagline || !p.bio) throw new HttpError(400, 'Arabic name, Latin name, tagline and bio are required');
+    if (!/^#[0-9a-f]{6}$/.test(p.accent)) throw new HttpError(400, 'Accent must be a #rrggbb colour');
+    if (!data.articles.some((c) => c.category === p.category)) throw new HttpError(400, `Unknown category: ${p.category}`);
+    const personas = existing ? f.personas.map((x) => (x.slug === slug ? p : x)) : [...f.personas, p];
+    writeJson(PERSONAS_JSON, { ...f, personas });
+    return { ok: true, persona: p };
+}
+
+function removePersona(body: Body) {
+    const f = readPersonas();
+    const p = f.personas.find((x) => x.slug === str(body.slug));
+    if (!p) throw new HttpError(404, 'No such persona');
+    if (p.collection !== HOUSE) throw new HttpError(400, `${p.slug} has its own collection — mark it inactive instead`);
+    if (personaPosts().get(p.slug)?.length) throw new HttpError(409, `${p.slug} has published articles — mark it inactive instead`);
+    if (listDrafts(f.personas).some((d) => d.persona === p.slug)) throw new HttpError(409, `Delete ${p.slug}'s drafts first`);
+    writeJson(PERSONAS_JSON, { ...f, personas: f.personas.filter((x) => x !== p) });
+    return { ok: true };
+}
+
+function saveCaps(body: Body) {
+    const f = readPersonas();
+    const n = (v: unknown) => {
+        const x = Number(v);
+        if (!Number.isInteger(x) || x < 0 || x > 100) throw new HttpError(400, 'Caps are whole numbers 0–100');
+        return x;
+    };
+    const caps = { perPersona: n(body.perPersona), total: n(body.total) };
+    writeJson(PERSONAS_JSON, { ...f, caps });
+    return { ok: true, caps };
+}
+
+/** How many more drafts the weekly caps allow for `p` (pending drafts count against them). */
+function capRoom(f: PersonaFile, p: PersonalBlogPerson) {
+    const week = weekCounts();
+    const drafts = listDrafts(f.personas);
+    const mine = (week.per.get(p.slug) ?? 0) + drafts.filter((d) => d.persona === p.slug).length;
+    return Math.max(0, Math.min(f.caps.perPersona - mine, f.caps.total - week.total - drafts.length));
+}
+
+// ─── Trends: what to write about, and which personas are missing ───
+// Catalog keywords rising on Arabic Substack (scripts/lib/trends.ts) plus Google's daily
+// search trends for Arab countries; cached for 30 minutes.
+
+const SUGGESTIONS_JSON = path.join(ROOT, '.drafts/persona-suggestions.json');
+let trendCache: { at: number; catalog: CatalogTrend[]; google: GoogleTrend[]; errors: string[] } | null = null;
+
+async function loadTrends(refresh = false) {
+    if (!refresh && trendCache && Date.now() - trendCache.at < 30 * 60000) return trendCache;
+    const g = await googleTrends().catch((e) => ({ trends: [] as GoogleTrend[], errors: [String(e?.message ?? e)] }));
+    trendCache = { at: Date.now(), catalog: catalogTrends(data.articles), google: g.trends.slice(0, 40), errors: g.errors };
+    return trendCache;
+}
+
+async function trendsOverview(params: URLSearchParams) {
+    const t = await loadTrends(params.get('refresh') === '1');
+    const personas = readPersonas().personas;
+    const title = (c: string) => data.articles.find((x) => x.category === c)?.title ?? c;
+    const catalog = t.catalog.map((x) => ({ ...x, tagSlug: slugifyTag(x.keyword), persona:matchPersona(x.keyword, x.categories.map((c) => c.category), personas)?.slug ?? null }));
+    const google = t.google.map((x) => ({ ...x, persona: matchPersona(x.term, [], personas)?.slug ?? null }));
+    // Rising keywords no persona covers, grouped by their main category: where a new persona would help.
+    const gaps = new Map<string, { category: string; title: string; keywords: string[]; authors: number }>();
+    for (const x of catalog) {
+        const c = x.categories[0]?.category;
+        if (x.persona || !c) continue;
+        const g = gaps.get(c) ?? { category: c, title: title(c), keywords: [], authors: 0 };
+        g.keywords.push(x.keyword);
+        g.authors += x.recent;
+        gaps.set(c, g);
+    }
+    return {
+        fetchedAt: t.at,
+        errors: t.errors,
+        catalog,
+        google,
+        gaps: [...gaps.values()].sort((a, b) => b.authors - a.authors),
+        suggestions: readSuggestions(),
+    };
+}
+
+/** Trending keywords that fit `p`, for the prompt when no topic is given. */
+function trendsFor(p: PersonalBlogPerson, personas: PersonalBlogPerson[]) {
+    return (trendCache?.catalog ?? catalogTrends(data.articles))
+        .filter((x) => matchPersona(x.keyword, x.categories.map((c) => c.category), personas)?.slug === p.slug)
+        .slice(0, 10)
+        .map((x) => `${x.keyword} (${x.recent} writers in 14 days, e.g. «${x.titles[0] ?? ''}»)`);
+}
+
+function readSuggestions(): Body[] {
+    try {
+        const list = JSON.parse(fs.readFileSync(SUGGESTIONS_JSON, 'utf-8'));
+        return Array.isArray(list) ? list.filter((x) => x && typeof x === 'object' && typeof x.slug === 'string') : [];
+    } catch {
+        return [];
+    }
+}
+
+function removeSuggestion(body: Body) {
+    const list = readSuggestions().filter((x) => x.slug !== str(body.slug));
+    fs.mkdirSync(path.dirname(SUGGESTIONS_JSON), { recursive: true });
+    fs.writeFileSync(SUGGESTIONS_JSON, JSON.stringify(list, null, 2) + '\n');
+    return { ok: true };
+}
+
+async function suggestPersonas(body: Body) {
+    if (personaSlot.proc) throw new HttpError(409, `${personaSlot.job?.mode} is already running`);
+    const count = Math.min(6, Math.max(1, Math.round(Number(body.count) || 3)));
+    const model = str(body.model);
+    if (!AI_MODELS.includes(model)) throw new HttpError(400, `model must be one of ${AI_MODELS.filter(Boolean).join(', ')}`);
+    const t = await trendsOverview(new URLSearchParams());
+    const f = readPersonas();
+    const focus = str(body.category);
+    const cats = data.articles.map((c) => `${c.category} (${c.title})`).join(', ');
+    const prompt = [
+        `Suggest ${count} new house writer persona${count > 1 ? 's' : ''} for elhellal.com, an Arabic site that curates Substack articles and publishes AI-assisted essays (600–700 words, researched, cited) under editorial personas.`,
+        focus ? `Focus on the "${focus}" category.` : 'Aim them at the rising topics below that no current persona covers.',
+        '',
+        'Current personas (do not duplicate their niches, names or colours):',
+        ...f.personas.map((p) => `- ${p.slug}: ${p.nameAr}, ${p.tagline}, category ${p.category}, accent ${p.accent}`),
+        '',
+        'Rising keywords on Arabic Substack with no persona, by category (writers using them in the last 14 days):',
+        ...t.gaps.slice(0, 10).map((g) => `- ${g.category}: ${g.keywords.slice(0, 12).join('، ')} (${g.authors})`),
+        '',
+        'All rising keywords: ' + t.catalog.slice(0, 40).map((x) => x.keyword).join('، '),
+        t.google.length ? 'Google searches today (news-driven; use only for evergreen niches): ' + t.google.slice(0, 25).map((x) => x.term).join('، ') : '',
+        '',
+        'Rules: niches must sustain evergreen, AdSense-safe essays (no politics/war, celebrity gossip, gambling, adult, or medical advice beyond general wellbeing). Personas are clearly editorial voices: plausible Arabic names from across the Arab world, no real people, no claimed credentials.',
+        `Valid categories: ${cats}`,
+        '',
+        `Write the result to .drafts/persona-suggestions.json (create the folder; keep any entries already there and append yours) as a JSON array of objects with exactly these keys: slug (lowercase English, a first name, not one of: ${f.personas.map((p) => p.slug).join(', ')}), nameAr, nameLatin (caps), tagline (2–4 Arabic words, "أ · ب" style), bio (2 Arabic sentences, third person, like the existing ones), accent (#rrggbb, distinct), category (one of the valid categories), voice (one English sentence on how they open, argue and close), topics (5–8 Arabic topics), keywords (the rising keywords that motivated it), why (one English sentence).`,
+        'Read nothing but src/data/personas.json if you need more detail. Write no other files.',
+    ].filter((l, i, a) => l !== '' || a[i - 1] !== '').join('\n');
+    return startCommand(personaSlot, [BUN, path.join(ROOT, 'scripts/lib/claude-run.ts'), '--cwd', ROOT, ...(model ? ['--model', model] : []), '--', prompt], `claude -p <suggest ${count} persona(s)>`, { mode: 'persona:suggest', scopes: [] });
+}
+
+function personaPrompt(p: PersonalBlogPerson, count: number, topic: string, by: Map<string, NativePost[]>, trend?: Body) {
+    const own = by.get(p.slug) ?? [];
+    const trending = topic ? [] : trendsFor(p, readPersonas().personas);
+    const others = [...by.entries()].filter(([who]) => who !== p.slug).flatMap(([, l]) => l.slice(0, 8));
+    const refs = (own.length ? own : others).slice(0, 2).map((x) => `src/content/${x.collection}/${x.slug}.md`);
+    const lines = [
+        `Draft ${count} new article${count > 1 ? 's' : ''} for elhellal.com's house writer ${p.nameAr} (${p.nameLatin}, slug "${p.slug}").`,
+        '',
+        'Persona:',
+        `- Tagline: ${p.tagline}`,
+        `- Bio: ${p.bio}`,
+        p.voice ? `- Voice: ${p.voice}` : '',
+        p.topics?.length ? `- Topics: ${p.topics.join('، ')}` : '',
+        '',
+        topic
+            ? `Topic: ${topic}${count > 1 ? ' (one angle per article, no two alike)' : ''}`
+            : trending.length
+              ? `Pick ${count > 1 ? 'distinct topics' : 'a topic'} from these keywords now rising on Arabic Substack that fit this persona (prefer them), else from the persona's topics:\n${trending.map((t) => `- ${t}`).join('\n')}`
+              : `Pick ${count > 1 ? 'distinct topics' : 'a topic'} yourself from the persona's topics: timely (2025–2026), useful to Arabic readers, and not already covered below.`,
+        trend ? trendContext(trend) : '',
+        '',
+        own.length ? `Already published by this persona (don't repeat these):\n${own.slice(0, 30).map((x) => `- ${x.title}`).join('\n')}` : 'This persona has no published articles yet.',
+        others.length ? `\nRecent titles by the other house writers (avoid overlap):\n${others.slice(0, 20).map((x) => `- ${x.title}`).join('\n')}` : '',
+        '',
+        'Steps:',
+        '1. Read .claude/skills/elhellal-author/SKILL.md, section "House style", and follow it exactly: length, structure, title pattern, two-sentence description, 4–6 inline citations, register.',
+        `2. Read ${refs.join(' and ')} as the reference for format${own.length ? ' and voice' : ' only (different writers)'}.`,
+        '3. Research each topic with WebSearch/WebFetch. Cite only pages you actually opened; prefer named studies, primary sources and original reporting from 2024–2026. Every number must come from the source cited next to it. Never invent quotes, people, studies or URLs.',
+        '4. The persona is an editorial voice, not a real person: no first-person anecdotes presented as fact ("when I visited…", "in my lab…").',
+        `5. Write each draft to .drafts/house/${p.slug}--<english-kebab-slug>.md (create the folder if needed), starting with exactly this frontmatter, then the markdown body (no H1, no images, no HTML):`,
+        '---',
+        'title: "<Arabic title>"',
+        'description: "<two Arabic sentences>"',
+        `persona: ${p.slug}`,
+        'topic: "<the topic, a few words>"',
+        ...(trend || trending.length ? ['trend: "<the trending keyword it answers, if any>"'] : []),
+        '---',
+        '6. Write nothing else: no edits under src/, no git, no build. Finish with one line per draft: its path and title.',
+    ];
+    return lines.filter((l, i, a) => l !== '' || a[i - 1] !== '').join('\n');
+}
+
+/** Why a trend-driven topic is trending, for the prompt, with the evergreen/AdSense screen. */
+function trendContext(trend: Body) {
+    const text = (v: unknown, max = 160) => str(v).replace(/[\r\n\t]+/g, ' ').trim().slice(0, max);
+    const items = (Array.isArray(trend.context) ? trend.context : []).slice(0, 4).map((x) => `- ${text(x, 200)}`);
+    const where = text(trend.source) === 'google' ? `Google searches today${trend.geos ? ` (${text(trend.geos, 40)})` : ''}` : 'Arabic Substack (rising in the last 14 days)';
+    return [
+        `This topic comes from a trending keyword: "${text(trend.keyword, 80)}" on ${where}.${items.length ? ' What people are reading about it:' : ''}`,
+        ...items,
+        'Write an evergreen essay that explains the idea behind the trend for a reader who searches for it months from now — not a news report. If the trend is about war or violence, politics, a crime, a disaster, a celebrity, sports results or anything not AdSense-safe, or it does not fit this persona, write no draft: say why in one line and stop.',
+    ].join('\n');
+}
+
+function generatePersona(body: Body) {
+    const f = readPersonas();
+    const p = f.personas.find((x) => x.slug === str(body.slug));
+    if (!p) throw new HttpError(404, 'No such persona');
+    if (p.active === false) throw new HttpError(400, `${p.slug} is inactive`);
+    const count = Math.min(5, Math.max(1, Math.round(Number(body.count) || 1)));
+    const room = capRoom(f, p);
+    if (count > room && body.force !== true) {
+        throw new HttpError(409, `Weekly cap: room for ${room} more draft(s) (${f.caps.perPersona}/persona, ${f.caps.total} in all, pending drafts included). Tick "ignore cap" to go over.`);
+    }
+    const topic = str(body.topic).replace(/[\r\n\t]+/g, ' ').trim().slice(0, 200);
+    const model = str(body.model);
+    if (!AI_MODELS.includes(model)) throw new HttpError(400, `model must be one of ${AI_MODELS.filter(Boolean).join(', ')}`);
+    const trend = body.trend && typeof body.trend === 'object' ? (body.trend as Body) : undefined;
+    const prompt = personaPrompt(p, count, topic, personaPosts(), trend);
+    fs.mkdirSync(DRAFTS_DIR, { recursive: true });
+    if (str(body.where) === 'terminal') return openClaude(prompt, model ? ['--model', model] : [], ROOT);
+    if (personaSlot.proc) throw new HttpError(409, `${personaSlot.job?.mode} is already running`);
+    const cmd = [BUN, path.join(ROOT, 'scripts/lib/claude-run.ts'), '--cwd', ROOT, ...(model ? ['--model', model] : []), '--', prompt];
+    return startCommand(personaSlot, cmd, `claude -p <persona ${p.slug} ×${count}${topic ? `: ${topic}` : ''}>`, { mode: `persona:${p.slug}`, scopes: [p.slug] });
+}
+
+function readDraft(params: URLSearchParams) {
+    const full = draftPath(params.get('file'));
+    return { file: path.basename(full), content: fs.readFileSync(full, 'utf-8') };
+}
+
+function saveDraft(body: Body) {
+    const full = draftPath(body.file);
+    if (typeof body.content !== 'string' || !body.content.trim()) throw new HttpError(400, 'Empty draft');
+    fs.writeFileSync(full, body.content.replace(/\r\n?/g, '\n'));
+    return { ok: true };
+}
+
+function removeDraft(body: Body) {
+    fs.unlinkSync(draftPath(body.file));
+    return { ok: true };
+}
+
+function approveDraft(body: Body) {
+    const full = draftPath(body.file);
+    if (typeof body.content === 'string' && body.content.trim()) fs.writeFileSync(full, body.content.replace(/\r\n?/g, '\n'));
+    const f = readPersonas();
+    const text = fs.readFileSync(full, 'utf-8');
+    const fm = frontmatter(text);
+    const p = f.personas.find((x) => x.slug === fm.persona);
+    if (!p) throw new HttpError(400, `Unknown persona "${fm.persona ?? ''}" in the frontmatter`);
+    const title = (fm.title ?? '').trim();
+    const description = (fm.description ?? '').trim();
+    const markdown = cleanMarkdown(draftBody(text));
+    if (!title || !description || !markdown) throw new HttpError(400, 'Title, description and body are required');
+    const week = weekCounts();
+    if (body.force !== true && ((week.per.get(p.slug) ?? 0) >= f.caps.perPersona || week.total >= f.caps.total)) {
+        throw new HttpError(409, `Weekly cap reached (${week.per.get(p.slug) ?? 0}/${f.caps.perPersona} for ${p.slug}, ${week.total}/${f.caps.total} in all) — tick "ignore cap" to publish anyway`);
+    }
+    const slug = freeSlug(DRAFT_RE.exec(path.basename(full))![2]!);
+    const front = [
+        '---',
+        `title: ${yamlString(title)}`,
+        `description: ${yamlString(description)}`,
+        `pubDate: ${new Date().toISOString().slice(0, 10)}`,
+        ...(p.collection === HOUSE ? [`persona: ${p.slug}`] : []),
+        '---',
+        '',
+    ];
+    const dir = path.join(CONTENT_DIR, p.collection);
+    fs.mkdirSync(dir, { recursive: true });
+    const out = path.join(dir, `${slug}.md`);
+    fs.writeFileSync(out, `${front.join('\n')}${markdown}\n`);
+    fs.unlinkSync(full);
+    return { ok: true, slug, file: path.relative(ROOT, out), url: `https://elhellal.com/articles/${encodeURIComponent(slug)}/` };
+}
+
 const POST: Record<string, (body: Body) => unknown | Promise<unknown>> = {
+    '/api/personas/save': savePersona,
+    '/api/personas/remove': removePersona,
+    '/api/personas/caps': saveCaps,
+    '/api/personas/generate': generatePersona,
+    '/api/personas/stop': () => stopJob(personaSlot),
+    '/api/personas/draft': saveDraft,
+    '/api/personas/draft/remove': removeDraft,
+    '/api/personas/draft/approve': approveDraft,
+    '/api/personas/suggest': suggestPersonas,
+    '/api/personas/suggestions/remove': removeSuggestion,
     '/api/remove': removeAction,
     '/api/authors/block': blockAuthor,
     '/api/authors/unblock': unblockAuthor,
@@ -3395,6 +3863,10 @@ const GET: Record<string, (params: URLSearchParams) => unknown | Promise<unknown
     '/api/push/stats': pushStats,
     '/api/push/audience': pushAudience,
     '/api/submissions': listSubmissions,
+    '/api/personas': personasOverview,
+    '/api/personas/job': (params) => ({ job: personaSlot.job ? publicJob(personaSlot.job, Number(params.get('from')) || 0) : null }),
+    '/api/personas/draft': readDraft,
+    '/api/personas/trends': trendsOverview,
 };
 
 Bun.serve({

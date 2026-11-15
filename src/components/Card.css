@@ -83,6 +83,12 @@ span.tag-new {
     line-height: 1.5;
 }
 
+span.tag-native {
+    background-color: rgba(13, 148, 136, 0.85);
+    border-color: rgba(255, 255, 255, 0.2);
+    font-family: inherit;
+}
+
 /* Title link — flush under the image */
 .link-card > a {
     width: 100%;

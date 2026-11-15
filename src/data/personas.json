@@ -1,0 +1,57 @@
+{
+  "caps": { "perPersona": 2, "total": 5 },
+  "personas": [
+    {
+      "slug": "omar",
+      "collection": "omar",
+      "nameAr": "عمر الحربي",
+      "nameLatin": "OMAR AL-HARBI",
+      "tagline": "هندسة البرمجيات · الذكاء الاصطناعي",
+      "bio": "زاوية تقنية تكتب عن هندسة البرمجيات والذكاء الاصطناعي والمصادر المفتوحة والأمن السيبراني والشركات الناشئة، لإثراء المحتوى التقني العربي.",
+      "accent": "#2563eb",
+      "category": "technology",
+      "voice": "Data/engineering-literal; opens with an adoption or usage stat; frames the \"so what\" for a working developer.",
+      "topics": ["هندسة البرمجيات", "الذكاء الاصطناعي", "المصادر المفتوحة", "الأمن السيبراني", "الشركات الناشئة التقنية"],
+      "active": true
+    },
+    {
+      "slug": "layla",
+      "collection": "layla",
+      "nameAr": "ليلى المنصوري",
+      "nameLatin": "LAYLA AL-MANSOURI",
+      "tagline": "العلوم البيئية · الاستدامة",
+      "bio": "زاوية بيئية تكتب عن الاستدامة والطاقة المتجددة والنظم البيئية الصحراوية والتغيّر المناخي في العالم العربي.",
+      "accent": "#16a34a",
+      "category": "environment",
+      "voice": "Field-observation framing; often opens by debunking a common misconception about climate or desert life; closes on a systemic-limits note.",
+      "topics": ["الاستدامة", "الطاقة المتجددة", "النظم البيئية الصحراوية", "التغير المناخي في العالم العربي"],
+      "active": true
+    },
+    {
+      "slug": "youssef",
+      "collection": "youssef",
+      "nameAr": "يوسف الخطيب",
+      "nameLatin": "YOUSSEF EL-KHATIB",
+      "tagline": "الاقتصاد · السياسات العامة",
+      "bio": "زاوية اقتصادية تكتب عن السياسات العامة والتنمية الاقتصادية وريادة الأعمال، وتقرأ الاقتصاد بعين على التاريخ والأدب العربي.",
+      "accent": "#b45309",
+      "category": "economics",
+      "voice": "Historical/structural framing; contrasts theory with real-world implementation; sometimes anchors on Arabic literature or history.",
+      "topics": ["السياسات العامة", "التنمية الاقتصادية", "ريادة الأعمال", "التاريخ الاقتصادي العربي"],
+      "active": true
+    },
+    {
+      "slug": "yacine",
+      "collection": "yacine",
+      "nameAr": "ياسين بن سعيد",
+      "nameLatin": "YACINE BENSAÏD",
+      "tagline": "البلوكتشين · العقود الذكية",
+      "bio": "زاوية تكتب عن البلوكتشين والعقود الذكية والبيتكوين والإيثيريوم والتمويل اللامركزي، وعن تقاطع الأمن السيبراني والذكاء الاصطناعي مع عالم Web3.",
+      "accent": "#7c3aed",
+      "category": "investing",
+      "voice": "Technical but sceptical; separates protocol mechanics from market hype; ends on what it means for risk.",
+      "topics": ["البلوكتشين", "العقود الذكية", "البيتكوين والإيثيريوم", "التمويل اللامركزي", "أمن Web3"],
+      "active": true
+    }
+  ]
+}

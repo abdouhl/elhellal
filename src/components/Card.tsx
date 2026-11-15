@@ -5,6 +5,7 @@ import { getPlaceholderImage } from '../utils/placeholderImage';
 import authorNames from '../data/author-names.json';
 import { CARD_SIZES, CARD_WIDTHS, isImageUrl, responsiveImage } from '../lib/images';
 import { minutesLabel } from '../lib/reading-time';
+import { NATIVE_BADGE, HOUSE_LABEL } from '../lib/native';
 
 interface CardProps {
     href: string;
@@ -29,6 +30,10 @@ interface CardProps {
     internalHref?: string | undefined;
     /** Reading time of the original post, in minutes */
     minutes?: number | undefined;
+    /** Written on elhellal: shows the "مكتوب على الهلال" badge */
+    native?: boolean | undefined;
+    /** Written by the house team with AI help */
+    ai?: boolean | undefined;
 }
 
 export default function Card({
@@ -47,6 +52,8 @@ export default function Card({
     authorLabel,
     internalHref,
     minutes,
+    native,
+    ai,
 }: CardProps) {
     //const linkUrl = internalHref || (slug ? `/articles/${slug}` : href);
     const linkUrl = internalHref || (slug ? `/articles/${encodeURIComponent(slug)}/` : href);
@@ -69,6 +76,11 @@ export default function Card({
                     height={360}
                 />
                 <p className="distribution">
+                    {native && (
+                        <span className="tag tag-native" title={ai ? HOUSE_LABEL : NATIVE_BADGE}>
+                            {NATIVE_BADGE}
+                        </span>
+                    )}
                     {isNew && (
                         <span className="tag tag-new" title="Recently added" aria-label="New item">
                             🔥

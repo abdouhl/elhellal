@@ -18,6 +18,8 @@ export interface AuthorEntry {
     bio?: string;
     accent?: string;
     isPersonal?: boolean;
+    /** House writer (AI-assisted): labelled as such, Organization in schema */
+    isHouse?: boolean;
     articles: AuthorArticle[];
 }
 

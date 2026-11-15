@@ -68,7 +68,8 @@
     "screen_name": "yroo",
     "created_at": "2025-06-04",
     "url": "https://yroo.substack.com/p/cc8",
-    "minutes": 1
+    "minutes": 1,
+    "slug": "الحرية-3"
   },
   {
     "id_str": "8437910177233645229",
@@ -267,6 +268,16 @@
     "url": "https://benlahbibwalid.substack.com/p/90a",
     "minutes": 3,
     "slug": "هل-المجانين-عقلاء"
+  },
+  {
+    "id_str": "8116860562772718591",
+    "title": "هل انا على قيد الحياة؟",
+    "preview_text": "في أحيان كثيرة مثل الآن يدور في عقلي ما إن كنت حيةً ام لا.. كيف للمرء ان يتأكد من وجوده؟ ليس على العالم الفيزيائي، بل على المستوى الروحي.. هل نحن موجودين؟ هل انا موجودة؟ اشعر بأننا نحيى في عالمٍ وهمي، روبوتات تُسيرها برمجةٌ ما حتى في مشاعرها وردود أفعالها انا لا اشعر بقلبي، لا أشعر بالاشياء من حولي.. لا ارى نفسي تحيى ولكني ارى ذاتي تنقاد هُنا وهُناك بلا سيطرة على نفسها وكأن هناك محركٌ لها لا افهمه",
+    "screen_name": "lunarwhispers8",
+    "created_at": "2025-06-27",
+    "url": "https://lunarwhispers8.substack.com/p/2bc",
+    "original_img_url": "https://substackcdn.com/image/fetch/$s_!JfdI!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F0217b15a-722f-402f-8e8d-d4ce2490a848_1061x1500.jpeg",
+    "minutes": 1
   },
   {
     "id_str": "7951723684845140734",

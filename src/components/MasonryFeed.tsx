@@ -212,8 +212,9 @@ export default function MasonryFeed({ scope, total = 0, initialCards = [], cards
                         if (sort === 'random' && !filterNew) rows = seededShuffle(rows, seed + batch[i]!);
                         if (filterNew) {
                             const fresh = rows.filter((c) => isRecentlyAdded(c.date, NEW_DAYS));
-                            // Newest-first: once a page has an old card, later pages are older still.
-                            if (fresh.length < rows.length) done = true;
+                            // Newest-first: once a page has an old card, later pages are older still
+                            // (native posts pinned to the top don't count; see compareNativeFirst).
+                            if (rows.some((c) => !c.n && !isRecentlyAdded(c.date, NEW_DAYS))) done = true;
                             rows = fresh;
                         }
                         if (filterShort) rows = rows.filter(isShort);
@@ -340,6 +341,8 @@ export default function MasonryFeed({ scope, total = 0, initialCards = [], cards
                                             category={categoryTitles[item.card.category] || item.card.category}
                                             image={item.card.img}
                                             minutes={item.card.min}
+                                            native={!!item.card.n}
+                                            ai={!!item.card.ai}
                                             authorHref={item.card.authorHref}
                                             authorLabel={item.card.authorName}
                                             priority={item.order === 0}

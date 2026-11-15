@@ -55,6 +55,8 @@ export interface Article {
     authorName?: string;
     authorHref?: string;
     internalHref?: string;
+    /** Where the article was written (src/lib/native.ts); unset = curated link */
+    origin?: import('../lib/native').Origin;
 }
 
 export interface Category {
