@@ -924,7 +924,8 @@ function browserSnippet(batch: string, items: Item[]): string {
       input.dispatchEvent(new Event("change", { bubbles: true }));
       await waitFor(() => $('[data-testid="attachments"]', dialog), "images to attach", 30000);
       await sleep(1500);
-      await waitFor(() => !$('[role="progressbar"]', dialog), "images to upload", 90000);
+      // Only the attachment area: the character-count ring next to Post is a role="progressbar" too.
+      await waitFor(() => !$('[data-testid="attachments"] [role="progressbar"]', dialog), "images to upload", 90000);
     }
 
     (await waitFor(() => $('[data-testid="scheduleOption"]', dialog), "schedule button")).click();

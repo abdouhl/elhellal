@@ -52,6 +52,7 @@ public/pins/
 
 # X scheduler output (snippet + posted state)
 .x-schedule/
+.social-coverage.json
 .linkedin-schedule/
 
 # substack discovery output

@@ -1307,8 +1307,74 @@ function tiktokPostInChrome() {
     return openClaude('Read tiktok-slides/upload-prompt.txt and do exactly what it says, using the Claude in Chrome tools.', ['--chrome'], ROOT);
 }
 
+// How far each channel is scheduled: the latest post time each scheduler recorded.
+// X / LinkedIn / TikTok are planned a month at a time, YouTube / Tumblr by day.
+// The furthest date ever seen is kept in .social-coverage.json, so deleting a
+// batch folder (YouTube, TikTok) doesn't lose it; a date typed in the panel
+// (`manual`) covers uploads made outside the schedulers.
+const COVERAGE_FILE = path.join(ROOT, '.social-coverage.json');
+const COVERAGE = ['x', 'linkedin', 'tiktok', 'youtube', 'tumblr'] as const;
+type CoveragePlatform = (typeof COVERAGE)[number];
+type CoverageStore = Partial<Record<CoveragePlatform, { last?: string; manual?: string }>>;
+
+function readCoverage(): CoverageStore {
+    try { return JSON.parse(fs.readFileSync(COVERAGE_FILE, 'utf-8')); } catch { return {}; }
+}
+
+/** Latest "YYYY-MM-DD…" string among values (they all sort as text). */
+const latest = (dates: (string | undefined | null)[]) => dates.filter((d): d is string => !!d && /^\d{4}-\d{2}-\d{2}/.test(d)).sort().at(-1) ?? null;
+
+function coverageSources(): Record<CoveragePlatform, string | null> {
+    const values = (file: string) => { try { return Object.values(readJson(path.join(ROOT, file)) as Record<string, string>); } catch { return []; } };
+    let tumblr: string[] = [];
+    try { tumblr = Object.values((readJson(path.join(Tumblr.TUMBLR_DIR, 'posted.json')) as { items?: Record<string, { at?: string }> }).items ?? {}).map((i) => i.at ?? ''); } catch {}
+    const tiktok: string[] = [];
+    if (fs.existsSync(TIKTOK_PROMPT)) {
+        for (const m of fs.readFileSync(TIKTOK_PROMPT, 'utf-8').matchAll(/^──────── POST \d+\/\d+ — (\d{4}-\d{2}-\d{2})/gm)) tiktok.push(m[1]!);
+    }
+    for (const tool of ['tiktok-slides', 'tiktok-books'] as const) for (const o of socialOutputs(tool)) tiktok.push(o.name.slice(0, 10));
+    const youtube = fs.existsSync(QUIZ_VIDEOS_OUT)
+        ? fs.readdirSync(QUIZ_VIDEOS_OUT).map((n) => /^youtube-\d{4}-\d{2}-\d{2}_(\d{4}-\d{2}-\d{2})$/.exec(n)?.[1] ?? '')
+        : [];
+    return {
+        x: latest(values('.x-schedule/posted.json')),
+        linkedin: latest(values('.linkedin-schedule/posted.json')),
+        tiktok: latest(tiktok),
+        youtube: latest(youtube),
+        tumblr: latest(tumblr),
+    };
+}
+
+function socialCoverage() {
+    const store = readCoverage();
+    const found = coverageSources();
+    let changed = false;
+    const out = {} as Record<CoveragePlatform, { last: string | null; manual: string | null; unit: 'month' | 'day' }>;
+    for (const p of COVERAGE) {
+        const entry = (store[p] ??= {});
+        const auto = latest([entry.last, found[p]]);
+        if (auto && auto !== entry.last) { entry.last = auto; changed = true; }
+        out[p] = { last: latest([auto, entry.manual]), manual: entry.manual ?? null, unit: p === 'youtube' || p === 'tumblr' ? 'day' : 'month' };
+    }
+    if (changed) fs.writeFileSync(COVERAGE_FILE, JSON.stringify(store, null, 2));
+    return out;
+}
+
+/** Sets (or with an empty date clears) the hand-entered "scheduled through" date of one channel. */
+function setSocialCoverage(body: Body) {
+    const p = str(body.platform) as CoveragePlatform;
+    if (!COVERAGE.includes(p)) throw new HttpError(400, `platform must be one of ${COVERAGE.join(', ')}`);
+    const date = str(body.date);
+    if (date && !DATE_RE.test(date)) throw new HttpError(400, 'date must be YYYY-MM-DD');
+    const store = readCoverage();
+    store[p] = { ...store[p], manual: date || undefined };
+    fs.writeFileSync(COVERAGE_FILE, JSON.stringify(store, null, 2));
+    return { coverage: socialCoverage() };
+}
+
 function socialState(params: URLSearchParams) {
     return {
+        coverage: socialCoverage(),
         tiktokPrompt: tiktokPromptInfo(),
         job: socialSlot.job ? publicJob(socialSlot.job, Number(params.get('from')) || 0) : null,
         snippets: { x: snippetInfo('x'), linkedin: snippetInfo('linkedin') },
@@ -3781,6 +3847,7 @@ const POST: Record<string, (body: Body) => unknown | Promise<unknown>> = {
     '/api/social/stop': () => stopJob(socialSlot),
     '/api/social/open': openOutput,
     '/api/social/tiktok-chrome': tiktokPostInChrome,
+    '/api/social/coverage': setSocialCoverage,
     '/api/social/x-plan': saveXPlan,
     '/api/tumblr/delete': tumblrDelete,
     '/api/tumblr/disconnect': () => (Tumblr.disconnect(), { ok: true }),

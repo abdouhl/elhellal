@@ -939,6 +939,36 @@ const soc = { tool: 'x', span: 'day', month: nextMonth(), days: '', articles: ''
   cards: true, xBios: true, roundup: true, recycle: true, jitter: true, aiHooks: false, autoTimes: false, noLinkShare: '', tz: 'Asia/Riyadh', ramadan: 'auto' };
 const TIKTOK_TIMES = { 1: ['19:00'], 2: ['13:00', '20:00'], 3: ['10:00', '15:00', '20:00'] };
 
+// "Scheduled through": the last month (X, LinkedIn, TikTok) or day (YouTube, Tumblr) each channel has posts in.
+const COVERAGE_LABELS = { x: 'X', linkedin: 'LinkedIn', tiktok: 'TikTok', youtube: 'YouTube', tumblr: 'Tumblr' };
+function coverageCard(cov) {
+  if (!cov) return null;
+  const today = new Date().toISOString().slice(0, 10);
+  const cell = ([p, c]) => {
+    const d = c.last?.slice(0, 10);
+    let main = '—', sub = 'nothing recorded', color = 'var(--muted)';
+    if (d) {
+      const date = new Date(d + 'T12:00:00');
+      main = c.unit === 'month'
+        ? date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+        : date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+      const days = Math.round((Date.parse(d) - Date.parse(today)) / 86400000);
+      sub = days > 0 ? `last post ${d} · ${days} day${days === 1 ? '' : 's'} left` : days === 0 ? `last post today` : `ended ${-days} day${days === -1 ? '' : 's'} ago`;
+      color = days < 0 ? 'var(--danger)' : days <= 7 ? 'var(--warn)' : 'var(--ok)';
+    }
+    return h('div', { style: 'flex:1;min-width:160px;padding:8px 10px;border:1px solid var(--line);border-radius:8px' },
+      h('div', { class: 'meta' }, COVERAGE_LABELS[p], ' · last ', c.unit),
+      h('div', { style: `font-size:18px;font-weight:600;color:${color}` }, main),
+      h('div', { class: 'meta' }, sub),
+      h('details', { style: 'margin-top:4px' }, h('summary', { class: 'meta', style: 'cursor:pointer' }, c.manual ? `set by hand: ${c.manual}` : 'set by hand'),
+        h('input', { type: 'date', value: c.manual || '', title: 'For posts uploaded outside the schedulers — the later of this and the recorded date is shown',
+          onchange: (e) => act(async () => { const r = await api('/api/social/coverage', { platform: p, date: e.target.value }); social.last.coverage = r.coverage; }, 'Saved') })));
+  };
+  return h('div', { class: 'card', style: 'margin-bottom:10px' },
+    h('h2', {}, 'Scheduled through'),
+    h('div', { style: 'display:flex;flex-wrap:wrap;gap:8px' }, ...Object.entries(cov).map(cell)));
+}
+
 async function copySnippet(tool) {
   try {
     const r = await api('/api/social/snippet?tool=' + tool);
@@ -1048,7 +1078,8 @@ async function renderSocial() {
 
   const snip = info.snippets?.[t];
   const outputs = info.outputs?.[t];
-  paint('social', 
+  paint('social',
+    coverageCard(info.coverage),
     h('div', { class: 'card' },
       h('div', { class: 'toolbar' }, ...Object.entries(SOCIAL_TOOLS).map(([k, label]) => h('label', {},
         h('input', { type: 'radio', name: 'soctool', checked: t === k, disabled: running, onchange: () => { soc.tool = k; renderSocial(); } }), ' ', label))),
