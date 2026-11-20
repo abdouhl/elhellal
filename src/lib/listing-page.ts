@@ -18,6 +18,7 @@ import { tileLoading } from '../utils/tileLoading';
 import { fnv1a } from './hash';
 import { jsonForScript } from './article-page';
 import { sisterTiles, type SisterLink } from './sister-sites';
+import { clampDescription } from './seo-text';
 
 export const LISTING_SHELL_SLUG = '__shell__';
 
@@ -240,13 +241,7 @@ function joinAr(items: string[]): string {
     return `${items.slice(0, -1).join('، ')} و${items[items.length - 1]}`;
 }
 
-/** Cuts a meta description to `max` characters at a word boundary. */
-export function clampDescription(text: string, max = 160): string {
-    if (text.length <= max) return text;
-    const cut = text.slice(0, max - 1);
-    const space = cut.lastIndexOf(' ');
-    return `${(space > max * 0.6 ? cut.slice(0, space) : cut).replace(/[،,.:\s]+$/, '')}…`;
-}
+export { clampDescription };
 
 /** "مقالة عربية منتقاة" / "مقالتان عربيتان منتقاتان" / "7 مقالات عربية منتقاة" / "25 مقالة عربية منتقاة" */
 function curatedPhrase(count: number): string {

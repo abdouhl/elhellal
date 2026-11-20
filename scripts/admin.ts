@@ -2034,12 +2034,50 @@ function listQuotes(params: URLSearchParams) {
 const GR_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 // Goodreads serves up to 100 pages. A manual scan is usually a few pages; the card's auto-fill (when the list
 // has no one left to import) steps up a page at a time until it has 100 new authors, so these are only ceilings.
-const GR_MAX_PAGES = 50;
-const GR_ARABIC_MAX_PAGES = 15; // per tag, so up to tags × 15 fetches (exhausted tags stop early)
-/** Goodreads tags Arabic quotes collect under; Arabic mode reads page N of each. */
+const GR_MAX_PAGES = 100;
+const GR_ARABIC_MAX_PAGES = 100; // per tag; most tags run out after a few pages (exhausted tags stop early)
+/** Pages one scan call may fetch (the rest are cached); the client calls again while `more` is set. */
+const GR_FETCH_BUDGET = 120;
+/** Cached pages are re-read from Goodreads after this long (popular lists drift). */
+const GR_PAGE_TTL_DAYS = 30;
+/** Goodreads tags Arabic quotes collect under; Arabic mode reads page N of each, plus every Arabic tag scans find on quotes. */
 const GR_ARABIC_TAGS = ['arabic', 'اقتباسات', 'حب', 'الحب', 'الحياة', 'حياة', 'حكمة', 'الحكمة', 'أدب', 'الأدب', 'شعر', 'الوطن', 'الحرية', 'الموت', 'الله', 'الإنسان', 'السعادة', 'الأمل', 'الحزن', 'فلسفة'];
-interface GrPageAuthor { quote: string; slug: string; name: string; image?: string | undefined; likes: number; arabic: boolean }
+interface GrPageAuthor { quote: string; slug: string; name: string; image?: string | undefined; likes: number; arabic: boolean; tags?: string[] | undefined }
 const grPages = new Map<string, GrPageAuthor[]>();
+// Pages are also kept on disk (one file per tag) so an admin restart doesn't re-read hundreds of tag pages.
+const GR_PAGES_DIR = path.join(ROOT, '.goodreads-discovery', 'pages');
+const GR_TAGS_PATH = path.join(ROOT, '.goodreads-discovery', 'arabic-tags.json');
+type GrPageFile = Record<string, { at: string; rows: GrPageAuthor[] }>;
+const grPageFiles = new Map<string, GrPageFile>();
+const grPageFilePath = (tag: string) => path.join(GR_PAGES_DIR, `${encodeURIComponent(tag || '_popular')}.json`);
+function grPageFile(tag: string): GrPageFile {
+    let f = grPageFiles.get(tag);
+    if (!f) {
+        try { f = JSON.parse(fs.readFileSync(grPageFilePath(tag), 'utf-8')) as GrPageFile; } catch { f = {}; }
+        const cutoff = Date.now() - GR_PAGE_TTL_DAYS * 86_400_000;
+        for (const [p, e] of Object.entries(f)) if (Date.parse(e.at) < cutoff) delete f[p];
+        grPageFiles.set(tag, f);
+        for (const [p, e] of Object.entries(f)) grPages.set(`${tag}|${p}`, e.rows);
+    }
+    return f;
+}
+function grRemember(tag: string, page: number, rows: GrPageAuthor[]) {
+    grPages.set(`${tag}|${page}`, rows);
+    const f = grPageFile(tag);
+    f[page] = { at: new Date().toISOString(), rows };
+    fs.mkdirSync(GR_PAGES_DIR, { recursive: true });
+    fs.writeFileSync(grPageFilePath(tag), JSON.stringify(f));
+}
+/** Arabic tags found on quotes during earlier scans. */
+function discoveredArabicTags(): string[] {
+    try { return JSON.parse(fs.readFileSync(GR_TAGS_PATH, 'utf-8')) as string[]; } catch { return []; }
+}
+const arabicScanTags = () => [...new Set([...GR_ARABIC_TAGS, ...discoveredArabicTags()])];
+/** The cached page, if any (undefined = not read yet). */
+function cachedGoodreadsPage(tag: string, page: number): GrPageAuthor[] | undefined {
+    grPageFile(tag);
+    return grPages.get(`${tag}|${page}`);
+}
 const isArabic = (s: string) => (s.match(/[؀-ۿ]/g) ?? []).length > (s.match(/[a-zA-Z]/g) ?? []).length;
 // Same folding as foldAuthorName in elhellal-quotes/scripts/lib/goodreads.ts ("الطيب صالح" = "طيب صالح").
 const foldName = (s: string) => s.replace(/[ً-ْـ]/g, '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[\s,،.\-_]+/g, ' ').trim().toLowerCase()
@@ -2063,8 +2101,7 @@ async function fetchGoodreads(url: string): Promise<string | null> {
 
 /** One page's quotes; null when Goodreads didn't answer (not cached, so the next scan retries it). */
 async function goodreadsPage(tag: string, page: number): Promise<GrPageAuthor[] | null> {
-    const key = `${tag}|${page}`;
-    const hit = grPages.get(key);
+    const hit = cachedGoodreadsPage(tag, page);
     if (hit) return hit;
     const url = `https://www.goodreads.com/quotes${tag ? `/tag/${encodeURIComponent(tag)}` : ''}?page=${page}`;
     const html = await fetchGoodreads(url);
@@ -2083,14 +2120,18 @@ async function goodreadsPage(tag: string, page: number): Promise<GrPageAuthor[] 
         const likes = Number((likesLink?.text ?? '').replace(/\D/g, '')) || 0;
         const quote = likesLink?.getAttribute('href')?.match(/\/quotes\/(\d+)/)?.[1] ?? `${slug}:${likes}`;
         const text = block.querySelector('.quoteText')?.childNodes.filter((n) => n.nodeType === 3).map((n) => n.rawText).join(' ') ?? '';
-        rows.push({ quote, slug, name, image: img?.getAttribute('src') ?? undefined, likes, arabic: isArabic(text) });
+        // The quote's own Arabic tags: where to look next for Arabic authors.
+        const tags = block.querySelectorAll('.quoteFooter .greyText a').map((a) => a.text.trim()).filter((t) => t && isArabic(t));
+        rows.push({ quote, slug, name, image: img?.getAttribute('src') ?? undefined, likes, arabic: isArabic(text), tags: tags.length ? tags : undefined });
     }
-    grPages.set(key, rows);
     // Past the last page Goodreads repeats it, so an exhausted tag is remembered as empty.
     const prev = page > 1 ? grPages.get(`${tag}|${page - 1}`) : undefined;
-    if (prev?.length && rows.length && rows[0]!.slug === prev[0]!.slug && rows.length === prev.length && rows.every((r, i) => r.likes === prev[i]!.likes)) grPages.set(key, []);
+    const repeat = prev?.length && rows.length && rows[0]!.slug === prev[0]!.slug && rows.length === prev.length && rows.every((r, i) => r.likes === prev[i]!.likes);
+    grRemember(tag, page, repeat ? [] : rows);
+    // No "next" link: this is the tag's last page.
+    if (!repeat && html && !root.querySelector('a.next_page')) grRemember(tag, page + 1, []);
     await new Promise((r) => setTimeout(r, 800));
-    return grPages.get(key)!;
+    return grPages.get(`${tag}|${page}`)!;
 }
 
 // Scanned authors are kept in a list (like the Substack import list) instead of being scraped
@@ -2151,17 +2192,29 @@ async function scanGoodreads(body: Body) {
     if (tag && !/^[\p{L}\p{N}_-]+$/u.test(tag)) throw new HttpError(400, 'Tag must be letters, digits and dashes');
     const maxPages = arabic ? GR_ARABIC_MAX_PAGES : GR_MAX_PAGES;
     const pages = Math.min(maxPages, Math.max(1, Number(body.pages) || (arabic ? 1 : 3)));
-    const tags = arabic ? GR_ARABIC_TAGS : [tag];
-    const byslug = new Map<string, Omit<GrPageAuthor, 'quote' | 'arabic'> & { popular: number; arabicQuotes: number }>();
+    const tags = arabic ? arabicScanTags() : [tag];
+    const known = new Set(tags);
+    const found = new Set<string>();
+    const byslug = new Map<string, Omit<GrPageAuthor, 'quote' | 'arabic' | 'tags'> & { popular: number; arabicQuotes: number }>();
     const seen = new Set<string>();
     let failed = 0;
+    let fetched = 0;
+    let budgetHit = false;
+    let deeper = false; // some tag has pages past `pages`
     for (const t of tags) {
         for (let p = 1; p <= pages; p++) {
+            // Out of fetches for this call: cached pages still count, the rest waits for the next call.
+            if (cachedGoodreadsPage(t, p) === undefined) {
+                if (fetched >= GR_FETCH_BUDGET) { budgetHit = true; break; }
+                fetched++;
+            }
             const rows = await goodreadsPage(t, p);
             // A page Goodreads didn't serve: skip the rest of this tag for now (a later scan retries it).
             if (rows === null) { failed++; break; }
             if (!rows.length) break;
+            if (p === pages && cachedGoodreadsPage(t, p + 1)?.length !== 0) deeper = true;
             for (const r of rows) {
+                for (const x of r.tags ?? []) if (!known.has(x)) found.add(x);
                 // Arabic tags list the same quote under several tags: count it once.
                 if (seen.has(r.quote)) continue;
                 seen.add(r.quote);
@@ -2172,6 +2225,12 @@ async function scanGoodreads(body: Body) {
                 byslug.set(r.slug, a);
             }
         }
+    }
+    // New Arabic tags join the Arabic scan from the next call on.
+    const newTags = [...found].filter((t) => !arabicScanTags().includes(t));
+    if (newTags.length) {
+        fs.mkdirSync(path.dirname(GR_TAGS_PATH), { recursive: true });
+        fs.writeFileSync(GR_TAGS_PATH, JSON.stringify([...discoveredArabicTags(), ...newTags], null, 2) + '\n');
     }
     const match = quoteAuthorMatcher();
     let authors = [...byslug.values()].map((a) => ({ ...a, arabicName: isArabic(a.name) }));
@@ -2223,7 +2282,9 @@ async function scanGoodreads(body: Body) {
     }
     saveGrList(list);
     if (failed && !people.size) throw new HttpError(502, `Goodreads didn't answer (${failed} page(s) failed) — try again in a minute`);
-    return { source, pages, maxPages, tags: arabic ? GR_ARABIC_TAGS : undefined, found: people.size, added, updated, failed };
+    // more: calling again finds something new (unread pages at this depth, or new tags to read); deeper: a bigger `pages` would.
+    const more = budgetHit || (arabic && newTags.length > 0);
+    return { source, pages, maxPages, tags: arabic ? tags : undefined, newTags: newTags.length, found: people.size, added, updated, failed, more, deeper, fetched };
 }
 
 /** The listed authors, each with what the site already has of them. */

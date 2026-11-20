@@ -1971,12 +1971,14 @@ async function autoFillGoodreads(source) {
   gr.open = true; gr.scanning = true; gr.error = '';
   let pages = gr.pages[source];
   let retries = 0; // Goodreads sometimes drops requests: a depth with failed pages is read again (cached pages are free)
+  let tagCount = 0;
   const label = source === 'arabic' ? 'Arabic' : 'famous';
   for (;;) {
-    gr.scanMsg = `Auto-filling ${label} authors: ${grPendingFor(source)}/${GR_FILL_TARGET} · reading ${pages} page(s)${source === 'arabic' ? ' of each Arabic tag' : ''}${retries ? ` (retry ${retries})` : ''}…`;
+    gr.scanMsg = `Auto-filling ${label} authors: ${grPendingFor(source)}/${GR_FILL_TARGET} · reading ${pages} page(s)${source === 'arabic' ? ` of each Arabic tag${tagCount ? ` (${tagCount})` : ''}` : ''}${retries ? ` (retry ${retries})` : ''}…`;
     render();
     let failed = 0;
-    try { failed = (await api('/api/quotes/goodreads-scan', { source, pages })).failed ?? 0; }
+    let r = {};
+    try { r = await api('/api/quotes/goodreads-scan', { source, pages }); failed = r.failed ?? 0; tagCount = r.tags?.length ?? tagCount; }
     catch (e) { failed = 1; gr.error = e.message; }
     await loadGoodreadsList();
     const n = grPendingFor(source);
@@ -1985,11 +1987,14 @@ async function autoFillGoodreads(source) {
     else gr.error = '';
     retries = 0;
     gr.pages[source] = pages;
-    if (failed || n >= GR_FILL_TARGET || pages >= max || gr.source !== source) {
-      gr.scanMsg = `Auto-fill: ${n} ${label} author(s) ready to import (scanned ${pages} page(s))${!failed && n < GR_FILL_TARGET && pages >= max ? ' — Goodreads has no more pages' : ''}`;
+    // Same depth again while there's unread work there (fetch budget, newly found Arabic tags); else one page deeper.
+    const exhausted = !r.more && (!r.deeper || pages >= max);
+    if (failed || n >= GR_FILL_TARGET || exhausted || gr.source !== source) {
+      const where = source === 'arabic' ? `${pages} page(s) of ${tagCount} Arabic tags` : `${pages} page(s)`;
+      gr.scanMsg = `Auto-fill: ${n} ${label} author(s) ready to import (scanned ${where})${!failed && n < GR_FILL_TARGET && exhausted ? ' — every page and tag found so far has been read; new ones appear as Goodreads users add quotes (cached pages refresh after 30 days)' : ''}`;
       break;
     }
-    pages = Math.min(max, pages + step);
+    if (!r.more) pages = Math.min(max, pages + step);
   }
   gr.scanning = false; render();
 }

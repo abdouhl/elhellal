@@ -13,6 +13,7 @@ import { fnv1a } from './hash';
 import { HERO_WIDTHS, isImageUrl, PLACEHOLDER_IMAGE, RELATED_WIDTH, resizeImage, responsiveImage } from './images';
 import { minutesLabel } from './reading-time';
 import { sisterTiles, type SisterLink } from './sister-sites';
+import { clampDescription, clampTitle, plainText } from './seo-text';
 
 export const ARTICLE_SHELL_SLUG = '__shell__';
 
@@ -65,6 +66,13 @@ export interface ArticleRecord {
 export type ArticleShard = Record<string, ArticleRecord>;
 
 const SITE = 'https://elhellal.com';
+
+/** The meta description: the excerpt, padded with who and where when it is too short for search results. */
+function articleDescription(text: string, r: ArticleRecord): string {
+    if (text.length >= 110) return clampDescription(text);
+    const lead = text ? `${text.replace(/[.،\s]+$/, '')}. ` : `«${r.title}». `;
+    return clampDescription(`${lead}مقالة لـ@${r.screen_name} في ${r.categoryTitle}، مع ملخصها ورابطها الأصلي على الهلال.`);
+}
 const DEFAULT_OG_IMAGE = `${SITE}/og-image.jpg`;
 
 /**
@@ -87,6 +95,9 @@ export function articleTemplateData(r: ArticleRecord): TemplateData {
         }
     }
     const isSubstack = !!sourceHost && sourceHost.endsWith('substack.com');
+    // Some imported excerpts (Blogger, Tumblr) hold raw HTML; pages and meta tags get the text.
+    const preview = plainText(r.preview_text);
+    const metaDescription = plainText(r.metaDescription);
     const authorDisplayName = `@${r.screen_name}`;
     const authorUrl = isSubstack
         ? `https://${r.screen_name}.substack.com`
@@ -108,7 +119,7 @@ export function articleTemplateData(r: ArticleRecord): TemplateData {
         '@context': 'https://schema.org',
         '@type': 'BlogPosting',
         headline: r.title,
-        description: r.preview_text,
+        description: preview,
         mainEntityOfPage: { '@type': 'WebPage', '@id': canonicalUrl },
     };
     // The summary up front, for answer engines (Copilot, AI Overviews) quoting the page.
@@ -144,8 +155,8 @@ export function articleTemplateData(r: ArticleRecord): TemplateData {
     const cover = coverUrl ? responsiveImage(coverUrl, HERO_WIDTHS) : undefined;
 
     return {
-        seoTitle: r.title,
-        seoDescription: r.preview_text || r.metaDescription || '',
+        seoTitle: clampTitle(r.title),
+        seoDescription: articleDescription(metaDescription.length >= 70 ? metaDescription : preview || metaDescription, r),
         canonicalUrl,
         ogImage: r.original_img_url || DEFAULT_OG_IMAGE,
         defaultOgImage: !r.original_img_url,
@@ -157,7 +168,7 @@ export function articleTemplateData(r: ArticleRecord): TemplateData {
 
         slug: r.slug,
         title: r.title,
-        preview_text: r.preview_text,
+        preview_text: preview,
         original_img_url: coverUrl,
         coverSrc: cover?.src,
         coverSrcset: cover?.srcset,

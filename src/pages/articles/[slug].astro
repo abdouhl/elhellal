@@ -10,6 +10,7 @@ import { PERSONAS, type PersonalBlogPerson } from "../../data/personal-blogs";
 import { getPersonPosts } from "../../utils/personPosts";
 import { getPlaceholderImage } from "../../utils/placeholderImage";
 import { ARTICLE_SHELL_SLUG } from "../../lib/article-page";
+import { clampTitle } from "../../lib/seo-text";
 import { shellMarkers } from "../../lib/shell-template";
 import { VIEWS_API_BASE } from "../../config/views";
 import { HERO_SIZES, HERO_WIDTHS, RELATED_WIDTH, resizeImage, responsiveImage } from "../../lib/images";
@@ -165,7 +166,7 @@ if (isShell) {
       const coverUrl = found.data.large || found.data.thumb;
       const cover = coverUrl ? responsiveImage(coverUrl, HERO_WIDTHS) : undefined;
       v = {
-        seoTitle: found.data.title,
+        seoTitle: clampTitle(found.data.title),
         seoDescription: found.data.description,
         canonicalUrl,
         // No placeholder fallback here on purpose: the article page shows no
@@ -240,7 +241,7 @@ if (isShell) {
       const coverUrl = d.large || d.thumb;
       const cover = coverUrl ? responsiveImage(coverUrl, HERO_WIDTHS) : undefined;
       v = {
-        seoTitle: d.title,
+        seoTitle: clampTitle(d.title),
         seoDescription: d.description,
         canonicalUrl,
         ogImage: coverUrl,
