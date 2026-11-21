@@ -64,8 +64,8 @@ try {
 }
 
 async function waitForLogin(page: Page) {
-    const ok = () => page.$('[data-testid="SideNav_NewTweet_Button"]');
-    if (await page.waitForSelector('[data-testid="SideNav_NewTweet_Button"]', { timeout: 15_000 }).catch(() => null)) return;
+    const ok = () => page.$('a[href="/compose/post"]');
+    if (await page.waitForSelector('a[href="/compose/post"]', { timeout: 15_000 }).catch(() => null)) return;
     console.log('Log into X in the Chrome window that just opened (first time only) — waiting up to 10 minutes…');
     const end = Date.now() + 10 * 60_000;
     while (Date.now() < end) {
@@ -96,23 +96,40 @@ async function runSnippet(page: Page) {
         console.log(`Report saved: ${data.done.length} scheduled (next x-schedule run reads it).`);
     });
     console.log(`Scheduling batch ${batch}…`);
-    const result = await page.evaluate(snippet);
-    if (result !== 'done') console.log('The snippet stopped early — run `bun run x-run` again to resume where it left off.');
+    // X sometimes reloads the page under the snippet; it keeps its progress in localStorage, so start it again.
+    for (let attempt = 1; ; attempt++) {
+        await new Promise((r) => setTimeout(r, 3000)); // let x.com finish its own redirects first
+        try {
+            const result = await page.evaluate(snippet);
+            if (result !== 'done') console.log('The snippet stopped early — run `bun run x-run` again to resume where it left off.');
+            return;
+        } catch (e) {
+            if (attempt >= 5 || !/context was destroyed|detached|Target closed/i.test(String(e))) throw e;
+            console.log(`(x.com reloaded the page — resuming, try ${attempt + 1}/5)`);
+            await page.goto('https://x.com/home', { waitUntil: 'domcontentloaded', timeout: 90_000 }).catch(() => {});
+            await waitForLogin(page);
+        }
+    }
 }
 
 async function verify(page: Page) {
     console.log('\nChecking x.com/compose/post/unsent/scheduled…');
-    await page.goto('https://x.com/compose/post/unsent/scheduled', { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('[data-testid="unsentTweet"]', { timeout: 30_000 }).catch(() => null);
+    await page.goto('https://x.com/compose/post/unsent/scheduled', { waitUntil: 'domcontentloaded', timeout: 90_000 }).catch(() => console.warn('(scheduled list slow to load — reading what is there)'));
+    // 2026 UI: no test ids; each entry has a "Will send on …" line.
+    const sendLines = () =>
+        page.evaluate(() =>
+            [...document.querySelectorAll('span')].filter((e) => !e.children.length && /^Will send on /.test(e.textContent ?? '')).map((e) => e.textContent ?? ''),
+        );
+    await page.waitForFunction(() => [...document.querySelectorAll('span')].some((e) => /^Will send on /.test(e.textContent ?? '')), { timeout: 30_000 }).catch(() => null);
     // Scroll the list's container until no more entries load, then read every "Will send on …" line
     // (a list, not a set: two posts can share a minute).
     let seen: string[] = [];
     for (let idle = 0, last = -1; idle < 4; ) {
-        seen = await page.$$eval('[data-testid="unsentTweet"]', (els) => els.map((e) => (e as HTMLElement).innerText.split('\n')[0] ?? ''));
+        seen = await sendLines();
         idle = seen.length === last ? idle + 1 : 0;
         last = seen.length;
         await page.evaluate(() => {
-            const el = document.querySelector('[data-testid="unsentTweet"]');
+            const el = [...document.querySelectorAll('span')].find((e) => /^Will send on /.test(e.textContent ?? ''));
             let p = el?.parentElement;
             while (p && p.scrollHeight <= p.clientHeight + 4) p = p.parentElement;
             (p ?? document.scrollingElement)!.scrollBy(0, 1500);

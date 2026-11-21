@@ -1,0 +1,1912 @@
+---
+// /editor/ — a private writing desk, modelled on X's Articles composer
+// (drafts list + cover/title/body editor with a floating format bar and a "+"
+// insert menu) and StackEdit's local workspace (many documents, import,
+// export, nothing sent anywhere). Everything lives in this browser's
+// localStorage: an index under `elhellal:notebook` and one key per document
+// (`elhellal:notebook:<id>`, sanitized HTML). No publishing; /write/ is the
+// page that submits to الهلال.
+import Layout from "../layouts/Layout.astro";
+
+const icon = (d: string, size = 20) =>
+    `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const I = {
+    write: '<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+    back: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+    undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>',
+    redo: '<path d="m15 14 5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/>',
+    expand: '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>',
+    more: '<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>',
+    image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    bold: '<path d="M6 4h8a4 4 0 0 1 0 8H6zM6 12h9a4 4 0 0 1 0 8H6z"/>',
+    italic: '<path d="M19 4h-9M14 20H5M15 4 9 20"/>',
+    strike: '<path d="M16 4H9a3 3 0 0 0-2.83 4M14 12a4 4 0 0 1 0 8H6M4 12h16"/>',
+    ul: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+    ol: '<path d="M10 6h11M10 12h11M10 18h11M4 6h1v4M4 10h2M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/>',
+    quote: '<path d="M3 21c3 0 7-1 7-8V5c0-1.25-.76-2-2-2H4c-1.25 0-2 .75-2 2v6c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 0-1 1v3c0 1 0 1 1 1zM15 21c3 0 7-1 7-8V5c0-1.25-.76-2-2-2h-4c-1.25 0-2 .75-2 2v6c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/>',
+    link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+    divider: '<path d="M4 12h16"/><path d="M8 6h8M8 18h8" opacity=".35"/>',
+    search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+    doc: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
+    upload: '<path d="M12 15V3M7 8l5-5 5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>',
+};
+const bubble = [
+    { cmd: "h2", label: "عنوان", text: "ع" },
+    { cmd: "h3", label: "عنوان فرعي", text: "ع٢" },
+    { sep: true },
+    { cmd: "bold", label: "غامق (Ctrl+B)", svg: I.bold },
+    { cmd: "italic", label: "مائل (Ctrl+I)", svg: I.italic },
+    { cmd: "strikeThrough", label: "يتوسطه خط", svg: I.strike },
+    { cmd: "link", label: "رابط (Ctrl+K)", svg: I.link },
+    { sep: true },
+    { cmd: "quote", label: "اقتباس", svg: I.quote },
+    { cmd: "insertUnorderedList", label: "قائمة نقطية", svg: I.ul },
+    { cmd: "insertOrderedList", label: "قائمة مرقّمة", svg: I.ol },
+] as const;
+const inserts = [
+    { cmd: "image", label: "صورة من جهازك", svg: I.image },
+    { cmd: "image-url", label: "صورة من رابط", svg: I.link },
+    { cmd: "divider", label: "فاصل", svg: I.divider },
+    { cmd: "h2", label: "عنوان", svg: '<path d="M4 12h8M4 18V6M12 18V6M17 10l3-2v10"/>' },
+    { cmd: "quote", label: "اقتباس", svg: I.quote },
+    { cmd: "insertUnorderedList", label: "قائمة", svg: I.ul },
+] as const;
+---
+
+<Layout
+    site="الهلال"
+    title="المحرر"
+    tagline="اكتب مسوداتك في متصفحك"
+    pageTitle="محرر الهلال: اكتب بالعربية واحفظ مسوداتك في متصفحك"
+    pageDescription="محرر عربي بسيط للكتابة الطويلة: عناوين وقوائم واقتباسات وصور، مسودات متعددة تُحفظ تلقائياً في متصفحك، وتصدير إلى Markdown وHTML. لا حساب ولا نشر."
+    canonicalUrl="https://elhellal.com/editor/"
+>
+    <main id="main-content" class="ne" data-ne data-view="list">
+        <aside class="ne-side" aria-label="مسوداتي">
+            <div class="ne-side-head">
+                <h1>مسوداتي</h1>
+                <button type="button" class="ne-btn ne-btn-solid" data-new>
+                    <span set:html={icon(I.write, 16)} />اكتب
+                </button>
+            </div>
+            <label class="ne-search">
+                <span set:html={icon(I.search, 16)} />
+                <input type="search" placeholder="ابحث في مسوداتك" aria-label="ابحث في مسوداتك" data-search />
+            </label>
+            <ul class="ne-list" data-list></ul>
+            <p class="ne-list-empty" data-list-empty hidden>لا مسودات بعد.</p>
+            <div class="ne-side-foot">
+                <button type="button" class="ne-link" data-import>
+                    <span set:html={icon(I.upload, 15)} />استيراد ملف
+                </button>
+                <span class="ne-usage" data-usage></span>
+                <p>تُحفظ مسوداتك في هذا المتصفح فقط، ولا تُرسل إلى أي مكان.</p>
+            </div>
+        </aside>
+
+        <section class="ne-main" aria-label="المحرر">
+            <div class="ne-blank" data-blank>
+                <span class="ne-blank-icon" set:html={icon(I.doc, 26)} />
+                <p class="ne-blank-title">هنا تكتب</p>
+                <p>تابع مسودة أو ابدأ واحدة جديدة.</p>
+                <button type="button" class="ne-btn ne-btn-solid" data-new>اكتب</button>
+            </div>
+
+            <div class="ne-doc" data-doc hidden>
+                <div class="ne-head">
+                    <div class="ne-head-start">
+                        <button type="button" class="ne-icon ne-back" data-back aria-label="رجوع إلى المسودات" title="المسودات" set:html={icon(I.back)} />
+                        <span class="ne-state"><span>مسودة</span> · <span data-saved>محفوظة</span></span>
+                    </div>
+                    <div class="ne-head-end">
+                        <span class="ne-stats" data-stats></span>
+                        <button type="button" class="ne-icon" data-undo aria-label="تراجع" title="تراجع (Ctrl+Z)" set:html={icon(I.undo, 18)} />
+                        <button type="button" class="ne-icon" data-redo aria-label="إعادة" title="إعادة (Ctrl+Shift+Z)" set:html={icon(I.redo, 18)} />
+                        <button type="button" class="ne-icon" data-focus aria-label="وضع التركيز" title="وضع التركيز" aria-pressed="false" set:html={icon(I.expand, 18)} />
+                        <div class="ne-menu-wrap">
+                            <button type="button" class="ne-icon" data-doc-menu aria-label="المزيد" aria-haspopup="menu" aria-expanded="false" set:html={icon(I.more)} />
+                            <div class="ne-menu" role="menu" data-doc-menu-list hidden>
+                                <button type="button" role="menuitem" data-act="copy">نسخ بصيغة Markdown</button>
+                                <button type="button" role="menuitem" data-act="md">تنزيل ملف Markdown</button>
+                                <button type="button" role="menuitem" data-act="html">تنزيل ملف HTML</button>
+                                <button type="button" role="menuitem" data-act="dup">نسخة مكررة</button>
+                                <button type="button" role="menuitem" data-act="delete" class="is-danger">حذف المسودة</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ne-canvas" data-canvas>
+                    <div class="ne-cover" data-cover>
+                        <button type="button" class="ne-cover-add" data-cover-add>
+                            <span set:html={icon(I.image, 16)} />أضف غلافاً
+                        </button>
+                        <figure class="ne-cover-fig" data-cover-fig hidden>
+                            <img alt="" data-cover-img />
+                            <div class="ne-cover-tools">
+                                <button type="button" data-cover-add>تغيير</button>
+                                <button type="button" data-cover-remove>إزالة</button>
+                            </div>
+                        </figure>
+                    </div>
+
+                    <textarea class="ne-title" data-title rows="1" maxlength="200" placeholder="أضف عنواناً" aria-label="العنوان"></textarea>
+
+                    <div
+                        class="ne-body article-prose"
+                        data-body
+                        contenteditable="true"
+                        dir="rtl"
+                        role="textbox"
+                        aria-multiline="true"
+                        aria-label="نص المسودة"
+                        data-placeholder="ابدأ الكتابة…"
+                        spellcheck="true"
+                    ></div>
+
+                    <button type="button" class="ne-plus" data-plus aria-label="إدراج" aria-haspopup="menu" aria-expanded="false" hidden set:html={icon(I.plus, 18)} />
+                    <div class="ne-menu ne-insert" role="menu" data-insert hidden>
+                        {inserts.map((t) => (
+                            <button type="button" role="menuitem" data-ins={t.cmd}><span set:html={icon(t.svg, 18)} />{t.label}</button>
+                        ))}
+                    </div>
+                    <div class="ne-figtools" data-figtools hidden>
+                        <button type="button" data-fig-remove>حذف الصورة</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="ne-bubble" role="toolbar" aria-label="تنسيق" data-bubble hidden>
+            <div class="ne-bubble-tools" data-bubble-tools>
+                {bubble.map((t) =>
+                    "sep" in t ? <span class="ne-sep" /> : (
+                        <button type="button" class="ne-tool" data-cmd={t.cmd} title={t.label} aria-label={t.label} aria-pressed="false">
+                            {"svg" in t ? <span set:html={icon(t.svg, 18)} /> : <b>{t.text}</b>}
+                        </button>
+                    )
+                )}
+                <button type="button" class="ne-tool ne-dock-only" data-cmd="image" title="صورة" aria-label="صورة"><span set:html={icon(I.image, 18)} /></button>
+            </div>
+            <div class="ne-bubble-link" data-link-form hidden>
+                <input type="url" dir="ltr" placeholder="https://…" aria-label="الرابط" data-link-input />
+                <button type="button" class="ne-btn ne-btn-solid" data-link-ok>إضافة</button>
+                <button type="button" class="ne-btn" data-link-off hidden>إزالة</button>
+            </div>
+        </div>
+
+        <div class="ne-toast" role="status" data-toast hidden>
+            <span data-toast-text></span>
+            <button type="button" data-toast-undo hidden>تراجع</button>
+        </div>
+        <input type="file" accept="image/*" hidden data-file-image />
+        <input type="file" accept=".md,.markdown,.txt,.html,.htm,text/markdown,text/plain,text/html" hidden data-file-import />
+    </main>
+</Layout>
+
+<script>
+    import { BLOCK, escapeHtml, htmlToMd, mdToHtml } from "../lib/editor-md";
+
+    const INDEX_KEY = "elhellal:notebook";
+    const DOC_KEY = (id: string) => `elhellal:notebook:${id}`;
+    const FOCUS_KEY = "elhellal:notebook-focus";
+    const QUOTA = 5_000_000; // localStorage is ~5M UTF-16 units per origin
+
+    type Meta = { id: string; title: string; excerpt: string; words: number; created: number; updated: number };
+    type Doc = { id: string; title: string; cover: string; html: string; created: number; updated: number };
+
+    // ---------- storage ----------
+
+    const store = {
+        get<T>(key: string, fallback: T): T {
+            try {
+                const v = localStorage.getItem(key);
+                return v ? (JSON.parse(v) as T) : fallback;
+            } catch {
+                return fallback;
+            }
+        },
+        /** false when the browser refuses (quota, private mode). */
+        set(key: string, value: unknown): boolean {
+            try {
+                localStorage.setItem(key, JSON.stringify(value));
+                return true;
+            } catch {
+                return false;
+            }
+        },
+        remove(key: string) {
+            try {
+                localStorage.removeItem(key);
+            } catch {}
+        },
+    };
+
+    const readIndex = (): Meta[] => {
+        const list = store.get<Meta[]>(INDEX_KEY, []);
+        return Array.isArray(list) ? list.filter((m) => m && typeof m.id === "string") : [];
+    };
+
+    const usedChars = () => {
+        let n = 0;
+        try {
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i)!;
+                n += k.length + (localStorage.getItem(k)?.length ?? 0);
+            }
+        } catch {}
+        return n;
+    };
+
+    // ---------- sanitizing (stored and pasted HTML) ----------
+
+    const ALLOWED = new Set(["P", "H2", "H3", "BLOCKQUOTE", "UL", "OL", "LI", "STRONG", "B", "EM", "I", "S", "A", "BR", "HR", "FIGURE", "IMG"]);
+    const DROP = new Set(["SCRIPT", "STYLE", "IFRAME", "OBJECT", "EMBED", "TEMPLATE", "SVG", "MATH", "NOSCRIPT"]);
+    const SAFE_IMG = /^(https:\/\/|data:image\/(png|jpe?g|webp|gif);base64,)/;
+
+    function sanitize(html: string): string {
+        const doc = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
+        const walk = (el: Element) => {
+            for (const c of [...el.children]) {
+                if (DROP.has(c.tagName)) {
+                    c.remove();
+                    continue;
+                }
+                walk(c);
+                if (!ALLOWED.has(c.tagName)) {
+                    c.replaceWith(...c.childNodes);
+                    continue;
+                }
+                for (const a of [...c.attributes]) {
+                    const keep =
+                        (c.tagName === "A" && a.name === "href" && /^https?:\/\//.test(a.value)) ||
+                        (c.tagName === "IMG" && a.name === "src" && SAFE_IMG.test(a.value)) ||
+                        (c.tagName === "IMG" && a.name === "alt");
+                    if (!keep) c.removeAttribute(a.name);
+                }
+                if (c.tagName === "IMG" && !c.getAttribute("src")) c.remove();
+                if (c.tagName === "FIGURE") c.setAttribute("contenteditable", "false");
+            }
+        };
+        walk(doc.body);
+        return doc.body.innerHTML;
+    }
+
+    // ---------- helpers ----------
+
+    const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    const rtf = new Intl.RelativeTimeFormat("ar", { numeric: "auto" });
+    const when = (t: number) => {
+        const s = (t - Date.now()) / 1000;
+        if (s > -60) return "الآن";
+        if (s > -3600) return rtf.format(Math.round(s / 60), "minute");
+        if (s > -86400) return rtf.format(Math.round(s / 3600), "hour");
+        if (s > -86400 * 7) return rtf.format(Math.round(s / 86400), "day");
+        return new Date(t).toLocaleDateString("ar", { day: "numeric", month: "long", year: new Date(t).getFullYear() === new Date().getFullYear() ? undefined : "numeric" });
+    };
+    const fileName = (title: string, ext: string) => `${(title.trim() || "مسودة").replace(/[\\/:*?"<>|\n]+/g, " ").slice(0, 80)}.${ext}`;
+    const download = (name: string, text: string, type: string) => {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(new Blob([text], { type }));
+        a.download = name;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    };
+
+    /** Shrink an image file to a JPEG data URL small enough for localStorage. */
+    async function shrink(file: File, max: number): Promise<string> {
+        const bmp = await createImageBitmap(file);
+        const s = Math.min(1, max / Math.max(bmp.width, bmp.height));
+        const c = document.createElement("canvas");
+        c.width = Math.round(bmp.width * s);
+        c.height = Math.round(bmp.height * s);
+        const ctx = c.getContext("2d")!;
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, c.width, c.height);
+        ctx.drawImage(bmp, 0, 0, c.width, c.height);
+        bmp.close();
+        return c.toDataURL("image/jpeg", 0.78);
+    }
+
+    // ---------- page ----------
+
+    let abort: AbortController | null = null;
+
+    function setup() {
+        abort?.abort();
+        if (location.pathname !== "/editor/") return;
+        abort = new AbortController();
+        const signal = abort.signal;
+        const on = <K extends keyof HTMLElementEventMap>(t: EventTarget, type: K | string, fn: (e: any) => void, opts: AddEventListenerOptions = {}) =>
+            t.addEventListener(type, fn, { ...opts, signal });
+
+        const root = document.querySelector<HTMLElement>("[data-ne]")!;
+        const $ = <T extends Element = HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
+        const list = $("[data-list]");
+        const listEmpty = $("[data-list-empty]");
+        const search = $<HTMLInputElement>("[data-search]");
+        const usage = $("[data-usage]");
+        const blank = $("[data-blank]");
+        const docEl = $("[data-doc]");
+        const canvas = $("[data-canvas]");
+        const title = $<HTMLTextAreaElement>("[data-title]");
+        const editor = $("[data-body]");
+        const saved = $("[data-saved]");
+        const stats = $("[data-stats]");
+        const coverFig = $("[data-cover-fig]");
+        const coverImg = $<HTMLImageElement>("[data-cover-img]");
+        const coverAdd = $("button.ne-cover-add");
+        const bubbleEl = $("[data-bubble]");
+        const bubbleTools = $("[data-bubble-tools]");
+        const linkForm = $("[data-link-form]");
+        const linkInput = $<HTMLInputElement>("[data-link-input]");
+        const linkOff = $("[data-link-off]");
+        const plus = $("[data-plus]");
+        const insertMenu = $("[data-insert]");
+        const figTools = $("[data-figtools]");
+        const docMenuBtn = $("[data-doc-menu]");
+        const docMenu = $("[data-doc-menu-list]");
+        const toast = $("[data-toast]");
+        const fileImage = $<HTMLInputElement>("[data-file-image]");
+        const fileImport = $<HTMLInputElement>("[data-file-import]");
+
+        let index = readIndex();
+        let doc: Doc | null = null;
+        let saveTimer: number | undefined;
+        let pending = false;
+
+        document.execCommand("defaultParagraphSeparator", false, "p");
+        document.execCommand("styleWithCSS", false, "false");
+
+        // ---- list ----
+        const sorted = () => [...index].sort((a, b) => b.updated - a.updated);
+        const renderList = () => {
+            const q = search.value.trim().toLowerCase();
+            const items = sorted().filter((m) => !q || `${m.title} ${m.excerpt}`.toLowerCase().includes(q));
+            list.innerHTML = items
+                .map(
+                    (m) => `<li class="ne-item${doc?.id === m.id ? " is-current" : ""}" data-id="${m.id}">
+                        <a href="#${m.id}" class="ne-item-link"${doc?.id === m.id ? ' aria-current="page"' : ""}>
+                            <span class="ne-item-title">${escapeHtml(m.title.trim() || "بلا عنوان")}</span>
+                            ${m.excerpt ? `<span class="ne-item-excerpt">${escapeHtml(m.excerpt)}</span>` : ""}
+                            <span class="ne-item-meta">${when(m.updated)}${m.words ? ` · ${m.words} كلمة` : ""}</span>
+                        </a>
+                        <button type="button" class="ne-item-del" data-del="${m.id}" aria-label="حذف «${escapeHtml(m.title.trim() || "بلا عنوان")}»" title="حذف">✕</button>
+                    </li>`
+                )
+                .join("");
+            listEmpty.hidden = items.length > 0;
+            listEmpty.textContent = index.length ? "لا نتائج." : "لا مسودات بعد.";
+            const pct = Math.min(100, Math.round((usedChars() / QUOTA) * 100));
+            usage.textContent = pct >= 1 ? `المساحة المستخدمة ${pct}%` : "";
+            usage.classList.toggle("is-high", pct >= 80);
+        };
+        on(search, "input", renderList);
+
+        // ---- stats & state ----
+        const textStats = () => {
+            const text = (editor.innerText ?? "").trim();
+            const words = text ? text.split(/\s+/).length : 0;
+            return { words, text };
+        };
+        const updateStats = () => {
+            const { words } = textStats();
+            const mins = Math.max(1, Math.round(words / 200));
+            stats.textContent = words ? `${words} كلمة · ${mins} د قراءة` : "";
+        };
+        const ensureParagraph = () => {
+            if (!editor.firstElementChild) editor.innerHTML = "<p><br></p>";
+            editor.toggleAttribute("data-empty", editor.children.length === 1 && !editor.textContent!.trim() && !editor.querySelector("img,hr,li"));
+        };
+        const fitTitle = () => {
+            title.style.height = "auto";
+            title.style.height = `${title.scrollHeight}px`;
+        };
+
+        // ---- saving ----
+        const writeNow = () => {
+            clearTimeout(saveTimer);
+            if (!doc || !pending) return;
+            pending = false;
+            doc.title = title.value;
+            doc.html = editor.innerHTML;
+            doc.updated = Date.now();
+            const { words, text } = textStats();
+            const meta: Meta = {
+                id: doc.id,
+                title: doc.title,
+                excerpt: text.replace(/\s+/g, " ").slice(0, 90),
+                words,
+                created: doc.created,
+                updated: doc.updated,
+            };
+            const ok = store.set(DOC_KEY(doc.id), doc);
+            index = [meta, ...readIndex().filter((m) => m.id !== doc!.id)];
+            const okIdx = store.set(INDEX_KEY, index);
+            saved.textContent = ok && okIdx ? "محفوظة" : "لم تُحفظ: مساحة المتصفح ممتلئة";
+            saved.classList.toggle("is-alert", !(ok && okIdx));
+            renderList();
+        };
+        const save = () => {
+            if (!doc) return;
+            pending = true;
+            saved.textContent = "جارٍ الحفظ…";
+            saved.classList.remove("is-alert");
+            clearTimeout(saveTimer);
+            saveTimer = window.setTimeout(writeNow, 500);
+        };
+        on(window, "pagehide", writeNow);
+        on(document, "visibilitychange", () => document.visibilityState === "hidden" && writeNow());
+        on(document, "astro:before-swap", writeNow);
+
+        const isEmpty = (d: Doc) => !d.title.trim() && !d.cover && !new DOMParser().parseFromString(d.html, "text/html").body.textContent!.trim() && !/<(img|hr)/.test(d.html);
+
+        const removeDoc = (id: string) => {
+            store.remove(DOC_KEY(id));
+            index = readIndex().filter((m) => m.id !== id);
+            store.set(INDEX_KEY, index);
+        };
+
+        // ---- cover ----
+        const setCover = (url: string) => {
+            if (!doc) return;
+            doc.cover = url;
+            coverFig.hidden = !url;
+            coverAdd.hidden = !!url;
+            if (url) coverImg.src = url;
+            else coverImg.removeAttribute("src");
+        };
+
+        // ---- open / close ----
+        const showView = (view: "list" | "doc") => (root.dataset.view = view);
+
+        const open = (id: string | null) => {
+            writeNow();
+            hideFloating();
+            // A draft left empty doesn't stay in the list (X keeps "Untitled"s; we don't).
+            if (doc && doc.id !== id && isEmpty({ ...doc, title: title.value, html: editor.innerHTML })) removeDoc(doc.id);
+            const next = id ? store.get<Doc | null>(DOC_KEY(id), null) : null;
+            doc = next && typeof next.html === "string" ? next : null;
+            blank.hidden = !!doc;
+            docEl.hidden = !doc;
+            if (doc) {
+                title.value = doc.title ?? "";
+                editor.innerHTML = sanitize(doc.html);
+                setCover(typeof doc.cover === "string" && SAFE_IMG.test(doc.cover) ? doc.cover : "");
+                saved.textContent = "محفوظة";
+                saved.classList.remove("is-alert");
+                ensureParagraph();
+                fitTitle();
+                updateStats();
+                document.title = `${doc.title.trim() || "بلا عنوان"} · المحرر`;
+            } else document.title = "المحرر · الهلال";
+            renderList();
+            showView(doc ? "doc" : "list");
+            fitTitle(); // measurable only once the pane is shown
+        };
+
+        const create = (init: Partial<Doc> = {}) => {
+            const now = Date.now();
+            const d: Doc = { id: uid(), title: "", cover: "", html: "<p><br></p>", created: now, updated: now, ...init };
+            if (!store.set(DOC_KEY(d.id), d)) {
+                showToast("مساحة المتصفح ممتلئة. احذف مسودات أو صوراً أولاً.");
+                return null;
+            }
+            index = [{ id: d.id, title: d.title, excerpt: "", words: 0, created: now, updated: now }, ...readIndex()];
+            store.set(INDEX_KEY, index);
+            return d;
+        };
+
+        const route = () => {
+            const id = decodeURIComponent(location.hash.slice(1));
+            if (id && doc?.id === id) return;
+            if (id && readIndex().some((m) => m.id === id)) open(id);
+            else {
+                open(null);
+                // Desktop: land on the latest draft, like X keeps your place.
+                const latest = sorted()[0];
+                if (latest && matchMedia("(min-width: 761px)").matches) history.replaceState(null, "", `#${latest.id}`), open(latest.id);
+            }
+        };
+        on(window, "hashchange", route);
+        on(window, "popstate", route);
+        // Our own history entries: the site's router would swallow the hashchange.
+        const go = (id: string) => {
+            if (location.hash !== `#${id}`) history.pushState(null, "", `#${id}`);
+            route();
+        };
+
+        root.querySelectorAll("[data-new]").forEach((b) =>
+            on(b, "click", () => {
+                const d = create();
+                if (!d) return;
+                go(d.id);
+                requestAnimationFrame(() => title.focus());
+            })
+        );
+        on($("[data-back]"), "click", () => {
+            if (history.length > 1 && location.hash) history.back();
+            else {
+                history.replaceState(null, "", location.pathname);
+                open(null);
+            }
+        });
+
+        // ---- toast (with undo for deletes) ----
+        let toastTimer: number | undefined;
+        let undoFn: (() => void) | null = null;
+        const showToast = (msg: string, undo?: () => void) => {
+            $("[data-toast-text]").textContent = msg;
+            const ub = $("[data-toast-undo]");
+            ub.hidden = !undo;
+            undoFn = undo ?? null;
+            toast.hidden = false;
+            clearTimeout(toastTimer);
+            toastTimer = window.setTimeout(() => ((toast.hidden = true), (undoFn = null)), 6000);
+        };
+        on($("[data-toast-undo]"), "click", () => {
+            undoFn?.();
+            undoFn = null;
+            toast.hidden = true;
+        });
+
+        const deleteDoc = (id: string) => {
+            if (doc?.id === id) writeNow();
+            const backup = store.get<Doc | null>(DOC_KEY(id), null);
+            const meta = readIndex().find((m) => m.id === id);
+            removeDoc(id);
+            if (doc?.id === id) {
+                doc = null;
+                history.replaceState(null, "", location.pathname);
+                route();
+            } else renderList();
+            showToast("حُذفت المسودة.", backup && meta ? () => {
+                store.set(DOC_KEY(id), backup);
+                index = [meta, ...readIndex().filter((m) => m.id !== id)];
+                store.set(INDEX_KEY, index);
+                go(id);
+                renderList();
+            } : undefined);
+        };
+        on(list, "click", (e: MouseEvent) => {
+            const t = e.target as Element;
+            const del = t.closest<HTMLElement>("[data-del]");
+            if (del) return deleteDoc(del.dataset.del!);
+            const item = t.closest<HTMLElement>("[data-id]");
+            if (item && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
+                e.preventDefault();
+                go(item.dataset.id!);
+            }
+        });
+
+        // ---- typing in the title ----
+        on(title, "input", () => {
+            fitTitle();
+            save();
+            if (doc) document.title = `${title.value.trim() || "بلا عنوان"} · المحرر`;
+        });
+        on(title, "keydown", (e: KeyboardEvent) => {
+            if (e.key === "Enter" || (e.key === "ArrowDown" && title.selectionStart === title.value.length)) {
+                e.preventDefault();
+                editor.focus();
+                const r = document.createRange();
+                r.setStart(editor.firstElementChild ?? editor, 0);
+                getSelection()!.removeAllRanges();
+                getSelection()!.addRange(r);
+            }
+        });
+        on(window, "resize", fitTitle);
+
+        // ---- selection helpers ----
+        const blockAt = (): HTMLElement | null => {
+            const sel = getSelection();
+            if (!sel?.rangeCount || !editor.contains(sel.anchorNode)) return null;
+            let n: Node | null = sel.anchorNode;
+            while (n && n.parentNode !== editor) n = n.parentNode;
+            return n instanceof HTMLElement ? n : null;
+        };
+        const anchorEl = () => {
+            const n = getSelection()?.anchorNode;
+            return n instanceof Element ? n : n?.parentElement ?? null;
+        };
+        const inQuote = () => !!anchorEl()?.closest("blockquote") && editor.contains(anchorEl()!);
+        const inLink = () => {
+            const a = anchorEl()?.closest("a");
+            return a && editor.contains(a) ? a : null;
+        };
+
+        let savedRange: Range | null = null;
+        const keepRange = () => {
+            const sel = getSelection();
+            if (sel?.rangeCount && editor.contains(sel.anchorNode)) savedRange = sel.getRangeAt(0).cloneRange();
+        };
+        const restoreRange = () => {
+            editor.focus({ preventScroll: true });
+            if (savedRange) {
+                const sel = getSelection()!;
+                sel.removeAllRanges();
+                sel.addRange(savedRange);
+            }
+        };
+
+        // Chrome nests lists (and the paragraph after them) inside the <p> they
+        // were made from; unwrap so every block sits directly in the editor.
+        const normalize = () => {
+            const sel = getSelection();
+            const at = sel?.rangeCount ? ([sel.anchorNode, sel.anchorOffset] as const) : null;
+            let p: Element | null;
+            while ((p = editor.querySelector(":scope > p:has(> ul, > ol, > p, > blockquote, > h2, > h3, > hr, > figure)"))) {
+                const out: Node[] = [];
+                let run: HTMLParagraphElement | null = null;
+                for (const k of [...p.childNodes]) {
+                    if (k instanceof HTMLElement && BLOCK.test(k.tagName)) {
+                        run = null;
+                        out.push(k);
+                    } else if (k.nodeType !== Node.TEXT_NODE || k.textContent!.trim()) {
+                        if (!run) out.push((run = document.createElement("p")));
+                        run.append(k);
+                    }
+                }
+                p.replaceWith(...out);
+            }
+            // Browsers sometimes wrap new lines in <div>s; make them paragraphs.
+            editor.querySelectorAll(":scope > div").forEach((d) => {
+                const np = document.createElement("p");
+                np.append(...d.childNodes);
+                d.replaceWith(np);
+            });
+            if (at?.[0] && editor.contains(at[0])) {
+                try {
+                    sel!.collapse(at[0], at[1]);
+                } catch {}
+            }
+        };
+
+        const changed = () => {
+            normalize();
+            ensureParagraph();
+            updateStats();
+            save();
+            refresh();
+        };
+
+        const exec = (cmd: string, value?: string) => {
+            restoreRange();
+            document.execCommand(cmd, false, value);
+            keepRange();
+            changed();
+        };
+
+        // ---- floating format bar (bubble) ----
+        const dock = matchMedia("(max-width: 760px), (pointer: coarse)");
+        const hideFloating = () => {
+            bubbleEl.hidden = true;
+            linkForm.hidden = true;
+            bubbleTools.hidden = false;
+            insertMenu.hidden = true;
+            plus.setAttribute("aria-expanded", "false");
+            figTools.hidden = true;
+            editor.querySelectorAll("figure.is-selected").forEach((f) => f.classList.remove("is-selected"));
+        };
+
+        const placeBubble = () => {
+            if (dock.matches) {
+                // Phones: a bar docked above the keyboard instead of a bubble.
+                bubbleEl.classList.add("is-dock");
+                const vv = window.visualViewport;
+                const bottom = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0;
+                bubbleEl.style.top = "";
+                bubbleEl.style.left = "";
+                bubbleEl.style.bottom = `${bottom}px`;
+                return;
+            }
+            bubbleEl.classList.remove("is-dock");
+            bubbleEl.style.bottom = "";
+            const sel = getSelection();
+            if (!sel?.rangeCount) return;
+            const rect = (savedRange ?? sel.getRangeAt(0)).getBoundingClientRect();
+            const w = bubbleEl.offsetWidth;
+            const h = bubbleEl.offsetHeight;
+            let top = rect.top - h - 10;
+            if (top < 8) top = rect.bottom + 10;
+            const left = Math.min(window.innerWidth - w - 8, Math.max(8, rect.left + rect.width / 2 - w / 2));
+            bubbleEl.style.top = `${top}px`;
+            bubbleEl.style.left = `${left}px`;
+        };
+
+        const refresh = () => {
+            const block = blockAt();
+            const sel = getSelection();
+            const focused = !!block && document.activeElement === editor;
+            const hasRange = !!sel && !sel.isCollapsed && focused;
+            if (linkForm.hidden) {
+                // Bubble: on a selection (desktop), whenever the editor has focus (phones).
+                const show = dock.matches ? focused : hasRange;
+                bubbleEl.hidden = !show;
+                if (show) {
+                    bubbleTools.querySelectorAll<HTMLButtonElement>("[data-cmd]").forEach((b) => {
+                        const cmd = b.dataset.cmd!;
+                        let pressed = false;
+                        if (cmd === "h2" || cmd === "h3") pressed = block!.tagName === cmd.toUpperCase();
+                        else if (cmd === "quote") pressed = inQuote();
+                        else if (cmd === "link") pressed = !!inLink();
+                        else if (cmd !== "image") pressed = document.queryCommandState(cmd);
+                        b.setAttribute("aria-pressed", String(pressed));
+                    });
+                    placeBubble();
+                }
+            }
+            // "+" beside an empty paragraph, like X's insert button.
+            const emptyLine = focused && sel?.isCollapsed && block!.tagName === "P" && !block!.textContent!.trim() && !block!.querySelector("img");
+            if (emptyLine) {
+                const cr = canvas.getBoundingClientRect();
+                const br = block!.getBoundingClientRect();
+                plus.style.top = `${br.top - cr.top + br.height / 2 - 16}px`;
+                plus.hidden = false;
+                plusFor = block!;
+            } else if (insertMenu.hidden) plus.hidden = true;
+        };
+        let plusFor: HTMLElement | null = null;
+
+        on(document, "selectionchange", () => {
+            if (!doc) return;
+            if (editor.contains(getSelection()?.anchorNode ?? null)) keepRange();
+            refresh();
+        });
+        on(editor, "blur", () => {
+            // Leave room for clicks on the bubble/insert menu (they keep focus via preventDefault).
+            setTimeout(() => {
+                if (!root.contains(document.activeElement) || document.activeElement === title || document.activeElement === search) {
+                    if (linkForm.hidden) bubbleEl.hidden = true;
+                    if (insertMenu.hidden) plus.hidden = true;
+                }
+            }, 150);
+        });
+        on(window, "scroll", () => !bubbleEl.hidden && placeBubble(), { passive: true });
+        window.visualViewport && on(window.visualViewport, "resize", () => !bubbleEl.hidden && placeBubble());
+
+        // Toolbar buttons never take focus, so the selection survives the click.
+        on(bubbleEl, "mousedown", (e: MouseEvent) => {
+            if ((e.target as Element).closest("button.ne-tool")) e.preventDefault();
+        });
+        on(insertMenu, "mousedown", (e: MouseEvent) => e.preventDefault());
+        on(plus, "mousedown", (e: MouseEvent) => e.preventDefault());
+
+        const toggleBlock = (tag: "h2" | "h3" | "blockquote") => {
+            const block = blockAt();
+            const isOn = tag === "blockquote" ? inQuote() : block?.tagName === tag.toUpperCase();
+            exec("formatBlock", isOn ? "p" : tag);
+        };
+
+        let pickFor: "body" | "cover" = "body";
+        const pickImage = (target: "body" | "cover") => {
+            pickFor = target;
+            keepRange();
+            fileImage.value = "";
+            fileImage.click();
+        };
+
+        const openLink = () => {
+            keepRange();
+            const a = inLink();
+            linkInput.value = a?.getAttribute("href") ?? "";
+            linkOff.hidden = !a;
+            bubbleTools.hidden = true;
+            linkForm.hidden = false;
+            bubbleEl.hidden = false;
+            placeBubble();
+            linkInput.focus();
+        };
+        const closeLink = () => {
+            linkForm.hidden = true;
+            bubbleTools.hidden = false;
+            restoreRange();
+            refresh();
+        };
+        const confirmLink = () => {
+            const raw = linkInput.value.trim();
+            const url = raw && !/^[a-z]+:/i.test(raw) ? `https://${raw}` : raw;
+            if (!/^https?:\/\/\S+$/.test(url)) {
+                linkInput.setCustomValidity("اكتب رابطاً صحيحاً");
+                linkInput.reportValidity();
+                linkInput.setCustomValidity("");
+                return;
+            }
+            linkForm.hidden = true;
+            bubbleTools.hidden = false;
+            restoreRange();
+            const a = inLink();
+            if (a) {
+                a.setAttribute("href", url);
+                changed();
+            } else if (getSelection()!.isCollapsed) exec("insertHTML", `<a href="${escapeHtml(url)}">${escapeHtml(raw)}</a>&nbsp;`);
+            else exec("createLink", url);
+        };
+        on($("[data-link-ok]"), "click", confirmLink);
+        on(linkOff, "click", () => {
+            const a = inLink();
+            linkForm.hidden = true;
+            bubbleTools.hidden = false;
+            restoreRange();
+            if (a) {
+                const r = document.createRange();
+                r.selectNodeContents(a);
+                getSelection()!.removeAllRanges();
+                getSelection()!.addRange(r);
+                savedRange = r.cloneRange();
+                exec("unlink");
+            }
+        });
+        on(linkInput, "keydown", (e: KeyboardEvent) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                confirmLink();
+            } else if (e.key === "Escape") closeLink();
+        });
+        on(linkInput, "blur", () => setTimeout(() => !linkForm.contains(document.activeElement) && !linkForm.hidden && closeLink(), 150));
+
+        const run = (cmd: string) => {
+            if (cmd === "h2" || cmd === "h3") toggleBlock(cmd);
+            else if (cmd === "quote") toggleBlock("blockquote");
+            else if (cmd === "link") openLink();
+            else if (cmd === "image") pickImage("body");
+            else if (cmd === "image-url") {
+                const url = prompt("رابط الصورة (https://…)")?.trim();
+                if (url && /^https:\/\/\S+$/.test(url)) insertFigure(url);
+            } else if (cmd === "divider") exec("insertHTML", "<hr><p><br></p>");
+            else exec(cmd);
+        };
+        bubbleTools.querySelectorAll<HTMLButtonElement>("[data-cmd]").forEach((b) => on(b, "click", () => run(b.dataset.cmd!)));
+
+        // ---- "+" insert menu ----
+        on(plus, "click", () => {
+            const open = insertMenu.hidden;
+            insertMenu.hidden = !open;
+            plus.setAttribute("aria-expanded", String(open));
+            if (open) {
+                insertMenu.style.top = `${plus.offsetTop + plus.offsetHeight + 6}px`;
+                bubbleEl.hidden = true;
+            }
+        });
+        insertMenu.querySelectorAll<HTMLButtonElement>("[data-ins]").forEach((b) =>
+            on(b, "click", () => {
+                insertMenu.hidden = true;
+                plus.setAttribute("aria-expanded", "false");
+                if (plusFor && editor.contains(plusFor)) {
+                    const r = document.createRange();
+                    r.setStart(plusFor, 0);
+                    r.collapse(true);
+                    savedRange = r;
+                }
+                run(b.dataset.ins!);
+            })
+        );
+
+        // ---- images ----
+        const insertFigure = (src: string) => {
+            restoreRange();
+            const block = blockAt();
+            const html = `<figure contenteditable="false"><img src="${escapeHtml(src)}" alt=""></figure><p><br></p>`;
+            // On an empty line the picture replaces it rather than landing after it.
+            if (block && block.tagName === "P" && !block.textContent!.trim() && !block.querySelector("img")) {
+                const r = document.createRange();
+                r.selectNode(block);
+                getSelection()!.removeAllRanges();
+                getSelection()!.addRange(r);
+            }
+            document.execCommand("insertHTML", false, html);
+            keepRange();
+            changed();
+        };
+        const addImageFile = async (file: File, target: "body" | "cover") => {
+            if (!file.type.startsWith("image/")) return;
+            try {
+                const data = await shrink(file, target === "cover" ? 1600 : 1400);
+                if (usedChars() + data.length > QUOTA * 0.95) {
+                    showToast("الصورة أكبر من المساحة المتبقية في المتصفح.");
+                    return;
+                }
+                if (target === "cover") {
+                    setCover(data);
+                    save();
+                } else insertFigure(data);
+            } catch {
+                showToast("تعذّر فتح الصورة.");
+            }
+        };
+        on(fileImage, "change", () => {
+            const f = fileImage.files?.[0];
+            if (f) addImageFile(f, pickFor);
+        });
+
+        // Click a picture to select it; Delete/Backspace or the button removes it.
+        let selectedFig: HTMLElement | null = null;
+        const selectFig = (fig: HTMLElement | null) => {
+            editor.querySelectorAll("figure.is-selected").forEach((f) => f.classList.remove("is-selected"));
+            selectedFig = fig;
+            figTools.hidden = !fig;
+            if (!fig) return;
+            fig.classList.add("is-selected");
+            const cr = canvas.getBoundingClientRect();
+            const fr = fig.getBoundingClientRect();
+            figTools.style.top = `${fr.top - cr.top + 10}px`;
+        };
+        const removeFig = () => {
+            if (!selectedFig) return;
+            const r = document.createRange();
+            r.selectNode(selectedFig);
+            editor.focus({ preventScroll: true });
+            getSelection()!.removeAllRanges();
+            getSelection()!.addRange(r);
+            document.execCommand("delete");
+            selectFig(null);
+            changed();
+        };
+        on(editor, "click", (e: MouseEvent) => selectFig((e.target as Element).closest<HTMLElement>("figure")));
+        on($("[data-fig-remove]"), "click", removeFig);
+        on(document, "click", (e: MouseEvent) => {
+            const t = e.target as Element;
+            if (selectedFig && !t.closest("figure") && !t.closest("[data-figtools]")) selectFig(null);
+            if (!insertMenu.hidden && !t.closest("[data-insert]") && !t.closest("[data-plus]")) {
+                insertMenu.hidden = true;
+                plus.setAttribute("aria-expanded", "false");
+            }
+            if (!docMenu.hidden && !t.closest(".ne-menu-wrap")) closeDocMenu();
+        });
+
+        // ---- typing ----
+        on(editor, "input", (e: InputEvent) => {
+            normalize();
+            const block = blockAt();
+            // Markdown shortcuts at the start of a paragraph: "## ", "### ", "- ", "1. ", "> ", "---".
+            if (block && block.tagName === "P" && e.inputType === "insertText") {
+                const text = (block.textContent ?? "").replace(/ /g, " ");
+                const m = e.data === " " ? text.match(/^(###|##|[-*]|1[.)]|>) /) : text === "---" ? ["---", "---"] : null;
+                const first = block.firstChild;
+                if (m && first?.nodeType === Node.TEXT_NODE) {
+                    const r = document.createRange();
+                    r.setStart(first, 0);
+                    r.setEnd(first, Math.min(m[0].length, first.textContent!.length));
+                    const sel = getSelection()!;
+                    sel.removeAllRanges();
+                    sel.addRange(r);
+                    document.execCommand("delete");
+                    const kind = m[1];
+                    if (kind === "##") document.execCommand("formatBlock", false, "h2");
+                    else if (kind === "###") document.execCommand("formatBlock", false, "h3");
+                    else if (kind === ">") document.execCommand("formatBlock", false, "blockquote");
+                    else if (kind === "---") document.execCommand("insertHTML", false, "<hr><p><br></p>");
+                    else if (/^1/.test(kind)) document.execCommand("insertOrderedList");
+                    else document.execCommand("insertUnorderedList");
+                }
+            }
+            changed();
+        });
+
+        on(editor, "keydown", (e: KeyboardEvent) => {
+            const mod = e.ctrlKey || e.metaKey;
+            if (mod && e.key.toLowerCase() === "k") {
+                e.preventDefault();
+                openLink();
+                return;
+            }
+            if (selectedFig && (e.key === "Backspace" || e.key === "Delete")) {
+                e.preventDefault();
+                removeFig();
+                return;
+            }
+            if (e.key === "Escape") hideFloating();
+            if (e.key !== "Enter" || e.shiftKey) return;
+            const block = blockAt();
+            if (!block) return;
+            if (block.tagName === "BLOCKQUOTE") {
+                // Enter on an empty line inside a quote leaves the quote.
+                const line = anchorEl()?.closest("p, div") ?? null;
+                if ((line && line !== editor && !line.textContent!.trim()) || !block.textContent!.trim()) {
+                    e.preventDefault();
+                    document.execCommand("formatBlock", false, "p");
+                    changed();
+                }
+            } else if (/^H[23]$/.test(block.tagName)) {
+                // A heading never continues onto the next line.
+                const sel = getSelection()!;
+                const r = sel.getRangeAt(0);
+                const tail = document.createRange();
+                tail.selectNodeContents(block);
+                tail.setStart(r.endContainer, r.endOffset);
+                if (!tail.toString()) {
+                    e.preventDefault();
+                    const p = document.createElement("p");
+                    p.innerHTML = "<br>";
+                    block.after(p);
+                    const nr = document.createRange();
+                    nr.setStart(p, 0);
+                    sel.removeAllRanges();
+                    sel.addRange(nr);
+                    changed();
+                }
+            }
+        });
+
+        // Paste keeps structure (headings, lists, quotes, bold, links) and images; drops the rest.
+        on(editor, "paste", (e: ClipboardEvent) => {
+            const data = e.clipboardData;
+            if (!data) return;
+            e.preventDefault();
+            const img = [...data.files].find((f) => f.type.startsWith("image/"));
+            if (img) {
+                keepRange();
+                addImageFile(img, "body");
+                return;
+            }
+            const plain = data.getData("text/plain");
+            const html = data.getData("text/html");
+            let md = plain;
+            if (html) {
+                const d = new DOMParser().parseFromString(html, "text/html");
+                d.querySelectorAll("script,style,meta,link,title,noscript").forEach((n) => n.remove());
+                md = htmlToMd(d.body);
+            }
+            if (!/\n/.test(md.trim()) && !/^(#|>|[-*] |\d+[.)] |!\[)/.test(md.trim()) && !/[*~\[]/.test(md)) {
+                document.execCommand("insertText", false, plain.replace(/\s+/g, " "));
+            } else document.execCommand("insertHTML", false, sanitize(mdToHtml(md)));
+            changed();
+        });
+
+        on(editor, "drop", (e: DragEvent) => {
+            const f = [...(e.dataTransfer?.files ?? [])].find((x) => x.type.startsWith("image/"));
+            if (!f) return;
+            e.preventDefault();
+            const pos = (document as any).caretRangeFromPoint?.(e.clientX, e.clientY) as Range | undefined;
+            if (pos) savedRange = pos;
+            addImageFile(f, "body");
+        });
+
+        // ---- cover ----
+        root.querySelectorAll("[data-cover-add]").forEach((b) => on(b, "click", () => pickImage("cover")));
+        on($("[data-cover-remove]"), "click", () => {
+            setCover("");
+            save();
+        });
+
+        // ---- header ----
+        on($("[data-undo]"), "click", () => {
+            editor.focus();
+            document.execCommand("undo");
+            changed();
+        });
+        on($("[data-redo]"), "click", () => {
+            editor.focus();
+            document.execCommand("redo");
+            changed();
+        });
+
+        const focusBtn = $("[data-focus]");
+        const setFocus = (onOff: boolean) => {
+            document.documentElement.classList.toggle("ne-focus", onOff);
+            focusBtn.setAttribute("aria-pressed", String(onOff));
+            focusBtn.title = onOff ? "الخروج من وضع التركيز (Esc)" : "وضع التركيز";
+            store.set(FOCUS_KEY, onOff);
+        };
+        on(focusBtn, "click", () => setFocus(!document.documentElement.classList.contains("ne-focus")));
+        on(document, "keydown", (e: KeyboardEvent) => {
+            if (e.key === "Escape" && document.documentElement.classList.contains("ne-focus") && bubbleEl.hidden && insertMenu.hidden) setFocus(false);
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+                e.preventDefault();
+                pending = true;
+                writeNow();
+            }
+        });
+        on(document, "astro:before-swap", () => document.documentElement.classList.remove("ne-focus"));
+        setFocus(store.get(FOCUS_KEY, false));
+
+        const closeDocMenu = () => {
+            docMenu.hidden = true;
+            docMenuBtn.setAttribute("aria-expanded", "false");
+        };
+        on(docMenuBtn, "click", () => {
+            const opening = docMenu.hidden;
+            docMenu.hidden = !opening;
+            docMenuBtn.setAttribute("aria-expanded", String(opening));
+        });
+
+        const asMarkdown = () => {
+            const parts = [];
+            if (title.value.trim()) parts.push(`# ${title.value.trim()}`);
+            if (doc?.cover) parts.push(`![](${doc.cover})`);
+            parts.push(htmlToMd(editor, { dataImages: true }));
+            return parts.filter(Boolean).join("\n\n") + "\n";
+        };
+        const asHtml = () => {
+            const t = escapeHtml(title.value.trim() || "مسودة");
+            return `<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${t}</title>
+<style>body{max-width:680px;margin:40px auto;padding:0 16px;font:18px/1.9 system-ui,sans-serif;color:#111}img{max-width:100%;height:auto;border-radius:12px}figure{margin:1.2em 0}blockquote{margin:1em 0;padding-inline-start:16px;border-inline-start:3px solid #f97316;color:#555}hr{width:40%;border:0;border-top:1px solid #ddd;margin:2em auto}h1{font-size:2em;line-height:1.35}</style>
+</head>
+<body>
+${doc?.cover ? `<img src="${escapeHtml(doc.cover)}" alt="">\n` : ""}<h1>${t}</h1>
+${sanitize(editor.innerHTML).replace(/ contenteditable="false"/g, "")}
+</body>
+</html>
+`;
+        };
+        docMenu.querySelectorAll<HTMLButtonElement>("[data-act]").forEach((b) =>
+            on(b, "click", async () => {
+                closeDocMenu();
+                if (!doc) return;
+                writeNow();
+                const act = b.dataset.act;
+                if (act === "copy") {
+                    try {
+                        await navigator.clipboard.writeText(asMarkdown());
+                        showToast("نُسخت المسودة بصيغة Markdown.");
+                    } catch {
+                        showToast("تعذّر النسخ.");
+                    }
+                } else if (act === "md") download(fileName(title.value, "md"), asMarkdown(), "text/markdown;charset=utf-8");
+                else if (act === "html") download(fileName(title.value, "html"), asHtml(), "text/html;charset=utf-8");
+                else if (act === "dup") {
+                    const d = create({ title: title.value ? `${title.value} (نسخة)` : "", cover: doc.cover, html: editor.innerHTML });
+                    if (d) {
+                        const { words, text } = textStats();
+                        index = readIndex().map((m) => (m.id === d.id ? { ...m, title: d.title, words, excerpt: text.slice(0, 90) } : m));
+                        store.set(INDEX_KEY, index);
+                        go(d.id);
+                    }
+                } else if (act === "delete") deleteDoc(doc.id);
+            })
+        );
+
+        // ---- import (.md / .txt / .html) ----
+        on($("[data-import]"), "click", () => {
+            fileImport.value = "";
+            fileImport.click();
+        });
+        on(fileImport, "change", async () => {
+            const f = fileImport.files?.[0];
+            if (!f) return;
+            if (f.size > 2_000_000) {
+                showToast("الملف كبير جداً (الحد 2 ميغابايت).");
+                return;
+            }
+            const text = await f.text();
+            let t = f.name.replace(/\.[^.]+$/, "");
+            let html: string;
+            if (/\.html?$/i.test(f.name) || f.type === "text/html") {
+                const d = new DOMParser().parseFromString(text, "text/html");
+                const h1 = d.querySelector("h1");
+                if (h1) {
+                    t = h1.textContent!.trim();
+                    h1.remove();
+                }
+                html = sanitize(mdToHtml(htmlToMd(d.body)));
+            } else {
+                let md = text.replace(/^﻿/, "").replace(/^---\n[\s\S]*?\n---\n/, "");
+                const h = md.match(/^\s*#\s+(.+)\n/);
+                if (h) {
+                    t = h[1].trim();
+                    md = md.slice(h[0].length);
+                }
+                html = sanitize(mdToHtml(md));
+            }
+            const d = create({ title: t, html: html || "<p><br></p>" });
+            if (!d) return;
+            go(d.id);
+            // Index stats fill in on the first save.
+            pending = true;
+            writeNow();
+        });
+
+        // ---- other tabs ----
+        on(window, "storage", (e: StorageEvent) => {
+            if (e.key === INDEX_KEY) {
+                index = readIndex();
+                renderList();
+            } else if (doc && e.key === DOC_KEY(doc.id)) {
+                if (e.newValue === null) {
+                    doc = null;
+                    route();
+                } else if (document.activeElement !== editor && document.activeElement !== title) {
+                    pending = false;
+                    open(doc.id);
+                }
+            }
+        });
+
+        // Keep "منذ ٣ دقائق" honest.
+        const tick = window.setInterval(renderList, 60_000);
+        signal.addEventListener("abort", () => clearInterval(tick));
+
+        route();
+    }
+
+    document.addEventListener("astro:page-load", setup);
+</script>
+
+<style>
+    .ne {
+        --ne-line: var(--border-muted);
+        --ne-soft: color-mix(in srgb, var(--content-primary) 6%, transparent);
+        --ne-accent: DarkOrange;
+        display: grid;
+        grid-template-columns: 320px minmax(0, 1fr);
+        max-width: 1180px;
+        margin: 0 auto;
+        min-height: calc(100dvh - 60px);
+        color: var(--content-primary);
+    }
+    [hidden] {
+        display: none !important;
+    }
+
+    /* ---- side list ---- */
+    .ne-side {
+        position: sticky;
+        top: 0;
+        align-self: start;
+        display: flex;
+        flex-direction: column;
+        height: 100dvh;
+        border-inline-end: 0.5px solid var(--ne-line);
+    }
+    .ne-side-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 14px 16px 10px;
+    }
+    .ne-side-head h1 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 800;
+    }
+    .ne-search {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0 16px 8px;
+        padding: 0 12px;
+        border: 0.5px solid var(--ne-line);
+        border-radius: 999px;
+        color: var(--content-secondary);
+    }
+    .ne-search input {
+        flex: 1;
+        min-width: 0;
+        min-height: 38px;
+        border: 0;
+        outline: none;
+        background: transparent;
+        color: var(--content-primary);
+        font: inherit;
+        font-size: 15px;
+    }
+    .ne-list {
+        flex: 1;
+        overflow-y: auto;
+        margin: 0;
+        padding: 0 8px;
+        list-style: none;
+    }
+    .ne-list :global(.ne-item) {
+        position: relative;
+        border-radius: 12px;
+    }
+    .ne-list :global(.ne-item:hover),
+    .ne-list :global(.ne-item.is-current) {
+        background: var(--ne-soft);
+    }
+    .ne-list :global(.ne-item-link) {
+        display: grid;
+        gap: 2px;
+        padding: 10px 12px;
+        padding-inline-end: 40px;
+        color: inherit;
+        text-decoration: none;
+    }
+    .ne-list :global(.ne-item-title) {
+        overflow: hidden;
+        font-weight: 700;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+    }
+    .ne-list :global(.ne-item-excerpt) {
+        display: -webkit-box;
+        overflow: hidden;
+        color: var(--content-secondary);
+        font-size: 13px;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+    }
+    .ne-list :global(.ne-item-meta) {
+        color: var(--content-secondary);
+        font-size: 12px;
+    }
+    .ne-list :global(.ne-item-del) {
+        display: grid;
+        place-items: center;
+        width: 30px;
+        height: 30px;
+        padding: 0;
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        color: var(--content-primary);
+        cursor: pointer;
+        position: absolute;
+        top: 8px;
+        inset-inline-end: 6px;
+        opacity: 0;
+        font-size: 13px;
+    }
+    .ne-list :global(.ne-item:hover .ne-item-del),
+    .ne-list :global(.ne-item-del:focus-visible) {
+        opacity: 0.75;
+    }
+    @media (hover: none) {
+        .ne-list :global(.ne-item-del) {
+            opacity: 0.6;
+        }
+    }
+    .ne-list-empty {
+        margin: 12px 20px;
+        color: var(--content-secondary);
+        font-size: 14px;
+    }
+    .ne-side-foot {
+        display: grid;
+        gap: 6px;
+        padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+        border-top: 0.5px solid var(--ne-line);
+        color: var(--content-secondary);
+        font-size: 12px;
+    }
+    .ne-side-foot p {
+        margin: 0;
+    }
+    .ne-usage.is-high {
+        color: #ef4444;
+    }
+
+    /* ---- buttons ---- */
+    .ne-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 34px;
+        padding: 0 14px;
+        border: 0.5px solid var(--ne-line);
+        border-radius: 999px;
+        background: transparent;
+        color: var(--content-primary);
+        font: inherit;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+    .ne-btn-solid {
+        border-color: transparent;
+        background: var(--content-primary);
+        color: var(--background);
+    }
+    .ne-btn span,
+    .ne-link span {
+        display: inline-flex;
+    }
+    .ne-icon {
+        display: inline-grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        flex: none;
+        padding: 0;
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        color: var(--content-primary);
+        cursor: pointer;
+    }
+    .ne-icon:hover,
+    .ne-icon[aria-pressed="true"],
+    .ne-icon[aria-expanded="true"] {
+        background: var(--ne-soft);
+    }
+    .ne-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        justify-self: start;
+        padding: 4px 0;
+        border: 0;
+        background: none;
+        color: var(--content-primary);
+        font: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    /* ---- main ---- */
+    .ne-main {
+        min-width: 0;
+    }
+    .ne-blank {
+        display: grid;
+        justify-items: center;
+        align-content: center;
+        gap: 6px;
+        min-height: 70vh;
+        padding: 24px;
+        text-align: center;
+        color: var(--content-secondary);
+    }
+    .ne-blank p {
+        margin: 0;
+    }
+    .ne-blank-icon {
+        display: grid;
+        place-items: center;
+        width: 52px;
+        height: 52px;
+        margin-bottom: 6px;
+        border-radius: 999px;
+        background: var(--ne-soft);
+        color: var(--content-primary);
+    }
+    .ne-blank-title {
+        color: var(--content-primary);
+        font-size: 20px;
+        font-weight: 800;
+    }
+    .ne-blank .ne-btn {
+        margin-top: 10px;
+    }
+
+    .ne-head {
+        position: sticky;
+        top: 0;
+        z-index: 40;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 8px 16px;
+        background: color-mix(in srgb, var(--background) 88%, transparent);
+        -webkit-backdrop-filter: blur(14px);
+        backdrop-filter: blur(14px);
+    }
+    .ne-head-start,
+    .ne-head-end {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        min-width: 0;
+    }
+    .ne-state,
+    .ne-stats {
+        overflow: hidden;
+        color: var(--content-secondary);
+        font-size: 13px;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+    }
+    .ne-state {
+        padding-inline-start: 6px;
+    }
+    .ne-stats {
+        margin-inline-end: 6px;
+    }
+    .ne-state .is-alert {
+        color: #ef4444;
+    }
+    .ne-back {
+        display: none;
+    }
+    .ne-menu-wrap {
+        position: relative;
+    }
+    .ne-menu {
+        position: absolute;
+        z-index: 60;
+        display: grid;
+        min-width: 210px;
+        padding: 6px;
+        border: 0.5px solid var(--ne-line);
+        border-radius: 14px;
+        background: var(--background);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+    }
+    .ne-menu-wrap .ne-menu {
+        top: calc(100% + 6px);
+        inset-inline-end: 0;
+    }
+    .ne-menu button {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 40px;
+        padding: 0 12px;
+        border: 0;
+        border-radius: 10px;
+        background: transparent;
+        color: var(--content-primary);
+        font: inherit;
+        font-size: 15px;
+        text-align: start;
+        cursor: pointer;
+    }
+    .ne-menu button:hover,
+    .ne-menu button:focus-visible {
+        background: var(--ne-soft);
+    }
+    .ne-menu .is-danger {
+        color: #ef4444;
+    }
+
+    /* ---- canvas ---- */
+    .ne-canvas {
+        position: relative;
+        max-width: 680px;
+        margin: 0 auto;
+        padding: 20px 56px 120px;
+    }
+    .ne-cover {
+        margin-bottom: 18px;
+        text-align: center;
+    }
+    .ne-cover-add {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 32px;
+        padding: 0 12px;
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        color: var(--content-secondary);
+        font: inherit;
+        font-size: 14px;
+        cursor: pointer;
+    }
+    .ne-cover-add:hover {
+        background: var(--ne-soft);
+        color: var(--content-primary);
+    }
+    .ne-cover-add span {
+        display: inline-flex;
+    }
+    .ne-cover-fig {
+        position: relative;
+        margin: 0;
+    }
+    .ne-cover-fig img {
+        display: block;
+        width: 100%;
+        aspect-ratio: 5 / 2;
+        object-fit: cover;
+        border-radius: 16px;
+        background: var(--ne-soft);
+    }
+    .ne-cover-tools {
+        position: absolute;
+        top: 10px;
+        inset-inline-end: 10px;
+        display: flex;
+        gap: 6px;
+    }
+    .ne-cover-tools button,
+    .ne-figtools button {
+        min-height: 32px;
+        padding: 0 12px;
+        border: 0.5px solid rgba(255, 255, 255, 0.35);
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.7);
+        color: #fff;
+        font: inherit;
+        font-size: 13px;
+        cursor: pointer;
+    }
+
+    .ne-title {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+        margin: 0 0 14px;
+        padding: 0;
+        border: 0;
+        outline: none;
+        resize: none;
+        overflow: hidden;
+        background: transparent;
+        color: var(--content-primary);
+        font: inherit;
+        font-size: clamp(28px, 5vw, 38px);
+        font-weight: 800;
+        line-height: 1.35;
+    }
+    .ne-title::placeholder,
+    .ne-body[data-empty]::before {
+        color: var(--content-secondary);
+        opacity: 0.55;
+    }
+
+    .ne-body {
+        min-height: 55vh;
+        outline: none;
+        font-size: 19px;
+        line-height: 1.9;
+        overflow-wrap: break-word;
+        caret-color: var(--ne-accent);
+    }
+    .ne-body[data-empty]::before {
+        content: attr(data-placeholder);
+        position: absolute;
+        pointer-events: none;
+    }
+    .ne-body > :global(:first-child) {
+        margin-top: 0;
+    }
+    .ne-body :global(p) {
+        margin: 0 0 1em;
+    }
+    .ne-body :global(h2) {
+        margin: 1.4em 0 0.5em;
+        font-size: 1.5em;
+        line-height: 1.4;
+    }
+    .ne-body :global(h3) {
+        margin: 1.2em 0 0.4em;
+        font-size: 1.22em;
+        line-height: 1.4;
+    }
+    .ne-body :global(blockquote) {
+        margin: 1em 0;
+        padding-inline-start: 16px;
+        border-inline-start: 3px solid var(--ne-accent);
+        color: var(--content-secondary);
+    }
+    .ne-body :global(blockquote p) {
+        margin: 0;
+    }
+    .ne-body :global(ul),
+    .ne-body :global(ol) {
+        margin: 0 0 1em;
+        padding-inline-start: 1.5em;
+    }
+    .ne-body :global(hr) {
+        width: 40%;
+        margin: 2em auto;
+        border: 0;
+        border-top: 1px solid var(--ne-line);
+    }
+    .ne-body :global(figure) {
+        margin: 1.2em 0;
+        border-radius: 12px;
+        cursor: pointer;
+    }
+    .ne-body :global(figure.is-selected) {
+        outline: 3px solid var(--ne-accent);
+        outline-offset: 2px;
+    }
+    .ne-body :global(img) {
+        display: block;
+        max-width: 100%;
+        height: auto;
+        margin: 0 auto;
+        border-radius: 12px;
+    }
+    .ne-body :global(a) {
+        color: var(--ne-accent);
+        text-decoration: underline;
+    }
+    .ne-figtools {
+        position: absolute;
+        inset-inline-end: 66px;
+    }
+
+    /* "+" sits outside the text column, at the end of an empty line. */
+    .ne-plus {
+        position: absolute;
+        inset-inline-end: 12px;
+        display: grid;
+        place-items: center;
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        border: 0.5px solid var(--ne-line);
+        border-radius: 999px;
+        background: var(--background);
+        color: var(--content-primary);
+        cursor: pointer;
+        transition: transform 0.15s;
+    }
+    .ne-plus[aria-expanded="true"] {
+        transform: rotate(45deg);
+    }
+    .ne-insert {
+        inset-inline-end: 12px;
+    }
+    .ne-insert span {
+        display: inline-flex;
+        color: var(--content-secondary);
+    }
+
+    /* ---- floating format bar ---- */
+    .ne-bubble {
+        position: fixed;
+        z-index: 1000;
+        padding: 4px;
+        border: 0.5px solid var(--ne-line);
+        border-radius: 12px;
+        background: var(--background);
+        box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
+    }
+    .ne-bubble-tools,
+    .ne-bubble-link {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+    }
+    .ne-bubble-link {
+        gap: 6px;
+        padding: 2px;
+    }
+    .ne-bubble-link input {
+        width: 240px;
+        min-width: 0;
+        min-height: 34px;
+        padding: 0 10px;
+        border: 0.5px solid var(--ne-line);
+        border-radius: 8px;
+        outline: none;
+        background: transparent;
+        color: var(--content-primary);
+        font: inherit;
+        font-size: 15px;
+    }
+    .ne-tool {
+        display: inline-grid;
+        place-items: center;
+        min-width: 34px;
+        height: 34px;
+        flex: none;
+        padding: 0 6px;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--content-primary);
+        font: inherit;
+        font-size: 15px;
+        cursor: pointer;
+    }
+    .ne-tool span {
+        display: inline-flex;
+    }
+    .ne-tool:hover {
+        background: var(--ne-soft);
+    }
+    .ne-tool[aria-pressed="true"] {
+        background: color-mix(in srgb, var(--ne-accent) 18%, transparent);
+        color: var(--ne-accent);
+    }
+    .ne-sep {
+        width: 1px;
+        height: 20px;
+        flex: none;
+        margin: 0 4px;
+        background: var(--ne-line);
+    }
+    .ne-dock-only {
+        display: none;
+    }
+    .ne-bubble.is-dock {
+        left: 0;
+        right: 0;
+        padding: 6px 8px;
+        border-width: 0.5px 0 0;
+        border-radius: 0;
+        box-shadow: none;
+        background: color-mix(in srgb, var(--background) 94%, transparent);
+        -webkit-backdrop-filter: blur(14px);
+        backdrop-filter: blur(14px);
+    }
+    .ne-bubble.is-dock .ne-bubble-tools {
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+    .ne-bubble.is-dock .ne-dock-only {
+        display: inline-grid;
+    }
+    .ne-bubble.is-dock .ne-bubble-link input {
+        flex: 1;
+        width: auto;
+    }
+
+    .ne-toast {
+        position: fixed;
+        bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+        left: 50%;
+        z-index: 80;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        max-width: calc(100vw - 32px);
+        padding: 10px 16px;
+        border-radius: 12px;
+        background: var(--content-primary);
+        color: var(--background);
+        font-size: 14px;
+        transform: translateX(-50%);
+    }
+    .ne-toast button {
+        padding: 0;
+        border: 0;
+        background: none;
+        color: var(--ne-accent);
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    /* ---- focus mode: just the page ---- */
+    :global(html.ne-focus .site-header),
+    :global(html.ne-focus #site-footer),
+    :global(html.ne-focus .app-tabbar),
+    :global(html.ne-focus .news-ticker) {
+        display: none !important;
+    }
+    :global(html.ne-focus) .ne {
+        grid-template-columns: minmax(0, 1fr);
+        max-width: none;
+    }
+    :global(html.ne-focus) .ne-side {
+        display: none;
+    }
+
+    /* ---- phones: list or document, one at a time ---- */
+    @media (max-width: 760px) {
+        .ne {
+            grid-template-columns: minmax(0, 1fr);
+        }
+        .ne-side {
+            position: static;
+            height: auto;
+            min-height: 70vh;
+            border: 0;
+        }
+        .ne[data-view="doc"] .ne-side,
+        .ne[data-view="list"] .ne-main {
+            display: none;
+        }
+        .ne-back {
+            display: inline-grid;
+        }
+        .ne-stats {
+            display: none;
+        }
+        .ne-canvas {
+            padding: 12px 16px 160px;
+        }
+        .ne-plus {
+            inset-inline-end: 4px;
+        }
+        .ne-insert {
+            inset-inline-end: 4px;
+        }
+        .ne-figtools {
+            inset-inline-end: 26px;
+        }
+        .ne-title {
+            font-size: 28px;
+        }
+        .ne-body {
+            font-size: 18px;
+        }
+    }
+</style>

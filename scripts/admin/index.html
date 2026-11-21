@@ -1767,7 +1767,10 @@ async function renderPersonas() {
   const drafts = d.drafts.length ? h('div', { class: 'list' }, d.drafts.map((x) => {
     const p = d.personas.find((y) => y.slug === x.persona);
     const isOpen = per.draft === x.file;
+    // Header image: drawn when the run ends, or on first request.
+    const headerSrc = '/api/personas/draft/header?file=' + encodeURIComponent(x.file) + '&v=' + (per.headerV ?? 0) + '-' + x.modified;
     const head = h('div', { class: 'row' },
+      h('img', { src: headerSrc, loading: 'lazy', alt: '', style: 'width:120px;height:63px;object-fit:cover;border-radius:6px;flex:none;background:#222' }),
       h('div', { class: 'body' },
         h('div', { class: 'title', dir: 'auto' }, x.title || x.file),
         h('div', { class: 'meta', dir: 'auto' }, `${p?.nameAr ?? x.persona}${x.topic ? ' · ' + x.topic : ''}${x.trend ? ' · 📈 ' + x.trend : ''} · ${x.words} words · ${x.citations} citations · ${new Date(x.modified).toLocaleString()}`),
@@ -1781,6 +1784,10 @@ async function renderPersonas() {
     const sentence = (per.draftText.replace(/^---[\s\S]*?---/, '').match(/[^.!؟\n(]{50,120}/)?.[0] ?? x.title).trim();
     return h('div', {}, head, h('div', { class: 'card', style: 'display:grid;gap:8px' },
       h('p', { class: 'meta' }, 'Check before approving: open 2–3 of the cited links and confirm the numbers; nothing presented as a personal experience; topic is AdSense-safe.'),
+      h('img', { src: headerSrc, alt: 'Header image', style: 'width:100%;max-width:800px;aspect-ratio:1600/840;border-radius:8px;background:#222' }),
+      h('div', { class: 'toolbar' },
+        h('span', { class: 'meta' }, 'Header image — becomes the post’s cover (public/thumbs/) on Approve, redrawn from the title.'),
+        h('button', { class: 'btn', onclick: () => act(async () => { await api('/api/personas/draft/header', { file: x.file, content: per.draftText }); per.headerV = (per.headerV ?? 0) + 1; per.data = null; }, 'Header redrawn') }, 'Redraw header')),
       h('textarea', { dir: 'auto', rows: 28, style: full(';font-family:inherit;line-height:1.8'), oninput: (e) => { per.draftText = e.target.value; } }, per.draftText),
       h('div', { class: 'toolbar' },
         h('button', { class: 'btn primary', onclick: () => act(async () => { const r = await api('/api/personas/draft/approve', { file: x.file, content: per.draftText, force: per.force }); per.draft = null; per.data = null; return r; }, (r) => `Approved → ${r.file} — Publish to put it live`) }, 'Approve & publish file'),

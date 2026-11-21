@@ -48,6 +48,7 @@ import type { PersonalBlogPerson } from '../src/data/personal-blogs.ts';
 import { slugifyTag } from '../src/utils/tag-slug.ts';
 import { catalogTrends, googleTrends, matchPersona, type CatalogTrend, type GoogleTrend } from './lib/trends.ts';
 import { archivePages } from './lib/substack-archive.ts';
+import { renderHeaders, type HeaderInput } from './lib/article-header.ts';
 
 const portArg = process.argv.indexOf('--port');
 const PORT = portArg > -1 ? Number(process.argv[portArg + 1]) : 4322;
@@ -841,7 +842,7 @@ function discoverState(params: URLSearchParams) {
 // git summary of the changes, a commit (data paths, or everything) and git push.
 
 /** What the admin and the importers change. Commits only ever include these. */
-const DATA_PATHS = ['src/content/community', 'src/data/catalog', 'src/data/moderation', 'src/data/author-names.json', 'src/data/external-blogs.ts', 'public/llms.txt'];
+const DATA_PATHS = ['src/content/community', 'src/content/house', 'src/content/omar', 'src/content/layla', 'src/content/youssef', 'src/content/yacine', 'public/thumbs', 'src/data/catalog', 'src/data/moderation', 'src/data/author-names.json', 'src/data/external-blogs.ts', 'public/llms.txt'];
 const BUN = process.execPath;
 const PUBLISH_STEPS: Record<string, { cmd: string[]; display: string }> = {
     check: { cmd: [BUN, 'run', 'check-data'], display: 'bun run check-data' },
@@ -3454,7 +3455,17 @@ const PERSONA_SLUG_RE = /^[a-z][a-z0-9-]{1,30}$/;
 /** Draft files are <persona>--<english-slug>.md. */
 const DRAFT_RE = /^([a-z][a-z0-9-]{1,30})--([a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
 const RESERVED_PERSONA_SLUGS = new Set([HOUSE, 'community', 'admin', 'write', 'written', 'me', 'today']);
-const personaSlot: Slot = { job: null, proc: null };
+const personaSlot: Slot = {
+    job: null,
+    proc: null,
+    // Every generated draft gets its header image as soon as the run ends.
+    onExit: () => {
+        if (personaSlot.job?.mode.startsWith('persona:') && personaSlot.job.mode !== 'persona:suggest') {
+            void drawDraftHeaders().catch((e) => console.error('draft headers:', e));
+        }
+    },
+};
+const THUMBS_DIR = path.join(ROOT, 'public/thumbs');
 
 interface PersonaFile { caps: { perPersona: number; total: number }; personas: PersonalBlogPerson[] }
 
@@ -3498,6 +3509,8 @@ interface Draft {
     citations: number;
     warnings: string[];
     modified: number;
+    /** A header image exists (.drafts/house/<draft>.webp). */
+    header: boolean;
 }
 
 const draftBody = (text: string) => text.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '');
@@ -3550,6 +3563,7 @@ function listDrafts(personas = readPersonas().personas): Draft[] {
                 trend: fm.trend ?? '',
                 ...lintDraft(fm, draftBody(text), personas),
                 modified: fs.statSync(full).mtimeMs,
+                header: fs.existsSync(headerPath(full)),
             };
         })
         .sort((a, b) => b.modified - a.modified);
@@ -3820,6 +3834,56 @@ function generatePersona(body: Body) {
     return startCommand(personaSlot, cmd, `claude -p <persona ${p.slug} ×${count}${topic ? `: ${topic}` : ''}>`, { mode: `persona:${p.slug}`, scopes: [p.slug] });
 }
 
+// ─── Header images ───────────────────────────────────────────────────────────
+// Each draft gets a cover (scripts/lib/article-header.ts) next to it as <draft>.webp;
+// Approve moves it to public/thumbs/<slug>.webp and points the post's `thumb:` at it.
+
+const headerPath = (draft: string) => draft.replace(/\.md$/, '.webp');
+
+function draftHeaderInput(full: string, personas = readPersonas().personas): HeaderInput {
+    const fm = frontmatter(fs.readFileSync(full, 'utf-8'));
+    const p = personas.find((x) => x.slug === fm.persona) ?? personas.find((x) => x.slug === DRAFT_RE.exec(path.basename(full))?.[1]);
+    return { title: (fm.title ?? '').trim() || path.basename(full, '.md'), author: p?.nameAr ?? fm.persona ?? '', kicker: p?.tagline || fm.topic, accent: p?.accent };
+}
+
+let headerQueue: Promise<unknown> = Promise.resolve();
+/** Draws headers one batch at a time (each launches a headless Chrome). */
+function drawHeaders(jobs: { out: string; header: HeaderInput }[]) {
+    const run = headerQueue.then(() => renderHeaders(jobs));
+    headerQueue = run.catch(() => {});
+    return run;
+}
+
+/** Headers for the drafts that have none (or all of them, with `force`). */
+async function drawDraftHeaders(files?: string[], force = false) {
+    if (!fs.existsSync(DRAFTS_DIR)) return [];
+    const personas = readPersonas().personas;
+    const drafts = (files ?? fs.readdirSync(DRAFTS_DIR).filter((f) => DRAFT_RE.test(f))).map((f) => path.join(DRAFTS_DIR, f));
+    const jobs = drafts.filter((d) => force || !fs.existsSync(headerPath(d))).map((d) => ({ out: headerPath(d), header: draftHeaderInput(d, personas) }));
+    return drawHeaders(jobs);
+}
+
+/** GET: the draft's header image, drawn first if it has none. */
+async function draftHeader(params: URLSearchParams) {
+    const full = draftPath(params.get('file'));
+    if (!fs.existsSync(headerPath(full))) await drawDraftHeaders([path.basename(full)]);
+    if (!fs.existsSync(headerPath(full))) throw new HttpError(500, 'Could not draw the header');
+    return new Response(Bun.file(headerPath(full)), { headers: { 'content-type': 'image/webp', 'cache-control': 'no-store' } });
+}
+
+/** POST: redraw a draft's header (after editing its title), or every draft's with `all`. */
+async function redrawDraftHeader(body: Body) {
+    if (body.all === true) {
+        const failed = await drawDraftHeaders(undefined, true);
+        return { ok: failed.length === 0, failed: failed.length };
+    }
+    const full = draftPath(body.file);
+    if (typeof body.content === 'string' && body.content.trim()) fs.writeFileSync(full, body.content.replace(/\r\n?/g, '\n'));
+    const failed = await drawDraftHeaders([path.basename(full)], true);
+    if (failed.length) throw new HttpError(500, 'Could not draw the header');
+    return { ok: true };
+}
+
 function readDraft(params: URLSearchParams) {
     const full = draftPath(params.get('file'));
     return { file: path.basename(full), content: fs.readFileSync(full, 'utf-8') };
@@ -3833,11 +3897,13 @@ function saveDraft(body: Body) {
 }
 
 function removeDraft(body: Body) {
-    fs.unlinkSync(draftPath(body.file));
+    const full = draftPath(body.file);
+    fs.unlinkSync(full);
+    fs.rmSync(headerPath(full), { force: true });
     return { ok: true };
 }
 
-function approveDraft(body: Body) {
+async function approveDraft(body: Body) {
     const full = draftPath(body.file);
     if (typeof body.content === 'string' && body.content.trim()) fs.writeFileSync(full, body.content.replace(/\r\n?/g, '\n'));
     const f = readPersonas();
@@ -3854,12 +3920,24 @@ function approveDraft(body: Body) {
         throw new HttpError(409, `Weekly cap reached (${week.per.get(p.slug) ?? 0}/${f.caps.perPersona} for ${p.slug}, ${week.total}/${f.caps.total} in all) — tick "ignore cap" to publish anyway`);
     }
     const slug = freeSlug(DRAFT_RE.exec(path.basename(full))![2]!);
+    // The header image: redrawn if the title changed since it was drawn (or it has none).
+    const header = headerPath(full);
+    if (!fs.existsSync(header) || fs.statSync(header).mtimeMs < fs.statSync(full).mtimeMs) await drawDraftHeaders([path.basename(full)], true);
+    let thumb = '';
+    if (fs.existsSync(header)) {
+        let name = slug;
+        for (let i = 2; fs.existsSync(path.join(THUMBS_DIR, `${name}.webp`)); i++) name = `${slug}-${i}`;
+        fs.mkdirSync(THUMBS_DIR, { recursive: true });
+        fs.renameSync(header, path.join(THUMBS_DIR, `${name}.webp`));
+        thumb = `/thumbs/${name}.webp`;
+    }
     const front = [
         '---',
         `title: ${yamlString(title)}`,
         `description: ${yamlString(description)}`,
         `pubDate: ${new Date().toISOString().slice(0, 10)}`,
         ...(p.collection === HOUSE ? [`persona: ${p.slug}`] : []),
+        ...(thumb ? [`thumb: ${yamlString(thumb)}`] : []),
         '---',
         '',
     ];
@@ -3868,7 +3946,7 @@ function approveDraft(body: Body) {
     const out = path.join(dir, `${slug}.md`);
     fs.writeFileSync(out, `${front.join('\n')}${markdown}\n`);
     fs.unlinkSync(full);
-    return { ok: true, slug, file: path.relative(ROOT, out), url: `https://elhellal.com/articles/${encodeURIComponent(slug)}/` };
+    return { ok: true, slug, thumb: thumb || null, file: path.relative(ROOT, out), url: `https://elhellal.com/articles/${encodeURIComponent(slug)}/` };
 }
 
 const POST: Record<string, (body: Body) => unknown | Promise<unknown>> = {
@@ -3880,6 +3958,7 @@ const POST: Record<string, (body: Body) => unknown | Promise<unknown>> = {
     '/api/personas/draft': saveDraft,
     '/api/personas/draft/remove': removeDraft,
     '/api/personas/draft/approve': approveDraft,
+    '/api/personas/draft/header': redrawDraftHeader,
     '/api/personas/suggest': suggestPersonas,
     '/api/personas/suggestions/remove': removeSuggestion,
     '/api/remove': removeAction,
@@ -3992,6 +4071,7 @@ const GET: Record<string, (params: URLSearchParams) => unknown | Promise<unknown
     '/api/push/audience': pushAudience,
     '/api/submissions': listSubmissions,
     '/api/personas': personasOverview,
+    '/api/personas/draft/header': draftHeader,
     '/api/personas/job': (params) => ({ job: personaSlot.job ? publicJob(personaSlot.job, Number(params.get('from')) || 0) : null }),
     '/api/personas/draft': readDraft,
     '/api/personas/trends': trendsOverview,

@@ -1,9 +1,12 @@
 ---
-// /write/ — readers write an article for الهلال. It goes to the push Worker
-// (POST /api/push/submit → D1 submissions); the admin panel's Submissions
-// queue approves it into src/content/community/<slug>.md, published with the
-// next build. Turnstile shows only when PUBLIC_TURNSTILE_SITEKEY is set at
-// build (the Worker checks it only when its TURNSTILE_SECRET is set).
+// /write/ — readers write an article for الهلال, in an editor modelled on X's
+// article composer: cover, big title, a sticky formatting toolbar and a rich
+// (contenteditable) body. The body is serialized to markdown, so the push
+// Worker (POST /api/push/submit → D1 submissions) and the admin Submissions
+// queue (→ src/content/community/<slug>.md) are unchanged. The byline,
+// summary and category are asked for in the Publish dialog. Turnstile shows
+// only when PUBLIC_TURNSTILE_SITEKEY is set at build (the Worker checks it
+// only when its TURNSTILE_SECRET is set).
 import fs from "node:fs";
 import path from "node:path";
 import Layout from "../layouts/Layout.astro";
@@ -15,6 +18,22 @@ const categories = JSON.parse(
 ) as Array<{ category: string; title: string }>;
 const sitekey = import.meta.env.PUBLIC_TURNSTILE_SITEKEY ?? "";
 const nativeCount = (await getFeeds()).get("native")!.newest.length;
+
+const icon = (d: string) =>
+    `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const tools = [
+    { cmd: "bold", label: "غامق (Ctrl+B)", svg: icon('<path d="M6 4h8a4 4 0 0 1 0 8H6zM6 12h9a4 4 0 0 1 0 8H6z"/>') },
+    { cmd: "italic", label: "مائل (Ctrl+I)", svg: icon('<path d="M19 4h-9M14 20H5M15 4 9 20"/>') },
+    { cmd: "strikeThrough", label: "يتوسطه خط", svg: icon('<path d="M16 4H9a3 3 0 0 0-2.83 4M14 12a4 4 0 0 1 0 8H6M4 12h16"/>') },
+    { sep: true },
+    { cmd: "insertUnorderedList", label: "قائمة نقطية", svg: icon('<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>') },
+    { cmd: "insertOrderedList", label: "قائمة مرقّمة", svg: icon('<path d="M10 6h11M10 12h11M10 18h11M4 6h1v4M4 10h2M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/>') },
+    { cmd: "quote", label: "اقتباس", svg: icon('<path d="M3 21c3 0 7-1 7-8V5c0-1.25-.76-2-2-2H4c-1.25 0-2 .75-2 2v6c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 0-1 1v3c0 1 0 1 1 1zM15 21c3 0 7-1 7-8V5c0-1.25-.76-2-2-2h-4c-1.25 0-2 .75-2 2v6c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/>') },
+    { sep: true },
+    { cmd: "link", label: "رابط", svg: icon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>') },
+    { cmd: "image", label: "صورة", svg: icon('<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21"/>') },
+    { cmd: "divider", label: "فاصل", svg: icon('<path d="M4 12h16"/><path d="M8 6h8M8 18h8" opacity=".35"/>') },
+] as const;
 ---
 
 <Layout
@@ -25,199 +44,583 @@ const nativeCount = (await getFeeds()).get("native")!.newest.length;
     pageDescription="اكتب مقالك بالعربية وأرسله إلى الهلال. نراجع كل مقال وننشر الجيد منها."
     canonicalUrl="https://elhellal.com/write/"
 >
-    <main id="main-content" class="write-page">
-        <h1>اكتب مقالاً</h1>
-        <p class="write-muted">
-            اكتب مقالك هنا وأرسله. نراجع كل مقال يدوياً قبل نشره، وننشر المقالات الأصيلة المفيدة.
-            لا يُنشر بريدك أبداً.
-        </p>
-        {nativeCount > 0 && (
-            <p class="write-muted">
-                <a href="/written/">{articlesCountAr(nativeCount)} كُتبت على الهلال حتى الآن</a>
-            </p>
-        )}
+    <main id="main-content" class="ed-page">
+        <h1 class="ed-sr">اكتب مقالاً</h1>
 
-        <form class="write-form" data-form novalidate>
-            <label>
-                <span>اسمك كما سيظهر</span>
-                <input name="author" required minlength="2" maxlength="60" autocomplete="name" />
-            </label>
-            <label>
-                <span>عنوان المقال</span>
-                <input name="title" required minlength="5" maxlength="150" />
-            </label>
-            <label>
-                <span>وصف قصير (سطر أو سطران)</span>
-                <textarea name="description" rows="2" required minlength="20" maxlength="300"></textarea>
-            </label>
-            <label>
-                <span>التصنيف</span>
-                <select name="category" required>
-                    <option value="">اختر تصنيفاً</option>
-                    {categories.map((c) => <option value={c.category}>{c.title}</option>)}
-                </select>
-            </label>
-
-            <div class="write-editor">
-                <div class="write-toolbar" role="toolbar" aria-label="تنسيق">
-                    <button type="button" data-md="h2" title="عنوان فرعي">عنوان</button>
-                    <button type="button" data-md="bold" title="غامق"><b>غامق</b></button>
-                    <button type="button" data-md="quote" title="اقتباس">اقتباس</button>
-                    <button type="button" data-md="list" title="قائمة">قائمة</button>
-                    <button type="button" data-md="link" title="رابط">رابط</button>
-                    <button type="button" class="write-preview-toggle" data-preview-toggle aria-pressed="false">معاينة</button>
-                </div>
-                <textarea name="body" dir="rtl" rows="18" required placeholder="اكتب مقالك هنا… افصل بين الفقرات بسطر فارغ."></textarea>
-                <div class="write-preview article-prose" data-preview hidden></div>
-                <p class="write-count" data-count></p>
+        <div class="ed-bar">
+            <div class="ed-bar-state">
+                <span class="ed-chip">مسودة</span>
+                <span class="ed-saved" data-saved></span>
             </div>
+            <div class="ed-bar-actions">
+                <span class="ed-words" data-words></span>
+                <button type="button" class="ed-publish" data-open-publish>نشر</button>
+            </div>
+        </div>
 
-            <details class="write-more">
-                <summary>اختياري</summary>
-                <label>
-                    <span>بريدك (للتواصل معك فقط، لا يُنشر)</span>
-                    <input name="email" type="email" dir="ltr" maxlength="200" autocomplete="email" />
-                </label>
-                <label>
-                    <span>رابطك (موقعك أو حسابك)</span>
-                    <input name="authorUrl" type="url" dir="ltr" placeholder="https://…" maxlength="500" />
-                </label>
-                <label>
-                    <span>رابط صورة الغلاف (صورة تملك حق نشرها)</span>
-                    <input name="cover" type="url" dir="ltr" placeholder="https://…" maxlength="500" />
-                </label>
-            </details>
+        <div class="ed-cover" data-cover>
+            <button type="button" class="ed-cover-add" data-cover-add>
+                <span set:html={icon('<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21"/>')} />
+                <span>أضف صورة غلاف</span>
+                <small>نسبة 5:2 تبدو أفضل</small>
+            </button>
+            <img class="ed-cover-img" data-cover-img alt="" hidden />
+            <div class="ed-cover-tools" data-cover-tools hidden>
+                <button type="button" data-cover-edit>تغيير</button>
+                <button type="button" data-cover-remove>إزالة</button>
+            </div>
+            <div class="ed-cover-form" data-cover-form hidden>
+                <input type="url" dir="ltr" placeholder="https://… رابط صورة تملك حق نشرها" maxlength="500" data-cover-input />
+                <button type="button" class="ed-pop-ok" data-cover-ok>حفظ</button>
+                <button type="button" data-cover-cancel>إلغاء</button>
+            </div>
+        </div>
 
-            <input class="write-hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
+        <textarea class="ed-title" data-title rows="1" maxlength="150" placeholder="أضف عنواناً" aria-label="عنوان المقال"></textarea>
 
-            <label class="write-check">
-                <input type="checkbox" name="rights" required />
-                <span>أؤكد أن المقال من كتابتي، وأوافق على نشره على الهلال وفق <a href="/terms/">الشروط</a>.</span>
-            </label>
+        <div class="ed-toolbar" role="toolbar" aria-label="تنسيق" data-toolbar>
+            <div class="ed-tools">
+            <select class="ed-block" data-block aria-label="نوع النص">
+                <option value="p">نص</option>
+                <option value="h2">عنوان</option>
+                <option value="h3">عنوان فرعي</option>
+            </select>
+            {tools.map((t) =>
+                "sep" in t ? <span class="ed-sep" /> : (
+                    <button type="button" class="ed-tool" data-cmd={t.cmd} title={t.label} aria-label={t.label} aria-pressed="false" set:html={t.svg} />
+                )
+            )}
+            </div>
+            <div class="ed-pop" data-pop hidden>
+                <input type="url" dir="ltr" placeholder="https://…" data-pop-input />
+                <button type="button" class="ed-pop-ok" data-pop-ok>إضافة</button>
+                <button type="button" data-pop-cancel>إلغاء</button>
+            </div>
+        </div>
 
-            {sitekey && <div class="cf-turnstile" data-sitekey={sitekey} data-language="ar"></div>}
+        <div
+            class="ed-body article-prose"
+            data-body
+            contenteditable="true"
+            dir="rtl"
+            role="textbox"
+            aria-multiline="true"
+            aria-label="نص المقال"
+            data-placeholder="ابدأ الكتابة… اكتب ## لعنوان، و- لقائمة، و> لاقتباس"
+        ></div>
 
-            <button type="submit" class="write-btn">أرسل المقال للمراجعة</button>
-            <p class="write-status" data-status role="status"></p>
-        </form>
+        <p class="ed-foot">
+            نراجع كل مقال يدوياً قبل نشره. مسودتك محفوظة في متصفحك.
+            {nativeCount > 0 && <a href="/written/">{articlesCountAr(nativeCount)} كُتبت على الهلال حتى الآن</a>}
+        </p>
+
+        <dialog class="ed-dialog" data-dialog aria-labelledby="ed-dialog-title">
+            <form class="ed-form" data-form novalidate>
+                <div class="ed-dialog-head">
+                    <h2 id="ed-dialog-title">نشر المقال</h2>
+                    <button type="button" class="ed-close" data-close aria-label="إغلاق">✕</button>
+                </div>
+                <div class="ed-dialog-body" data-dialog-body>
+                    <label>
+                        <span>اسمك كما سيظهر</span>
+                        <input name="author" required minlength="2" maxlength="60" autocomplete="name" />
+                    </label>
+                    <label>
+                        <span>وصف قصير يظهر في البطاقات <small data-desc-count></small></span>
+                        <textarea name="description" rows="3" required minlength="20" maxlength="300"></textarea>
+                    </label>
+                    <label>
+                        <span>التصنيف</span>
+                        <select name="category" required>
+                            <option value="">اختر تصنيفاً</option>
+                            {categories.map((c) => <option value={c.category}>{c.title}</option>)}
+                        </select>
+                    </label>
+                    <details class="ed-more">
+                        <summary>اختياري</summary>
+                        <label>
+                            <span>بريدك (للتواصل معك فقط، لا يُنشر)</span>
+                            <input name="email" type="email" dir="ltr" maxlength="200" autocomplete="email" />
+                        </label>
+                        <label>
+                            <span>رابطك (موقعك أو حسابك)</span>
+                            <input name="authorUrl" type="url" dir="ltr" placeholder="https://…" maxlength="500" />
+                        </label>
+                    </details>
+
+                    <input class="ed-hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
+
+                    <label class="ed-check">
+                        <input type="checkbox" name="rights" required />
+                        <span>أؤكد أن المقال من كتابتي، وأوافق على نشره على الهلال وفق <a href="/terms/">الشروط</a>.</span>
+                    </label>
+
+                    {sitekey && <div class="cf-turnstile" data-sitekey={sitekey} data-language="ar"></div>}
+
+                    <button type="submit" class="ed-send">أرسل المقال للمراجعة</button>
+                    <p class="ed-status" data-status role="status"></p>
+                </div>
+                <div class="ed-done" data-done hidden>
+                    <p class="ed-done-title">شكراً! وصل مقالك.</p>
+                    <p>سنراجعه قبل النشر، وقد نتواصل معك إن تركت بريدك.</p>
+                    <button type="button" class="ed-send" data-close>اكتب مقالاً آخر</button>
+                </div>
+            </form>
+        </dialog>
     </main>
     {sitekey && <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>}
 </Layout>
 
 <script>
+    import { BLOCK, escapeHtml, htmlToMd, mdToHtml } from "../lib/editor-md";
+
     const DRAFT_KEY = "elhellal:write-draft";
-    const FIELDS = ["author", "title", "description", "category", "body", "email", "authorUrl", "cover"];
+    const META = ["author", "description", "category", "email", "authorUrl"] as const;
     const MIN_BODY = 1500;
 
-    function escapeHtml(s: string): string {
-        return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
-    }
-
-    function inline(s: string): string {
-        return s
-            .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-            .replace(/\*(.+?)\*/g, "<em>$1</em>")
-            .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" rel="nofollow ugc noopener" target="_blank">$1</a>');
-    }
-
-    /** Just enough markdown for the preview: the build renders the real thing. */
-    function renderMarkdown(md: string): string {
-        return escapeHtml(md)
-            .split(/\n{2,}/)
-            .map((block) => {
-                const b = block.trim();
-                if (!b) return "";
-                if (/^###\s/.test(b)) return `<h3>${inline(b.slice(4))}</h3>`;
-                if (/^##\s/.test(b)) return `<h2>${inline(b.slice(3))}</h2>`;
-                if (/^&gt;\s?/.test(b)) return `<blockquote><p>${inline(b.replace(/^&gt;\s?/gm, ""))}</p></blockquote>`;
-                if (/^[-*]\s/.test(b)) return `<ul>${b.split("\n").map((l) => `<li>${inline(l.replace(/^[-*]\s/, ""))}</li>`).join("")}</ul>`;
-                if (/^\d+[.)]\s/.test(b)) return `<ol>${b.split("\n").map((l) => `<li>${inline(l.replace(/^\d+[.)]\s/, ""))}</li>`).join("")}</ol>`;
-                return `<p>${inline(b).replace(/\n/g, "<br>")}</p>`;
-            })
-            .join("");
-    }
+    // ---------- page ----------
 
     function setup() {
         if (location.pathname !== "/write/") return;
-        const form = document.querySelector<HTMLFormElement>("[data-form]")!;
-        const body = form.elements.namedItem("body") as HTMLTextAreaElement;
-        const preview = document.querySelector<HTMLElement>("[data-preview]")!;
-        const toggle = document.querySelector<HTMLButtonElement>("[data-preview-toggle]")!;
-        const count = document.querySelector<HTMLElement>("[data-count]")!;
-        const status = document.querySelector<HTMLElement>("[data-status]")!;
-        const openedAt = Date.now();
+        const $ = <T extends Element = HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
+        const editor = $("[data-body]");
+        const title = $<HTMLTextAreaElement>("[data-title]");
+        const toolbar = $("[data-toolbar]");
+        const blockSel = $<HTMLSelectElement>("[data-block]");
+        const pop = $("[data-pop]");
+        const popInput = $<HTMLInputElement>("[data-pop-input]");
+        const words = $("[data-words]");
+        const saved = $("[data-saved]");
+        const coverImg = $<HTMLImageElement>("[data-cover-img]");
+        const coverAdd = $("[data-cover-add]");
+        const coverTools = $("[data-cover-tools]");
+        const coverForm = $("[data-cover-form]");
+        const coverInput = $<HTMLInputElement>("[data-cover-input]");
+        const dialog = $<HTMLDialogElement>("[data-dialog]");
+        const form = $<HTMLFormElement>("[data-form]");
+        const status = $("[data-status]");
+        const descCount = $("[data-desc-count]");
         const field = (name: string) => form.elements.namedItem(name) as HTMLInputElement;
+        const openedAt = Date.now();
+        let cover = "";
 
-        try {
-            const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "{}");
-            for (const name of FIELDS) if (typeof draft[name] === "string") field(name).value = draft[name];
-        } catch {}
+        document.execCommand("defaultParagraphSeparator", false, "p");
+        document.execCommand("styleWithCSS", false, "false");
+
+        // Title grows with its text, like X's.
+        const fitTitle = () => {
+            title.style.height = "auto";
+            title.style.height = `${title.scrollHeight}px`;
+        };
+
+        const setCover = (url: string) => {
+            cover = url;
+            coverImg.hidden = !url;
+            coverTools.hidden = !url;
+            coverAdd.hidden = !!url;
+            coverForm.hidden = true;
+            if (url) coverImg.src = url;
+            else coverImg.removeAttribute("src");
+        };
+
+        const ensureParagraph = () => {
+            if (!editor.firstElementChild) editor.innerHTML = "<p><br></p>";
+            editor.toggleAttribute("data-empty", !editor.textContent!.trim() && !editor.querySelector("img,hr,li"));
+        };
+
+        const bodyMd = () => htmlToMd(editor);
 
         const updateCount = () => {
-            const n = body.value.trim().length;
-            const words = body.value.trim().split(/\s+/).filter(Boolean).length;
-            count.textContent = n < MIN_BODY ? `${words} كلمة — يحتاج المقال ${MIN_BODY - n} حرفاً أخرى على الأقل` : `${words} كلمة`;
+            const text = (editor.textContent ?? "").trim();
+            const n = bodyMd().length;
+            const w = text ? text.split(/\s+/).length : 0;
+            words.textContent = `${w} كلمة`;
+            words.title = n < MIN_BODY ? `يحتاج المقال ${MIN_BODY - n} حرفاً أخرى على الأقل` : "";
+            words.classList.toggle("is-short", n < MIN_BODY);
         };
+
+        // ---- draft ----
+        try {
+            const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "{}");
+            if (typeof draft.title === "string") title.value = draft.title;
+            if (typeof draft.body === "string") editor.innerHTML = mdToHtml(draft.body);
+            if (typeof draft.cover === "string" && /^https:\/\//.test(draft.cover)) setCover(draft.cover);
+            for (const name of META) if (typeof draft[name] === "string") field(name).value = draft[name];
+        } catch {}
+        ensureParagraph();
+        fitTitle();
         updateCount();
 
         let saveTimer: number | undefined;
-        form.addEventListener("input", () => {
-            updateCount();
+        const save = () => {
             clearTimeout(saveTimer);
+            saved.textContent = "";
             saveTimer = window.setTimeout(() => {
                 try {
-                    localStorage.setItem(DRAFT_KEY, JSON.stringify(Object.fromEntries(FIELDS.map((n) => [n, field(n).value]))));
+                    localStorage.setItem(
+                        DRAFT_KEY,
+                        JSON.stringify({
+                            title: title.value,
+                            body: bodyMd(),
+                            cover,
+                            ...Object.fromEntries(META.map((n) => [n, field(n).value])),
+                        })
+                    );
+                    saved.textContent = "محفوظة";
                 } catch {}
-            }, 500);
+            }, 600);
+        };
+
+        title.addEventListener("input", () => {
+            fitTitle();
+            save();
+        });
+        title.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                editor.focus();
+            }
+        });
+        form.addEventListener("input", save);
+
+        // ---- toolbar state ----
+        const blockAt = (): HTMLElement | null => {
+            const sel = getSelection();
+            if (!sel?.rangeCount || !editor.contains(sel.anchorNode)) return null;
+            let n: Node | null = sel.anchorNode;
+            while (n && n.parentNode !== editor) n = n.parentNode;
+            return n instanceof HTMLElement ? n : null;
+        };
+        const inQuote = () => {
+            const sel = getSelection();
+            const el = sel?.anchorNode instanceof Element ? sel.anchorNode : sel?.anchorNode?.parentElement;
+            return !!el?.closest("blockquote") && editor.contains(el!);
+        };
+        const refresh = () => {
+            const block = blockAt();
+            toolbar.classList.toggle("is-idle", !block);
+            if (!block) return;
+            blockSel.value = block.tagName === "H2" ? "h2" : block.tagName === "H3" ? "h3" : "p";
+            toolbar.querySelectorAll<HTMLButtonElement>("[data-cmd]").forEach((b) => {
+                const cmd = b.dataset.cmd!;
+                let on = false;
+                if (cmd === "quote") on = inQuote();
+                else if (cmd === "link") on = !!getSelection()?.anchorNode?.parentElement?.closest("a");
+                else if (!["image", "divider"].includes(cmd)) on = document.queryCommandState(cmd);
+                b.setAttribute("aria-pressed", String(on));
+            });
+        };
+        document.addEventListener("selectionchange", refresh);
+
+        // Chrome nests lists (and the paragraph after them) inside the <p> they
+        // were made from; unwrap so every block sits directly in the editor.
+        const normalize = () => {
+            const sel = getSelection();
+            const at = sel?.rangeCount ? [sel.anchorNode, sel.anchorOffset] as const : null;
+            let p: Element | null;
+            while ((p = editor.querySelector(":scope > p:has(> ul, > ol, > p, > blockquote, > h2, > h3, > hr, > figure)"))) {
+                const kids = [...p.childNodes];
+                const out: Node[] = [];
+                let run: HTMLParagraphElement | null = null;
+                for (const k of kids) {
+                    if (k instanceof HTMLElement && BLOCK.test(k.tagName)) {
+                        run = null;
+                        out.push(k);
+                    } else if (k.nodeType !== Node.TEXT_NODE || k.textContent!.trim()) {
+                        if (!run) out.push((run = document.createElement("p")));
+                        run.append(k);
+                    }
+                }
+                p.replaceWith(...out);
+            }
+            if (at?.[0] && editor.contains(at[0])) {
+                try {
+                    sel!.collapse(at[0], at[1]);
+                } catch {}
+            }
+        };
+
+        const changed = () => {
+            normalize();
+            ensureParagraph();
+            updateCount();
+            save();
+            refresh();
+        };
+
+        // ---- commands ----
+        let savedRange: Range | null = null;
+        const keepRange = () => {
+            const sel = getSelection();
+            if (sel?.rangeCount && editor.contains(sel.anchorNode)) savedRange = sel.getRangeAt(0).cloneRange();
+        };
+        const restoreRange = () => {
+            editor.focus();
+            if (savedRange) {
+                const sel = getSelection()!;
+                sel.removeAllRanges();
+                sel.addRange(savedRange);
+            }
+        };
+        editor.addEventListener("keyup", keepRange);
+        editor.addEventListener("mouseup", keepRange);
+        editor.addEventListener("blur", keepRange);
+
+        const exec = (cmd: string, value?: string) => {
+            restoreRange();
+            document.execCommand(cmd, false, value);
+            keepRange();
+            changed();
+        };
+
+        let popMode: "link" | "image" = "link";
+        const openPop = (mode: "link" | "image") => {
+            popMode = mode;
+            const existing = getSelection()?.anchorNode?.parentElement?.closest("a");
+            popInput.value = mode === "link" && existing ? existing.getAttribute("href") ?? "" : "";
+            popInput.placeholder = mode === "link" ? "https://… الرابط" : "https://… رابط الصورة";
+            pop.hidden = false;
+            popInput.focus();
+        };
+        const closePop = () => {
+            pop.hidden = true;
+            restoreRange();
+        };
+        const confirmPop = () => {
+            const url = popInput.value.trim();
+            const ok = popMode === "image" ? /^https:\/\/\S+$/.test(url) : /^https?:\/\/\S+$/.test(url);
+            if (!ok) {
+                popInput.setCustomValidity(popMode === "image" ? "رابط يبدأ بـ https://" : "رابط يبدأ بـ https://");
+                popInput.reportValidity();
+                popInput.setCustomValidity("");
+                return;
+            }
+            pop.hidden = true;
+            if (popMode === "image") {
+                exec("insertHTML", `<figure contenteditable="false"><img src="${escapeHtml(url)}" alt=""></figure><p><br></p>`);
+                return;
+            }
+            restoreRange();
+            if (getSelection()!.isCollapsed) exec("insertHTML", `<a href="${escapeHtml(url)}">${escapeHtml(url)}</a>&nbsp;`);
+            else exec("createLink", url);
+        };
+        $("[data-pop-ok]").onclick = confirmPop;
+        $("[data-pop-cancel]").onclick = closePop;
+        popInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                confirmPop();
+            } else if (e.key === "Escape") closePop();
         });
 
-        const wrap = (before: string, after = "", placeholder = "") => {
-            const { selectionStart: a, selectionEnd: b, value } = body;
-            const selected = value.slice(a, b) || placeholder;
-            body.setRangeText(before + selected + after, a, b, "end");
-            body.focus();
-            body.dispatchEvent(new Event("input", { bubbles: true }));
-        };
-        const linePrefix = (prefix: string) => {
-            const { selectionStart: a, selectionEnd: b, value } = body;
-            const start = value.lastIndexOf("\n", a - 1) + 1;
-            const lines = value.slice(start, b).split("\n").map((l) => prefix + l).join("\n");
-            body.setRangeText(lines, start, b, "end");
-            body.focus();
-            body.dispatchEvent(new Event("input", { bubbles: true }));
-        };
-        form.querySelectorAll<HTMLButtonElement>("[data-md]").forEach((btn) => {
-            btn.onclick = () => {
-                const kind = btn.dataset.md;
-                if (kind === "h2") linePrefix("## ");
-                else if (kind === "bold") wrap("**", "**", "نص غامق");
-                else if (kind === "quote") linePrefix("> ");
-                else if (kind === "list") linePrefix("- ");
-                else if (kind === "link") {
-                    const url = prompt("الرابط (https://…)");
-                    if (url && /^https?:\/\//.test(url)) wrap("[", `](${url})`, "نص الرابط");
-                }
+        // Buttons keep the editor's selection: no focus steal on mousedown.
+        toolbar.addEventListener("mousedown", (e) => {
+            if ((e.target as Element).closest("button.ed-tool")) e.preventDefault();
+        });
+        toolbar.querySelectorAll<HTMLButtonElement>("[data-cmd]").forEach((b) => {
+            b.onclick = () => {
+                const cmd = b.dataset.cmd!;
+                if (cmd === "quote") exec("formatBlock", inQuote() ? "p" : "blockquote");
+                else if (cmd === "link") {
+                    keepRange();
+                    openPop("link");
+                } else if (cmd === "image") {
+                    keepRange();
+                    openPop("image");
+                } else if (cmd === "divider") exec("insertHTML", "<hr><p><br></p>");
+                else exec(cmd);
             };
         });
+        blockSel.addEventListener("mousedown", keepRange);
+        blockSel.onchange = () => exec("formatBlock", blockSel.value);
 
-        toggle.onclick = () => {
-            const showing = preview.hidden;
-            preview.hidden = !showing;
-            body.hidden = showing;
-            toggle.setAttribute("aria-pressed", String(showing));
-            toggle.textContent = showing ? "تحرير" : "معاينة";
-            if (showing) preview.innerHTML = renderMarkdown(body.value) || "<p>لا شيء بعد.</p>";
+        // ---- typing ----
+        editor.addEventListener("input", (e) => {
+            const ie = e as InputEvent;
+            // Markdown shortcuts at the start of a paragraph: "## ", "### ", "- ", "1. ", "> ", "---".
+            normalize();
+            const block = blockAt();
+            if (block && block.tagName === "P" && ie.inputType === "insertText") {
+                const text = (block.textContent ?? "").replace(/ /g, " ");
+                const m = ie.data === " " ? text.match(/^(###|##|[-*]|1[.)]|>) / ) : text === "---" ? ["---", "---"] : null;
+                if (m) {
+                    const first = block.firstChild;
+                    if (first?.nodeType === Node.TEXT_NODE) {
+                        const r = document.createRange();
+                        r.setStart(first, 0);
+                        r.setEnd(first, Math.min(m[0].length, first.textContent!.length));
+                        const sel = getSelection()!;
+                        sel.removeAllRanges();
+                        sel.addRange(r);
+                        document.execCommand("delete");
+                        const kind = m[1];
+                        if (kind === "##") document.execCommand("formatBlock", false, "h2");
+                        else if (kind === "###") document.execCommand("formatBlock", false, "h3");
+                        else if (kind === ">") document.execCommand("formatBlock", false, "blockquote");
+                        else if (kind === "---") document.execCommand("insertHTML", false, "<hr><p><br></p>");
+                        else if (/^1/.test(kind)) document.execCommand("insertOrderedList");
+                        else document.execCommand("insertUnorderedList");
+                    }
+                }
+            }
+            keepRange();
+            changed();
+        });
+
+        editor.addEventListener("keydown", (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+                e.preventDefault();
+                keepRange();
+                openPop("link");
+                return;
+            }
+            if (e.key !== "Enter" || e.shiftKey) return;
+            const block = blockAt();
+            if (!block) return;
+            // Enter on an empty line inside a quote leaves the quote.
+            if (block.tagName === "BLOCKQUOTE") {
+                const sel = getSelection()!;
+                const el = sel.anchorNode instanceof Element ? sel.anchorNode : sel.anchorNode?.parentElement;
+                const line = el?.closest("p, div") ?? null;
+                if ((line && line !== editor && !line.textContent!.trim()) || !block.textContent!.trim()) {
+                    e.preventDefault();
+                    document.execCommand("formatBlock", false, "p");
+                    changed();
+                }
+            } else if (/^H[23]$/.test(block.tagName)) {
+                // A heading never continues onto the next line.
+                const sel = getSelection()!;
+                const r = sel.getRangeAt(0);
+                const tail = document.createRange();
+                tail.selectNodeContents(block);
+                tail.setStart(r.endContainer, r.endOffset);
+                if (!tail.toString()) {
+                    e.preventDefault();
+                    const p = document.createElement("p");
+                    p.innerHTML = "<br>";
+                    block.after(p);
+                    const nr = document.createRange();
+                    nr.setStart(p, 0);
+                    sel.removeAllRanges();
+                    sel.addRange(nr);
+                    changed();
+                }
+            }
+        });
+
+        // Paste keeps structure (headings, lists, quotes, bold, links), drops everything else.
+        editor.addEventListener("paste", (e) => {
+            const data = e.clipboardData;
+            if (!data) return;
+            e.preventDefault();
+            const plain = data.getData("text/plain");
+            const html = data.getData("text/html");
+            let md = plain;
+            if (html) {
+                const doc = new DOMParser().parseFromString(html, "text/html");
+                doc.querySelectorAll("script,style,meta,link,title,noscript").forEach((n) => n.remove());
+                md = htmlToMd(doc.body);
+            }
+            if (!/\n/.test(md.trim()) && !/^(#|>|[-*] |\d+[.)] |!\[)/.test(md.trim()) && !/[*~\[]/.test(md)) {
+                document.execCommand("insertText", false, plain.replace(/\s+/g, " "));
+            } else {
+                document.execCommand("insertHTML", false, mdToHtml(md));
+            }
+            changed();
+        });
+
+        // Dropped files can't be uploaded: say so instead of inlining a data: URL.
+        editor.addEventListener("drop", (e) => {
+            if (e.dataTransfer?.files.length) {
+                e.preventDefault();
+                saved.textContent = "لا يمكن رفع الصور؛ استخدم رابط صورة";
+            }
+        });
+
+        // ---- cover ----
+        const openCoverForm = () => {
+            coverInput.value = cover;
+            coverForm.hidden = false;
+            coverAdd.hidden = true;
+            coverInput.focus();
         };
+        const saveCover = () => {
+            const url = coverInput.value.trim();
+            if (url && !/^https:\/\/\S+$/.test(url)) {
+                coverInput.setCustomValidity("رابط يبدأ بـ https://");
+                coverInput.reportValidity();
+                coverInput.setCustomValidity("");
+                return;
+            }
+            setCover(url);
+            save();
+        };
+        coverAdd.onclick = openCoverForm;
+        $("[data-cover-edit]").onclick = openCoverForm;
+        $("[data-cover-remove]").onclick = () => {
+            setCover("");
+            save();
+        };
+        $("[data-cover-ok]").onclick = saveCover;
+        $("[data-cover-cancel]").onclick = () => setCover(cover);
+        coverInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                saveCover();
+            } else if (e.key === "Escape") setCover(cover);
+        });
+        coverImg.onerror = () => {
+            if (!cover) return;
+            saved.textContent = "تعذّر تحميل صورة الغلاف";
+        };
+
+        // ---- publish ----
+        const flash = (msg: string) => {
+            saved.textContent = msg;
+            saved.classList.add("is-alert");
+            setTimeout(() => saved.classList.remove("is-alert"), 2500);
+        };
+        const updateDesc = () => {
+            descCount.textContent = `${field("description").value.trim().length}/300`;
+        };
+        field("description").addEventListener("input", updateDesc);
+
+        $("[data-open-publish]").onclick = () => {
+            const n = bodyMd().length;
+            if (title.value.trim().length < 5) {
+                flash("أضف عنواناً للمقال أولاً");
+                title.focus();
+                return;
+            }
+            if (n < MIN_BODY) {
+                flash(`المقال قصير: يحتاج ${MIN_BODY - n} حرفاً أخرى على الأقل`);
+                editor.focus();
+                return;
+            }
+            // The summary starts as the opening paragraph; the writer can rewrite it.
+            const desc = field("description");
+            if (!desc.value.trim()) {
+                const first = [...editor.querySelectorAll("p")].map((p) => p.textContent!.trim()).find((t) => t.length >= 40) ?? "";
+                desc.value = first.length > 300 ? first.slice(0, first.lastIndexOf(" ", 297)) + "…" : first;
+            }
+            updateDesc();
+            $("[data-dialog-body]").hidden = false;
+            $("[data-done]").hidden = true;
+            status.textContent = "";
+            dialog.showModal();
+        };
+        dialog.querySelectorAll<HTMLButtonElement>("[data-close]").forEach((b) => (b.onclick = () => dialog.close()));
+        dialog.addEventListener("click", (e) => {
+            if (e.target === dialog) dialog.close();
+        });
 
         form.onsubmit = async (e) => {
             e.preventDefault();
             const v = (n: string) => field(n).value.trim();
             const problem =
                 v("author").length < 2 ? "اكتب اسمك." :
-                v("title").length < 5 ? "اكتب عنواناً للمقال." :
                 v("description").length < 20 ? "اكتب وصفاً قصيراً (20 حرفاً على الأقل)." :
                 !v("category") ? "اختر تصنيفاً." :
-                body.value.trim().length < MIN_BODY ? "المقال قصير جداً." :
                 !(form.elements.namedItem("rights") as HTMLInputElement).checked ? "أكّد أن المقال من كتابتك." :
                 "";
             if (problem) {
@@ -227,24 +630,36 @@ const nativeCount = (await getFeeds()).get("native")!.newest.length;
             const button = form.querySelector<HTMLButtonElement>("button[type=submit]")!;
             button.disabled = true;
             status.textContent = "جارٍ الإرسال…";
-            const turnstile = (form.querySelector<HTMLInputElement>("[name='cf-turnstile-response']")?.value) ?? "";
+            const turnstile = form.querySelector<HTMLInputElement>("[name='cf-turnstile-response']")?.value ?? "";
             try {
                 const res = await fetch("/api/push/submit", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        ...Object.fromEntries(FIELDS.map((n) => [n, v(n)])),
-                        body: body.value.trim(),
+                        ...Object.fromEntries(META.map((n) => [n, v(n)])),
+                        title: title.value.trim(),
+                        body: bodyMd(),
+                        cover,
                         website: v("website"),
                         ms: Date.now() - openedAt,
                         turnstile,
                     }),
                 });
                 if (res.ok) {
-                    try { localStorage.removeItem(DRAFT_KEY); } catch {}
+                    try {
+                        localStorage.removeItem(DRAFT_KEY);
+                    } catch {}
+                    // Keep the byline for the next article; clear the article itself.
+                    const keep = { author: v("author"), email: v("email"), authorUrl: v("authorUrl") };
                     form.reset();
-                    updateCount();
-                    status.textContent = "شكراً! وصل مقالك، وسنراجعه قبل النشر.";
+                    for (const [k, val] of Object.entries(keep)) field(k).value = val;
+                    title.value = "";
+                    editor.innerHTML = "";
+                    setCover("");
+                    fitTitle();
+                    changed();
+                    $("[data-dialog-body]").hidden = true;
+                    $("[data-done]").hidden = false;
                 } else if (res.status === 429) {
                     status.textContent = "أرسلت مقالات كثيرة اليوم. حاول غداً.";
                 } else if (res.status === 403) {
@@ -265,57 +680,155 @@ const nativeCount = (await getFeeds()).get("native")!.newest.length;
 </script>
 
 <style>
-    .write-page {
-        max-width: 720px;
+    .ed-page {
+        max-width: 680px;
         margin: 0 auto;
-        padding: var(--spacing-06, 24px) 16px var(--spacing-10, 48px);
+        padding: 0 16px var(--spacing-10, 48px);
         color: var(--content-primary);
     }
-    .write-page h1 {
-        margin: 0 0 8px;
+    .ed-sr {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
     }
-    .write-form {
-        display: grid;
-        gap: 14px;
-        margin-top: 16px;
+
+    /* Top bar: draft state + Publish, like X's composer header. */
+    .ed-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 14px 0;
     }
-    .write-form label {
-        display: grid;
-        gap: 6px;
-        font-size: 14px;
+    .ed-bar-state,
+    .ed-bar-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+    }
+    .ed-chip {
+        padding: 3px 10px;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--content-primary) 8%, transparent);
+        font-size: 13px;
+        font-weight: 600;
+    }
+    .ed-saved,
+    .ed-words {
         color: var(--content-secondary);
+        font-size: 13px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
-    .write-form input,
-    .write-form select,
-    .write-form textarea {
-        padding: 12px 14px;
-        border: 0.5px solid var(--border-muted);
-        border-radius: 12px;
-        background: rgba(255, 255, 255, 0.04);
+    .ed-saved.is-alert {
+        color: #ef4444;
+    }
+    .ed-words.is-short {
+        cursor: help;
+    }
+    .ed-publish {
+        min-height: 36px;
+        padding: 0 18px;
+        border: 0;
+        border-radius: 999px;
+        background: var(--content-primary);
+        color: var(--background);
+        font: inherit;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    /* Cover */
+    .ed-cover {
+        position: relative;
+        margin-bottom: 20px;
+    }
+    .ed-cover-add {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        width: 100%;
+        aspect-ratio: 5 / 2;
+        border: 1px dashed var(--border-muted);
+        border-radius: 16px;
+        background: color-mix(in srgb, var(--content-primary) 3%, transparent);
+        color: var(--content-secondary);
+        font: inherit;
+        font-size: 15px;
+        cursor: pointer;
+    }
+    .ed-cover-add:hover {
+        background: color-mix(in srgb, var(--content-primary) 6%, transparent);
+    }
+    .ed-cover-add small {
+        font-size: 12px;
+        opacity: 0.8;
+    }
+    .ed-cover-add[hidden],
+    .ed-cover-img[hidden],
+    .ed-cover-tools[hidden],
+    .ed-cover-form[hidden],
+    .ed-pop[hidden] {
+        display: none;
+    }
+    .ed-cover-img {
+        display: block;
+        width: 100%;
+        aspect-ratio: 5 / 2;
+        object-fit: cover;
+        border-radius: 16px;
+        background: color-mix(in srgb, var(--content-primary) 6%, transparent);
+    }
+    .ed-cover-tools {
+        position: absolute;
+        top: 10px;
+        inset-inline-end: 10px;
+        display: flex;
+        gap: 6px;
+    }
+    .ed-cover-tools button {
+        min-height: 32px;
+        padding: 0 12px;
+        border: 0;
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.65);
+        color: #fff;
+        font: inherit;
+        font-size: 13px;
+        cursor: pointer;
+    }
+    .ed-cover-form,
+    .ed-pop {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+    }
+    .ed-cover-form input,
+    .ed-pop input {
+        flex: 1;
+        min-width: 0;
+        min-height: 40px;
+        padding: 0 12px;
+        border: 1px solid var(--border-muted);
+        border-radius: 10px;
+        background: var(--background);
         color: var(--content-primary);
         font: inherit;
-        font-size: 16px;
-        width: 100%;
-        box-sizing: border-box;
+        font-size: 15px;
     }
-    .write-form textarea[name="body"] {
-        line-height: 1.9;
-        resize: vertical;
-        min-height: 320px;
-    }
-    .write-editor {
-        display: grid;
-        gap: 8px;
-    }
-    .write-toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-    }
-    .write-toolbar button {
-        min-height: 36px;
-        padding: 6px 12px;
-        border: 0.5px solid var(--border-muted);
+    .ed-cover-form button,
+    .ed-pop button {
+        min-height: 40px;
+        padding: 0 14px;
+        border: 1px solid var(--border-muted);
         border-radius: 999px;
         background: transparent;
         color: var(--content-primary);
@@ -323,55 +836,284 @@ const nativeCount = (await getFeeds()).get("native")!.newest.length;
         font-size: 14px;
         cursor: pointer;
     }
-    .write-preview-toggle {
-        margin-inline-start: auto;
+    button.ed-pop-ok {
+        border-color: transparent;
+        background: var(--content-primary);
+        color: var(--background);
+        font-weight: 700;
     }
-    .write-preview {
-        min-height: 320px;
-        padding: 12px 16px;
-        border: 0.5px dashed var(--border-muted);
-        border-radius: 12px;
-        line-height: 1.9;
+
+    /* Title */
+    .ed-title {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+        padding: 0;
+        margin: 0 0 8px;
+        border: 0;
+        outline: none;
+        resize: none;
+        overflow: hidden;
+        background: transparent;
+        color: var(--content-primary);
+        font: inherit;
+        font-size: clamp(28px, 6vw, 38px);
+        font-weight: 800;
+        line-height: 1.35;
     }
-    .write-preview[hidden],
-    .write-form textarea[hidden] {
+    .ed-title::placeholder {
+        color: var(--content-secondary);
+        opacity: 0.6;
+    }
+
+    /* Sticky toolbar */
+    .ed-toolbar {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        margin: 0 -16px;
+        padding: 8px 16px;
+        border-block: 0.5px solid var(--border-muted);
+        background: color-mix(in srgb, var(--background) 88%, transparent);
+        -webkit-backdrop-filter: blur(14px);
+        backdrop-filter: blur(14px);
+    }
+    :global(html[data-standalone]) .ed-toolbar {
+        position: static;
+    }
+    .ed-tools {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+    .ed-tools::-webkit-scrollbar {
         display: none;
     }
-    .write-count,
-    .write-muted,
-    .write-status {
-        color: var(--content-secondary);
+    .ed-tools > * {
+        flex: none;
+    }
+    .ed-block {
+        field-sizing: content;
+        min-height: 36px;
+        margin-inline-end: 4px;
+        padding: 0 10px;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--content-primary);
+        font: inherit;
         font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .ed-block:hover,
+    .ed-tool:hover {
+        background: color-mix(in srgb, var(--content-primary) 8%, transparent);
+    }
+    .ed-tool {
+        display: inline-grid;
+        place-items: center;
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--content-primary);
+        cursor: pointer;
+    }
+    .ed-tool[aria-pressed="true"] {
+        background: color-mix(in srgb, DarkOrange 18%, transparent);
+        color: DarkOrange;
+    }
+    .ed-toolbar.is-idle .ed-tool,
+    .ed-toolbar.is-idle .ed-block {
+        opacity: 0.55;
+    }
+    .ed-sep {
+        width: 1px;
+        height: 20px;
+        margin: 0 6px;
+        background: var(--border-muted);
+    }
+    .ed-pop {
+        margin-top: 8px;
+    }
+
+    /* Body */
+    .ed-body {
+        min-height: 50vh;
+        padding: 20px 0 8px;
+        outline: none;
+        font-size: 18px;
+        line-height: 1.9;
+        word-wrap: break-word;
+    }
+    .ed-body[data-empty]::before {
+        content: attr(data-placeholder);
+        position: absolute;
+        color: var(--content-secondary);
+        opacity: 0.6;
+        pointer-events: none;
+    }
+    .ed-body > :global(:first-child) {
+        margin-top: 0;
+    }
+    .ed-body :global(p) {
+        margin: 0 0 1em;
+    }
+    .ed-body :global(h2) {
+        margin: 1.4em 0 0.5em;
+        font-size: 1.5em;
+        line-height: 1.4;
+    }
+    .ed-body :global(h3) {
+        margin: 1.2em 0 0.4em;
+        font-size: 1.22em;
+        line-height: 1.4;
+    }
+    .ed-body :global(blockquote) {
+        margin: 1em 0;
+        padding-inline-start: 16px;
+        border-inline-start: 3px solid DarkOrange;
+        color: var(--content-secondary);
+    }
+    .ed-body :global(blockquote p) {
         margin: 0;
     }
-    .write-more summary {
+    .ed-body :global(ul),
+    .ed-body :global(ol) {
+        margin: 0 0 1em;
+        padding-inline-start: 1.5em;
+    }
+    .ed-body :global(hr) {
+        margin: 2em auto;
+        width: 40%;
+        border: 0;
+        border-top: 1px solid var(--border-muted);
+    }
+    .ed-body :global(figure) {
+        margin: 1.2em 0;
+    }
+    .ed-body :global(figure img),
+    .ed-body :global(img) {
+        display: block;
+        max-width: 100%;
+        height: auto;
+        border-radius: 12px;
+    }
+    .ed-body :global(a) {
+        color: DarkOrange;
+        text-decoration: underline;
+    }
+    .ed-foot {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 12px;
+        margin: 24px 0 0;
+        padding-top: 14px;
+        border-top: 0.5px solid var(--border-muted);
+        color: var(--content-secondary);
+        font-size: 13px;
+    }
+
+    /* Publish dialog */
+    .ed-dialog {
+        width: min(520px, calc(100vw - 32px));
+        max-height: calc(100dvh - 32px);
+        padding: 0;
+        border: 0.5px solid var(--border-muted);
+        border-radius: 20px;
+        background: var(--background);
+        color: var(--content-primary);
+    }
+    .ed-dialog::backdrop {
+        background: rgba(0, 0, 0, 0.55);
+    }
+    .ed-dialog-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 18px;
+        border-bottom: 0.5px solid var(--border-muted);
+    }
+    .ed-dialog-head h2 {
+        margin: 0;
+        font-size: 18px;
+    }
+    .ed-close {
+        width: 36px;
+        height: 36px;
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        color: var(--content-primary);
+        font-size: 16px;
+        cursor: pointer;
+    }
+    .ed-dialog-body,
+    .ed-done {
+        display: grid;
+        gap: 14px;
+        padding: 18px;
+    }
+    .ed-dialog-body[hidden],
+    .ed-done[hidden] {
+        display: none;
+    }
+    .ed-form label {
+        display: grid;
+        gap: 6px;
+        font-size: 14px;
+        color: var(--content-secondary);
+    }
+    .ed-form input,
+    .ed-form select,
+    .ed-form textarea {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 11px 13px;
+        border: 0.5px solid var(--border-muted);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--content-primary);
+        font: inherit;
+        font-size: 16px;
+    }
+    .ed-form textarea {
+        resize: vertical;
+        line-height: 1.7;
+    }
+    .ed-more summary {
         cursor: pointer;
         color: var(--content-secondary);
         font-size: 14px;
         margin-bottom: 10px;
     }
-    .write-more label + label {
+    .ed-more label + label {
         margin-top: 10px;
     }
-    .write-check {
-        display: flex !important;
+    .ed-form .ed-check {
+        display: flex;
         align-items: flex-start;
         gap: 8px;
     }
-    .write-check input {
+    .ed-form .ed-check input {
         width: 20px;
         height: 20px;
         flex: none;
         margin-top: 2px;
     }
-    .write-hp {
+    .ed-hp {
         position: absolute;
         left: -9999px;
         width: 1px;
         height: 1px;
         opacity: 0;
     }
-    .write-btn {
+    .ed-send {
         padding: 14px;
         border: 0;
         border-radius: 999px;
@@ -381,7 +1123,21 @@ const nativeCount = (await getFeeds()).get("native")!.newest.length;
         font-weight: 700;
         cursor: pointer;
     }
-    .write-btn:disabled {
+    .ed-send:disabled {
         opacity: 0.6;
+    }
+    .ed-status {
+        margin: 0;
+        color: var(--content-secondary);
+        font-size: 14px;
+    }
+    .ed-done p {
+        margin: 0;
+        color: var(--content-secondary);
+    }
+    .ed-done .ed-done-title {
+        color: var(--content-primary);
+        font-size: 18px;
+        font-weight: 700;
     }
 </style>

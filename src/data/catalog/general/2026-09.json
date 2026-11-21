@@ -72,7 +72,8 @@
     "created_at": "2026-09-07",
     "url": "https://v665561.substack.com/p/eb1",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!t8pm!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F482d6103-97e1-48cb-a8b6-8911ed477c26_1195x1316.png",
-    "minutes": 2
+    "minutes": 2,
+    "slug": "الحب-واحد-من-أجمل-الرحلات-التي-قد-يخوضها-قلب-الإنسان-في-حياته"
   },
   {
     "id_str": "2824962856536854082",
@@ -406,7 +407,8 @@
     "created_at": "2026-09-22",
     "url": "https://leavena.substack.com/p/a53",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!W_dh!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fd0d728a9-f1d4-4ae0-b51f-04002e2fc096_350x378.png",
-    "minutes": 2
+    "minutes": 2,
+    "slug": "أصدق-مني-حديثا"
   },
   {
     "id_str": "6094779597490278059",
@@ -564,7 +566,8 @@
     "created_at": "2026-09-06",
     "url": "https://leavena.substack.com/p/491",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!2ol-!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F7d627e1f-9255-462a-9dd2-7569970541a0_675x1200.jpeg",
-    "minutes": 2
+    "minutes": 2,
+    "slug": "إذا-أصلحت-ما-في-نفسك-أتتك-الدنيا-راغمة"
   },
   {
     "id_str": "5664516668641634786",
@@ -744,13 +747,24 @@
     "slug": "افضل-شركة-تكييف-في-الرياض-تقدم-خدمات-التكييف-الشاملة-تركيب-التكييف-صيانة-التكييف"
   },
   {
+    "id_str": "2299392676060409879",
+    "title": "الأشباح",
+    "preview_text": "عزيزي القارئ، عزيزتي القارئة: فيما يلي مقال يتحدث عن أحداث مزعجة، تفاصيل مخيفة بعض الشيء، والكثير من الأشباح الفضية، ولذلك جرى التنويه. الخوف هو من المشاعر الإنسانية الطبيعية التي فطرها الله سبحانه وتعالى في نفوسنا، بالإضافة إلى المشاعر الأخرى، من الحب والكره والحزن والفرح والغضب وغير ذلك، وهو شعور مفيد، إذ يردع الإنسان عن المضي في إيذاء نفسه أو إيذاء غيره، أو يجعله يتوقف عن اتخاذ قرارات في حياته ",
+    "screen_name": "arabiandays",
+    "created_at": "2026-09-21",
+    "url": "https://arabiandays.substack.com/p/171",
+    "original_img_url": "https://substackcdn.com/image/fetch/$s_!SDor!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fca0e2b80-c6e8-4698-9281-c8abef782023_1280x1280.png",
+    "minutes": 15
+  },
+  {
     "id_str": "1605298430417802202",
     "title": "الأشخاص الذين لم نعرف أننا نودّعهم",
     "preview_text": "تدري وش أكثر شيء يوجع في بعض الناس ؟ إنك ما تعرف إن آخر مرة شفتهم فيها كانت فعلًا آخر مرة . تودّعهم وأنت ما تدري إنك تودّعهم أصلًا . تضحك معهم ، تسولف ، تطلعون ، تتهاوشون على شيء تافه ، ويمكن حتى تقول له : «نشوفك بعدين» . وأنت ما عندك أي فكرة إن كلمة «بعدين» ممكن ما تجي . وهذا اللي يخلي بعض الذكريات غريبة جدًا . لأنك لو كنت تعرف إنها الأخيرة ، كان يمكن جلست أكثر . قلت كلام أكثر . ضحكت أكثر . يمكن ",
     "screen_name": "ra310",
     "created_at": "2026-09-26",
     "url": "https://ra310.substack.com/p/882",
-    "minutes": 3
+    "minutes": 3,
+    "slug": "الأشخاص-الذين-لم-نعرف-أننا-نودعهم"
   },
   {
     "id_str": "6460427383836269149",
@@ -813,7 +827,8 @@
     "created_at": "2026-09-29",
     "url": "https://ra310.substack.com/p/689",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!J-Su!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fb9ea1718-d3e4-4102-8fcb-cdb8d1da0614_555x304.jpeg",
-    "minutes": 2
+    "minutes": 2,
+    "slug": "الأيام-اللي-ماصار-فيها-شيء-ليه-نتذكرها"
   },
   {
     "id_str": "1445953341688856232",
@@ -1021,6 +1036,16 @@
     "slug": "الجهاز-الطبي-قد-يعمل-جيدا-وتبقى-فيه-مشكلة-لا-تظهر-على-الشاشة"
   },
   {
+    "id_str": "7755340826819596199",
+    "title": "الحب",
+    "preview_text": "(كل الي مكتوب حقيقه 💯) الحب الي هو حب من الطفوله إلى الان ما تغير دام ١١سنه نفس الي يقول غلاك عندي من أيام الطفولة يكبر بقلبي مثل ما تكبر سنين حبي عفيفه وصعب غيرنا يناله محفور بالخاطر وساكن بعيني في كل مره أشوفها نطالع في بعض وسرح في عيونها نفس الي يقول وألحُ الحبّ في عينيكٍ يغمزٌ لي فهل ألامُ إذا استعجلت أحساسي ؟ ملأَتِني بكِ حتي مَسّنِي خَجِّل من فرطِ ما غازلًتني أعْين الناسِ ما عاد يمِلأْ رأسي",
+    "screen_name": "n9p2",
+    "created_at": "2026-09-12",
+    "url": "https://n9p2.substack.com/p/b29",
+    "original_img_url": "https://substackcdn.com/image/fetch/$s_!3Ann!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fb76ceecd-e516-4302-b555-1bf9de933643_1284x1222.jpeg",
+    "minutes": 2
+  },
+  {
     "id_str": "3574797261346390654",
     "title": "الحجر الأسود",
     "preview_text": "عن ابن عباس رضي الله عنهما قال: قال رسول الله صلى الله عليه وسلم: «نزل الحجر الأسود من الجنة، وهو أشد بياضا من اللبن فسودته خطايا بني آدم» [الترمذي، والنسائي]",
@@ -1089,7 +1114,8 @@
     "screen_name": "ra310",
     "created_at": "2026-09-05",
     "url": "https://ra310.substack.com/p/099",
-    "minutes": 6
+    "minutes": 6,
+    "slug": "الخسارة"
   },
   {
     "id_str": "2819727635840309201",
@@ -1153,6 +1179,16 @@
     "slug": "الشك-الراديكالي-في-الحياة-العملية"
   },
   {
+    "id_str": "7152416195038925330",
+    "title": "الشيء الوحيد الذي يفعله كل الناجحين ولا يتحدث عنه أحد!",
+    "preview_text": "هناك شيء غريب يجمع بين معظم الأشخاص الذين وصلوا إلى مكان جيد في حياتهم، لكنه في الوقت نفسه لا يحظى بنفس القدر من الاهتمام الذي تحصل عليه أشياء مثل الانضباط، والعمل الجاد، وإدارة الوقت. وهو أنهم يعرفون كيف يستمرون في فعل الشيء نفسه لفترة طويلة، حتى بعد أن يتوقف عن إثارة حماسهم. نحن نحب الحديث عن البدايات. عن الشخص الذي استيقظ في الخامسة صباحًا، وقرر أن يغير حياته، ووضع خطة جديدة، واشترى دفترًا جديد",
+    "screen_name": "ahmeedramadan",
+    "created_at": "2026-09-29",
+    "url": "https://ahmeedramadan.substack.com/p/489",
+    "original_img_url": "https://substackcdn.com/image/fetch/$s_!6J3C!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fb83eb4d3-e28a-49a1-a90a-e668019458ca_736x552.jpeg",
+    "minutes": 5
+  },
+  {
     "id_str": "1803309628622518193",
     "title": "الـــصــمــت النــفـســي",
     "preview_text": "——————- قد فكرتوا يوم او جاء في بالكم سؤال ليه بعض الناس فجاءة يصيرون ساكتين ؟ مو شرط ان ماعنده كلام يبي يقوله او يسولف فيه بالعكس تلقى داخلهم كلااام كثيررر بس ماعندهم طاقة يشرحون او يتكلمون فيه احياناً الواحد يوصل للمرحلة يحس في بالتعب من الكلام و تبرير وتعب من انه يوصل شعوره ومشاعره للناس بشكل صحيح وكل مره يحس ان داخله شيء اقصد اشياء اكبر منه بس تعب من انه يتكلم . وهنا يبدأ الصمت النفسي: تلقاه س",
@@ -1212,6 +1248,15 @@
     "url": "https://calm2008.substack.com/p/64e",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!we5-!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F56036b6d-1ca6-40c6-a51b-60d81d63c970_1024x1536.png",
     "slug": "العفة-و-الطهارة-في-المجتمع-العربي"
+  },
+  {
+    "id_str": "6036466648591273898",
+    "title": "العلاقات المحرمه",
+    "preview_text": "مخيفه فكرة ان الهوى أقوى من الخوف من الله كيف يطمئن قلبك و أنت تخفي العلاقة؟ كيف تستمر في شيء تخشى أن يراه أهلك؟ بينما الله سبحانه و تعالى يراك في كل لحظه و تبرر في معصيتك و تقول <إن الله غفورٌ رحيم> تجهل أنه شديد العقاب ايضًا لا تجعل شخصًا سببًا في أن تضعف علاقتك بالله و لا تجعل كلمة “أحبه” مبرر لكل تجاوز اسأل نفسك سؤال واحد فقط; إلى متى؟ إلى أين تأخذني هذي العلاقه؟ و هل تقربني من الله ولا تبعدني",
+    "screen_name": "nlkuf3",
+    "created_at": "2026-09-04",
+    "url": "https://nlkuf3.substack.com/p/59f",
+    "minutes": 2
   },
   {
     "id_str": "5577616102692445266",
@@ -1287,6 +1332,16 @@
     "slug": "الفكر-الإلحادي"
   },
   {
+    "id_str": "4300163881448583773",
+    "title": "الفِلَاحة",
+    "preview_text": "في العام 1963، نشر عالم الفيزياء البريطاني “ديريك برايس” كتابه “العلوم الصغرى والكبرى”. في ذلك الكتاب، طرح نظرية عجيبة لم نسمع بها في آبائنا الأولين، حيث قال بأن أغلب البحوث العلمية في مجالٍ ما، يقوم بها عدد قليل من الباحثين في ذلك المجال، وقد حدد ذلك بمعادلة رياضية: الجذر التربيعي لعدد الباحثين الكلي في مجال علمي معين ينشر نصف البحوث العلمية في ذلك المجال. على سبيل المثال، إذا كان هناك عشرة آلاف ",
+    "screen_name": "arabiandays",
+    "created_at": "2026-09-18",
+    "url": "https://arabiandays.substack.com/p/7a3",
+    "original_img_url": "https://substackcdn.com/image/fetch/$s_!KHN_!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fefd29001-da67-493f-a66a-929eef9eae0d_2100x3161.jpeg",
+    "minutes": 4
+  },
+  {
     "id_str": "4926121066498436830",
     "title": "الفيدرالي يشعل الأسواق برفع الفائدة لأول مرة منذ 2023 .. إنفيديا تضيف 132 مليار دولار لقيمتها في يوم واحد",
     "preview_text": "تقرأ في هذه النشرة: ملخص الأخبار العالمي الفيدرالي يرفع الفائدة 25 نقطة أساس للمرة الأولى منذ 2023 إلى 3.75%-4% . “برق” السعودية تجمع 330 مليون دولار وتنضم إلى نادي “يونيكورن” . الرياض تقفز 47 مرتبة إلى المركز 50 عالمياً في مؤشر أكسفورد للمدن العالمية 2026 . أسهم “إنفيديا” تكسب 132 مليار دولار في يوم واحد وهوانغ يتوقع مضاعفة المبيعات. الشريك المؤسس لـ OpenAI يدخل قائمة “فوربس 400” بثروة 25.5 مليار",
@@ -1325,7 +1380,8 @@
     "created_at": "2026-09-26",
     "url": "https://ra310.substack.com/p/c6b",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!ONcO!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F8a53b4d7-2b95-4f58-bc27-b5131433b770_736x1308.jpeg",
-    "minutes": 3
+    "minutes": 3,
+    "slug": "اللحظة-التي-تصبح-فيها-الغريب-في-قصة-كنت-بطلها"
   },
   {
     "id_str": "4782830240260298753",
@@ -1569,6 +1625,36 @@
     "created_at": "2026-09-04",
     "url": "https://saaf2323.substack.com/p/7e6",
     "slug": "اهل-الحضيض-من-القاع-إلى-القمة"
+  },
+  {
+    "id_str": "9142201966936950935",
+    "title": "اهلاً أنا سعود من سلسلة شاعرك المفضل الحلقة الاولى ( مجنون ليلى )",
+    "preview_text": "في اوئل القرن الاول الهجري كان فيه شاب اسمه قيس بن الملوح كبر قيس وكان يحب واحده من جماعته اسمها ليلى كان يعرفون بعض من يوم هم صغار لما كان يرعون الغنم سواء معى الوقت كبر الحب بينهم وصار قيس يحب ليلى لكن لما كبرت ليلى منعها أهلها من الخروج للرعي ونقطعت عن قيس ومن هنا بدأ قيس يشتاق لها وصار يذكرها في شعره وتغزل فيها ______ لما قال : ______ تَذَكَّرتُ لَيلى والسِنينَ الحَوالِيا وَأَيّامَ لا نَخشى عَ",
+    "screen_name": "n9p2",
+    "created_at": "2026-09-17",
+    "url": "https://n9p2.substack.com/p/f9d",
+    "original_img_url": "https://substackcdn.com/image/fetch/$s_!j7Is!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F433cd294-ad49-4955-b9db-f8376ed1b7cd_1284x867.jpeg",
+    "minutes": 2
+  },
+  {
+    "id_str": "9532736519575858865",
+    "title": "اهلاً أنا سعود من سلسلة شاعرك المفضل الحلقة الثانيه(سعد بن جدلان ) الله يرحمه",
+    "preview_text": "هو الشاعر سعد بن شارع بن جدلان السعدي الأكلبي من مواليد عام 1366هـ في قرية الشقيقة محافظة بيشة، من أسرة معروفة بالشعر فوالده شاعر، وجده وبعض أخوته، شاعر لا يشق له غبار، أبدع في جميع فنون الشعر الشعبي مثل: القلطة، والعرضة والمحاورة، والنظم، لم يتفق جمهور الشعر الشعبي مثل اتفاقهم على شاعريته وحبه، فهو الشاعر المحبوب من جميع فنات المجتمع، والكل يتغنى بشعره ويحفظه، لقب ياسطورة الشعرم وملك الوصف وشاعر ",
+    "screen_name": "n9p2",
+    "created_at": "2026-09-20",
+    "url": "https://n9p2.substack.com/p/1e1",
+    "original_img_url": "https://substackcdn.com/image/fetch/$s_!Bu1Z!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F5ab28011-75da-43b6-b113-4ae21af43f5c_1157x798.jpeg",
+    "minutes": 3
+  },
+  {
+    "id_str": "1307742408373793119",
+    "title": "باتمان و الهوية",
+    "preview_text": "ما هو وجه الشبه بين بروس واين وصديقك؟ كلاهما يمتلك اسماً وهمياً يستخدمه في الليل . النكتة بايخة بس الحمد لله لا أحد يعلم من أنا لماذا نحتاج لإختراع شخص لنفعل الأشياء التى نعجز القيام بها بمفردنا ؟ أنا عن نفسي لاأحب باتمان ولكنني استمتع عندما أرآه بشكلين مختلفين , لا أريد التطرق لقصته اليوم بل ما سأتحدث عنه هو سؤال كان يحيرني : ما نوع هذه الظاهرة المنتشرة في المسلسلات والبرامج وأيضاً في الحقيقة؟ هذ",
+    "screen_name": "1234619399",
+    "created_at": "2026-09-16",
+    "url": "https://1234619399.substack.com/p/84e",
+    "original_img_url": "https://substackcdn.com/image/fetch/$s_!TQOt!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fb95a2ecc-6e0a-407b-8999-797dfd5459b3_736x736.jpeg",
+    "minutes": 4
   },
   {
     "id_str": "9094111669299921985",
@@ -2145,7 +2231,8 @@
     "created_at": "2026-09-18",
     "url": "https://ra310.substack.com/p/b5d",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!U3yN!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F7382e7cb-80bf-4559-a0a3-61e58e56e402_736x720.jpeg",
-    "minutes": 5
+    "minutes": 5,
+    "slug": "حين-نبتعد-عن-الله-ثم-نخاف-أن-نعود"
   },
   {
     "id_str": "7300064484533721438",
@@ -2438,7 +2525,8 @@
     "created_at": "2026-09-05",
     "url": "https://v665561.substack.com/p/dfd",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!44VM!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F5f49f899-df7a-4f05-8c23-2540b9ed12e6_720x720.jpeg",
-    "minutes": 5
+    "minutes": 5,
+    "slug": "رجال-الدين-قالوا-إن-الموسيقى-تفسد-القلب-لكن-هل-هذا-صحيح"
   },
   {
     "id_str": "1604336911918922624",
@@ -2448,7 +2536,8 @@
     "created_at": "2026-09-25",
     "url": "https://leavena.substack.com/p/e48",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!Rv1v!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fcf0369ea-7a7a-4228-97f8-608e29463521_1280x698.jpeg",
-    "minutes": 3
+    "minutes": 3,
+    "slug": "رحيل-الدهراب"
   },
   {
     "id_str": "5363115399378259792",
@@ -2774,7 +2863,8 @@
     "created_at": "2026-09-28",
     "url": "https://thx7.substack.com/p/1327",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!Qo0p!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fb9fe9497-d7e2-4c12-ae45-d2d0b2b524f0_1000x756.jpeg",
-    "minutes": 3
+    "minutes": 3,
+    "slug": "سنة-الجوع-1327هـ-حين-اصبح-البقاء-معجزه"
   },
   {
     "id_str": "1606705871773469915",
@@ -2783,7 +2873,8 @@
     "screen_name": "ra310",
     "created_at": "2026-09-05",
     "url": "https://ra310.substack.com/p/852",
-    "minutes": 7
+    "minutes": 7,
+    "slug": "سورة-الحشر"
   },
   {
     "id_str": "1607831824445274658",
@@ -2793,7 +2884,8 @@
     "created_at": "2026-09-05",
     "url": "https://ra310.substack.com/p/81a",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!ivCU!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Ff21cb190-f10e-4a24-b699-dd3207fcbf76_736x543.jpeg",
-    "minutes": 5
+    "minutes": 5,
+    "slug": "سورة-الضحى"
   },
   {
     "id_str": "8009990667247691231",
@@ -3264,7 +3356,8 @@
     "created_at": "2026-09-25",
     "url": "https://ra310.substack.com/p/aca",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!rNtI!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fd5f176ea-1017-4fcd-b501-3761ebf9f49f_551x551.jpeg",
-    "minutes": 3
+    "minutes": 3,
+    "slug": "صدمة-العودة"
   },
   {
     "id_str": "8032509748501078393",
@@ -3355,7 +3448,8 @@
     "created_at": "2026-09-08",
     "url": "https://ra310.substack.com/p/0c2",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!qC7r!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F79ffd6df-9f73-4989-aba1-4278040a2a01_736x981.jpeg",
-    "minutes": 5
+    "minutes": 5,
+    "slug": "على-قدر-قربك-أثر-الخفاء-بينك-وبين-الله"
   },
   {
     "id_str": "3952560829678959740",
@@ -3425,7 +3519,8 @@
     "created_at": "2026-09-10",
     "url": "https://leavena.substack.com/p/c2f",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!e34Y!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F4780a358-db7f-428c-b1f0-acf83b088b4d_736x414.jpeg",
-    "minutes": 1
+    "minutes": 1,
+    "slug": "غفران-مؤجل"
   },
   {
     "id_str": "9723350703467841613",
@@ -3487,7 +3582,8 @@
     "screen_name": "ryut",
     "created_at": "2026-09-22",
     "url": "https://ryut.substack.com/p/630",
-    "minutes": 2
+    "minutes": 2,
+    "slug": "في-مواجهة-المجهول-يجب-عليك-التصنيف-و-منح-المسمى"
   },
   {
     "id_str": "4159003063761195491",
@@ -3544,7 +3640,8 @@
     "created_at": "2026-09-06",
     "url": "https://thx7.substack.com/p/05f",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!0Bfu!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fa874e1b3-ae8c-4e31-9ee2-8073ea55321a_630x300.jpeg",
-    "minutes": 2
+    "minutes": 2,
+    "slug": "قد-تتأخر-النتيجة-لكن-لا-يتأخر-أثر-السعي"
   },
   {
     "id_str": "1008316658775345941",
@@ -4109,6 +4206,16 @@
     "slug": "لم-أكن-أنا-الجاني-1"
   },
   {
+    "id_str": "8206479952238153476",
+    "title": "لم تكن تلك النسخة الأخيرة",
+    "preview_text": "في خضمّ انغماس الإنسان في أيامه، ظنًّا منه أنه في طور الاستقرار، لا جديد؛ فقط مبادئ وقوانين، وكذلك أفكار وضعها وأدرك أنها الأنسب لكل حال قد يحلّ عليه ويحتال، ينساب إلى يومه موقف أو اثنان، يعبثان بالوقت والنظام، فيفسد ذلك القالب الذي كان عليه، ويصبح غير مناسب لما جارته عليه الأيام، فتدفعه قسرًا للبحث عن قالب يلائم جديد الحال. ومن بين ما يحدث للمرء ويهدد رتابة الأيام، حدث يجعله ينأى عن الخطأ نحو الص",
+    "screen_name": "shouqali",
+    "created_at": "2026-09-08",
+    "url": "https://shouqali.substack.com/p/dda",
+    "original_img_url": "https://substack-post-media.s3.amazonaws.com/public/images/914ac6e1-c03b-40ba-b7f5-d7d25b86af01_1080x1080.jpeg",
+    "minutes": 7
+  },
+  {
     "id_str": "6394648212654051128",
     "title": "لم يعد يؤلمني ما كان يؤلمني",
     "preview_text": "تعيش بما يكفي، وتخسر بما يكفي، وتنصدم بالناس بالقدر اللي يخليك تفهم إن بعض الأشياء ما تستحق حتى ردة فعل. في البداية كنت أعاتب. ثم صرت أبتعد. ثم وصلت لمرحلة ما عاد يهمني حتى أعرف السبب. الحياة ما علّمتني كيف أكون سعيد، علّمتني كيف ما أنهار. علّمتني إن الإنسان ممكن يختفي من قلبك وهو ما زال واقف قدامك، وإن بعض العلاقات تنتهي قبل أن تنتهي رسميًا، وإن الاعتذار أحيانًا ما يصلح الشيء… بس يؤكد لك إنك كنت ",
@@ -4235,7 +4342,8 @@
     "created_at": "2026-09-25",
     "url": "https://ra310.substack.com/p/d79",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!OnYa!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fc4697157-4271-4339-b226-1e31995c6d66_736x736.jpeg",
-    "minutes": 4
+    "minutes": 4,
+    "slug": "لماذا-نحتاج-أحيانا-أن-يكرهنا-أحد"
   },
   {
     "id_str": "1470343121493191712",
@@ -4413,7 +4521,8 @@
     "created_at": "2026-09-29",
     "url": "https://ra310.substack.com/p/884",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!pbNk!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F7fb923ef-a3e7-440d-9d30-d9d3dbb93c02_736x1104.jpeg",
-    "minutes": 2
+    "minutes": 2,
+    "slug": "ما-أبحث-عن-قارئ-بل-راحة-بعد-كل-سطر"
   },
   {
     "id_str": "6651091225441887867",
@@ -4485,7 +4594,8 @@
     "screen_name": "yoyo3257",
     "created_at": "2026-09-24",
     "url": "https://yoyo3257.substack.com/p/5",
-    "minutes": 3
+    "minutes": 3,
+    "slug": "ما-لم-نقله-سيظل-شبحا-يطاردنا6"
   },
   {
     "id_str": "4825896631048848890",
@@ -4515,7 +4625,8 @@
     "created_at": "2026-09-26",
     "url": "https://ra310.substack.com/p/7db",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!X03M!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fbaf012fe-b5f7-4a84-a616-e5dc84511b32_700x700.jpeg",
-    "minutes": 4
+    "minutes": 4,
+    "slug": "ماذا-لو-أن-أكثر-شيء-تخاف-فقدانه-ليس-الشيء-الذي-ستفقده-فعلا"
   },
   {
     "id_str": "4678516294256097783",
@@ -4525,7 +4636,8 @@
     "created_at": "2026-09-26",
     "url": "https://ra310.substack.com/p/131",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!wsms!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F1d7e84e0-f9d4-430d-b0bf-ef8936542485_735x461.jpeg",
-    "minutes": 3
+    "minutes": 3,
+    "slug": "ماذا-لو-كان-الصمت-له-ذاكرة"
   },
   {
     "id_str": "1072706276042886910",
@@ -4676,7 +4788,8 @@
     "created_at": "2026-09-27",
     "url": "https://leavena.substack.com/p/342",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!wgUQ!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F86d7c88f-7b0d-4170-ba80-009cd7bea78d_518x921.jpeg",
-    "minutes": 1
+    "minutes": 1,
+    "slug": "مرآة-الخشب-العتيقة"
   },
   {
     "id_str": "8024735823137705496",
@@ -5082,7 +5195,8 @@
     "screen_name": "v665561",
     "created_at": "2026-09-15",
     "url": "https://v665561.substack.com/p/650",
-    "minutes": 2
+    "minutes": 2,
+    "slug": "هل-أنت-مستعد-لترك-دينك-من-أجل-من-تحب"
   },
   {
     "id_str": "4350590369386868802",
@@ -5092,7 +5206,8 @@
     "created_at": "2026-09-29",
     "url": "https://ra310.substack.com/p/09a",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!Fby1!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F84e09d66-49dc-4fdf-b854-f3833ee1eb85_735x919.jpeg",
-    "minutes": 2
+    "minutes": 2,
+    "slug": "هل-الإنسان-يتغير-او-بس-يتعلم-كيف-يخفي-نفسه"
   },
   {
     "id_str": "5718654524025248444",
@@ -5300,7 +5415,8 @@
     "created_at": "2026-09-11",
     "url": "https://rmyr.substack.com/p/55d",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!y-RU!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F80d40ce5-fa0a-4cb1-bdb6-254cde2461d5_735x743.jpeg",
-    "minutes": 2
+    "minutes": 2,
+    "slug": "يمكن-جت-بوقتها"
   },
   {
     "id_str": "3987815480195683674",
@@ -5310,7 +5426,8 @@
     "created_at": "2026-09-29",
     "url": "https://ra310.substack.com/p/e43",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!dlhs!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F257bc532-daef-4ddf-a8da-de4770632188_736x725.jpeg",
-    "minutes": 2
+    "minutes": 2,
+    "slug": "يمكن-مو-كل-شيء-نبيه-نبيه-فعلا"
   },
   {
     "id_str": "5093059182989652597",

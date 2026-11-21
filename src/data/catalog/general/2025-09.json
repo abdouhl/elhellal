@@ -69,7 +69,8 @@
     "created_at": "2025-09-10",
     "url": "https://leavena.substack.com/p/e09",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!N1yb!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F29e90a83-21c6-4fb2-8267-f67be3331be4_731x469.png",
-    "minutes": 1
+    "minutes": 1,
+    "slug": "إلام-تخدعني-عيني-وما-انخدعت"
   },
   {
     "id_str": "5199271240247852178",
@@ -152,7 +153,8 @@
     "created_at": "2025-09-13",
     "url": "https://leavena.substack.com/p/e0c",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!xSva!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F490ea809-f72b-46b7-992a-ae36fd4798b8_736x1104.jpeg",
-    "minutes": 3
+    "minutes": 3,
+    "slug": "الزواج-بين-تضليل-المواقع-وحقيقة-العلاقة"
   },
   {
     "id_str": "9384402076926812758",
@@ -173,7 +175,8 @@
     "created_at": "2025-09-28",
     "url": "https://leavena.substack.com/p/6a3",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!cV91!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F64d2bc9e-4794-4e14-a3a0-10fe2fd1bfe0_600x900.jpeg",
-    "minutes": 2
+    "minutes": 2,
+    "slug": "الفروق-الفردية-عبقرية-الاختلاف"
   },
   {
     "id_str": "3199132104247645442",
@@ -280,7 +283,8 @@
     "created_at": "2025-09-28",
     "url": "https://leavena.substack.com/p/dd6",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!c47O!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fd3c1bec9-c68c-466f-b8af-d13571dee24f_640x640.jpeg",
-    "minutes": 1
+    "minutes": 1,
+    "slug": "حديث-صامت"
   },
   {
     "id_str": "1106363322404839306",
@@ -331,7 +335,8 @@
     "created_at": "2025-09-07",
     "url": "https://kafkasgirl.substack.com/p/adb",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!__Wi!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F91bf579f-3ef1-492e-bc01-2c51ef471179_616x768.jpeg",
-    "minutes": 3
+    "minutes": 3,
+    "slug": "رسالة-قبل-النهاية"
   },
   {
     "id_str": "4273768009918983134",
@@ -341,7 +346,8 @@
     "created_at": "2025-09-05",
     "url": "https://kafkasgirl.substack.com/p/d3e",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!-VWy!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fd121c90b-ce71-40da-b297-5bbd32eb40c5_4084x6030.jpeg",
-    "minutes": 2
+    "minutes": 2,
+    "slug": "رسالة-إلى-النسخة-الأخرى-أختي"
   },
   {
     "id_str": "7378193385470968645",
@@ -373,7 +379,8 @@
     "created_at": "2025-09-23",
     "url": "https://leavena.substack.com/p/11f",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!CJxx!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fe5596533-faa9-42f2-9953-d418a4bab759_736x981.jpeg",
-    "minutes": 1
+    "minutes": 1,
+    "slug": "على-صرير-السلالم"
   },
   {
     "id_str": "2144726370622100524",
@@ -446,7 +453,19 @@
     "created_at": "2025-09-17",
     "url": "https://leavena.substack.com/p/6fe",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!X-wv!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fbc0170a4-c5cc-432f-aa4f-747d8f1012a2_736x722.jpeg",
-    "minutes": 1
+    "minutes": 1,
+    "slug": "كوب-فارغ"
+  },
+  {
+    "id_str": "6038043415820155600",
+    "title": "ما أوصلك إلى هنا… لن يوصلك إلى هناك.",
+    "preview_text": "وقت القراءة: 3 دقائق و27 ثانية عدد الكلمات: 657 كلمة الفكرة: النجاح يتطلب أكثر من مجرد استثمار مالي شكرًا لقراءتك نشرة أبو عنزة!، أشترك لتصلك أعداد النشرة كل أسبوع، ولتدعم ما أقدمه من أفكار ومحتوى مرحبا، اسمي محمد أبو عنزة، كاتب يبحث عن إجابات لأسئلة كثيرة في هذه النشرة، أشاركك ما أكتبه، ما أكتشفه، وما أعيشه. كنت أعتقد أن نمو مشروع يعني إضافة الكثير من التعقيد. المزيد من أعضاء الفريق. المزيد من ال",
+    "screen_name": "abu3nza",
+    "created_at": "2025-09-27",
+    "url": "https://abu3nza.substack.com/p/940",
+    "original_img_url": "https://substackcdn.com/image/fetch/$s_!vgP9!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F47635d1a-f558-42cf-8cfd-56d0e765132f_500x333.jpeg",
+    "minutes": 4,
+    "slug": "ما-أوصلك-إلى-هنا-لن-يوصلك-إلى-هناك"
   },
   {
     "id_str": "8172241281245743520",
@@ -466,7 +485,8 @@
     "created_at": "2025-09-20",
     "url": "https://leavena.substack.com/p/498",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!FDTR!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F06d66ceb-6e1f-4e2c-bcfb-57a662164335_736x736.jpeg",
-    "minutes": 2
+    "minutes": 2,
+    "slug": "مذكرات-الراحلة"
   },
   {
     "id_str": "4044761877283685066",
@@ -553,7 +573,8 @@
     "created_at": "2025-09-01",
     "url": "https://leavena.substack.com/p/3b8",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!Sa7F!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F9a8eb4a5-da9d-472e-bac1-b9853e57cb2d_1024x608.jpeg",
-    "minutes": 1
+    "minutes": 1,
+    "slug": "ورقة-كتبت-بألم"
   },
   {
     "id_str": "4940005986322576563",

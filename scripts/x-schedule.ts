@@ -275,6 +275,9 @@ const earliest = Date.now() + 15 * 60_000;
 type Slot = { at: string; ms: number; day: string; kind: SlotKind };
 const takenStamps = new Set(Object.values(posted)); // never two posts in the same minute
 
+const QUARTER = 15 * 60_000;
+const snapQuarter = (ms: number) => Math.round(ms / QUARTER) * QUARTER;
+
 function daySlots(day: string): Slot[] {
     const ramadan = isRamadan(day);
     const taken: string[] = [];
@@ -287,11 +290,12 @@ function daySlots(day: string): Slot[] {
         if (kind === "bio" && !opt("bio-times") && wd !== 1 && wd !== 4 && !anniversaryOn(day).length) list = [];
         taken.push(...list);
         for (const t of list) {
-            // A few minutes off the round time; posts at exactly :00 look automated.
-            let ms = zoned(day, t);
-            if (!flag("no-jitter")) ms += Math.round((rand(`${day}${kind}${t}`) * 14 - 4)) * 60_000;
+            // X's schedule picker only offers quarter hours: snap to one, sometimes a quarter late
+            // so not every post lands on :00.
+            let ms = snapQuarter(zoned(day, t));
+            if (!flag("no-jitter") && rand(`${day}${kind}${t}`) < 0.5) ms += QUARTER;
             let at = localStamp(ms);
-            while (takenStamps.has(at)) at = localStamp((ms += 60_000));
+            while (takenStamps.has(at)) at = localStamp((ms += QUARTER));
             takenStamps.add(at);
             if (ms > earliest) out.push({ at, ms, day, kind });
         }
@@ -826,6 +830,19 @@ async function rebuild() {
         if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(q.at)) throw new Error(`Bad time ${q.at} for ${q.id}`);
         if (xWeight(q.text) > MAX_WEIGHT) throw new Error(`${q.id} is ${xWeight(q.text)}/280`);
     }
+    // Older plans have times like 08:07; X's picker only offers quarter hours.
+    const used = new Set<string>();
+    let moved = 0;
+    for (const q of plan.items.sort((a, b) => a.at.localeCompare(b.at))) {
+        const [h, m] = q.at.slice(11).split(":").map(Number);
+        let ms = Date.UTC(+q.at.slice(0, 4), +q.at.slice(5, 7) - 1, +q.at.slice(8, 10), h, Math.round(m! / 15) * 15);
+        const stamp = () => new Date(ms).toISOString().slice(0, 16);
+        while (used.has(stamp())) ms += 15 * 60_000;
+        used.add(stamp());
+        if (stamp() !== q.at) moved++;
+        q.at = stamp();
+    }
+    if (moved) console.log(`${moved} times moved to the nearest free quarter hour (X only offers :00/:15/:30/:45).`);
     plan.items.sort((a, b) => a.at.localeCompare(b.at));
     console.log(`Rebuilding batch ${plan.batch}: ${plan.items.length} posts (${ids.length - plan.items.length} removed).`);
     writeBatch(plan.batch, plan.items, plan.tz);
@@ -903,54 +920,74 @@ function browserSnippet(batch: string, items: Item[]): string {
     const [y, mo, d] = date.split("-").map(Number);
     const [h, mi] = time.split(":").map(Number);
 
-    // Always use the modal composer — /home also has an inline one with the same test ids.
-    const modal = () => $('[role="dialog"] [data-testid="tweetTextarea_0"]')?.closest('[role="dialog"]');
+    if (mi % 15) throw new Error("X only schedules on quarter hours — run \`bun run x-schedule --rebuild\` to snap " + item.at);
+    const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+    const visible = (el) => el && el.checkVisibility({ opacityProperty: true, visibilityProperty: true });
+    const buttonNamed = (root, text) => [...root.querySelectorAll("button")].find((b) => b.innerText.trim() === text);
+
+    // The modal composer (x.com, 2026 UI: a <textarea> in a dialog; /home also has an inline one).
+    const modal = () => [...document.querySelectorAll('[role="dialog"]')].find((d) => d.querySelector("textarea"));
     for (let i = 0; i < 3 && !modal(); i++) {
-      (await waitFor(() => $('[data-testid="SideNav_NewTweet_Button"]'), "Post button")).click();
+      (await waitFor(() => $('a[href="/compose/post"]'), "Post button")).click();
       await waitFor(modal, "composer", 8000).catch(() => {});
     }
     const dialog = await waitFor(modal, "composer");
-    const box = $('[data-testid="tweetTextarea_0"]', dialog);
-    if (box.textContent.trim()) throw new Error("composer is not empty — clear it and paste again");
-    typeInto(box, item.text);
-    const chars = Math.min(20, item.text.replace(/\\s/g, "").length - 1);
-    await waitFor(() => box.textContent.replace(/\\s/g, "").length >= chars, "text to appear");
+    const box = $("textarea", dialog);
+    if (box.value.trim()) throw new Error("composer is not empty — clear it and paste again");
+    box.focus();
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(box, item.text);
+    box.dispatchEvent(new Event("input", { bubbles: true }));
+    await waitFor(() => box.value === item.text, "text to appear");
 
     if (item.media) {
-      const input = await waitFor(() => $('input[data-testid="fileInput"]', dialog), "image input");
+      const input = await waitFor(() => $('input[type="file"]', dialog), "image input");
       const dt = new DataTransfer();
-      for (const p of item.media) dt.items.add(await getFile(p));
+      const files = [];
+      for (const p of item.media) { const f = await getFile(p); files.push(f); dt.items.add(f); }
       input.files = dt.files;
       input.dispatchEvent(new Event("change", { bubbles: true }));
-      await waitFor(() => $('[data-testid="attachments"]', dialog), "images to attach", 30000);
-      await sleep(1500);
-      // Only the attachment area: the character-count ring next to Post is a role="progressbar" too.
-      await waitFor(() => !$('[data-testid="attachments"] [role="progressbar"]', dialog), "images to upload", 90000);
+      await waitFor(() => files.every((f) => dialog.querySelector('button[aria-label="Remove ' + f.name + '"]')), "images to attach", 30000);
+      // A visible "Retry <file>" means the upload failed.
+      await sleep(2000);
+      await waitFor(() => { const bad = [...dialog.querySelectorAll('button[aria-label^="Retry "]')].some(visible); if (bad) throw new Error("image upload failed"); return !dialog.querySelector('[data-testid="attachments"] [role="progressbar"]'); }, "images to upload", 90000);
     }
 
-    (await waitFor(() => $('[data-testid="scheduleOption"]', dialog), "schedule button")).click();
-    const selects = await waitFor(() => { const s = document.querySelectorAll('[role="dialog"] select'); return s.length >= 6 && s; }, "schedule dialog");
-    const [month, day, year, hour, minute, ampm] = selects;
-    setSelect(year, y);
-    setSelect(month, mo);
-    setSelect(day, d);
-    setSelect(hour, h % 12 === 0 ? 12 : h % 12);
-    setSelect(minute, mi);
-    setSelect(ampm, h < 12 ? "am" : "pm");
-    await sleep(300);
-    (await waitFor(() => $('[data-testid="scheduledConfirmationPrimaryAction"]'), "Confirm")).click();
-
-    // Never click unless X shows the schedule banner for this exact time — otherwise it would post right now.
-    const indicator = await waitFor(() => $('[role="dialog"] [data-testid="scheduledTweetIndicator"]'), "schedule banner");
+    // Schedule picker: a month calendar + quarter-hour list, then its own "Schedule" button.
+    (await waitFor(() => $('button[aria-label="Schedule post"]', dialog), "schedule button")).click();
+    const picker = () => [...document.querySelectorAll('[role="dialog"]')].find((d) => d.querySelector('button[aria-label="Next month"]'));
+    await waitFor(picker, "schedule picker");
+    const want = MONTHS[mo - 1] + " " + y;
+    for (let i = 0; i < 24; i++) {
+      const head = picker().querySelector('button[aria-label="Previous month"]').nextElementSibling.innerText.replace(/\\s+/g, " ").trim();
+      if (head === want) break;
+      const [hm, hy] = head.split(" ");
+      const ahead = (y - Number(hy)) * 12 + (mo - 1 - MONTHS.indexOf(hm));
+      picker().querySelector(ahead > 0 ? 'button[aria-label="Next month"]' : 'button[aria-label="Previous month"]').click();
+      await sleep(400);
+    }
+    const dayBtn = await waitFor(() => [...picker().querySelectorAll('button[aria-label$=", ' + MONTHS[mo - 1] + " " + d + ", " + y + '"]')].find((b) => !b.disabled), "day " + date);
+    dayBtn.click();
+    await sleep(400);
     const hh = h % 12 === 0 ? 12 : h % 12;
-    const expect = hh + ":" + String(mi).padStart(2, "0") + " " + (h < 12 ? "AM" : "PM");
-    const banner = indicator.textContent.replace(/[\\s\\u00a0\\u202f]+/g, " ");
-    if (!banner.includes(expect) || !banner.includes(String(y))) {
-      throw new Error("schedule banner says '" + indicator.textContent + "', expected " + item.at);
+    const label = hh + ":" + String(mi).padStart(2, "0") + " " + (h < 12 ? "AM" : "PM");
+    const slot = await waitFor(() => [...picker().querySelectorAll('button[role="option"]')].find((b) => b.innerText.trim() === label && !b.disabled), "time " + label);
+    slot.click();
+    await waitFor(() => slot.getAttribute("aria-selected") === "true", "time to be selected");
+    await sleep(300);
+    buttonNamed(picker(), "Schedule").click();
+
+    // Never click unless the composer shows this exact time and its button says "Schedule" — a "Post" button would post right now.
+    const result = await waitFor(() => {
+      if (!modal()) return "closed";
+      if (picker()) return null;
+      const text = modal().innerText.replace(/[\\s\\u00a0\\u202f]+/g, " ");
+      return text.includes(label) && text.includes(String(y)) && buttonNamed(modal(), "Schedule") ? "ready" : null;
+    }, "schedule banner for " + item.at);
+    if (result === "ready") {
+      const btn = await waitFor(() => { const b = buttonNamed(modal(), "Schedule"); return b && !b.disabled && b.getAttribute("aria-disabled") !== "true" && b; }, "Schedule button", 90000);
+      btn.click();
+      await waitFor(() => !modal(), "composer to close", 90000);
     }
-    const btn = await waitFor(() => { const b = $('[role="dialog"] [data-testid="tweetButton"]'); return b && !b.disabled && b.getAttribute("aria-disabled") !== "true" && b; }, "Schedule button", 90000);
-    btn.click();
-    await waitFor(() => !modal(), "composer to close", 30000);
   }
 
   // Tells the next \`bun run x-schedule\` which posts really got scheduled (the rest go back in its pool).
@@ -998,6 +1035,19 @@ function browserSnippet(batch: string, items: Item[]): string {
     }
   }
 
+  async function discardComposer() {
+    for (let i = 0; i < 3; i++) {
+      const open = [...document.querySelectorAll('[role="dialog"]')];
+      if (!open.length) return;
+      const discard = [...document.querySelectorAll('[role="dialog"] button')].find((b) => b.innerText.trim() === "Discard");
+      if (discard) discard.click();
+      else (open.at(-1).querySelector('button[aria-label="Close"]') || document.body).dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      open.at(-1).querySelector('button[aria-label="Close"]')?.click();
+      await sleep(1500);
+    }
+    location.reload(); // last resort; x-run.ts resumes after a reload
+  }
+
   let ok = 0, skipped = 0;
   for (const item of QUEUE) {
     if (done.has(item.id)) continue;
@@ -1005,7 +1055,18 @@ function browserSnippet(batch: string, items: Item[]): string {
       console.warn("skip (time already passed)", item.at); skipped++; continue;
     }
     try {
-      await schedule(item);
+      // X sometimes leaves the composer open after "Schedule" without scheduling (seen on the
+      // 2026 UI): note what it says, throw that composer away and try the same post again.
+      for (let attempt = 1; ; attempt++) {
+        try { await schedule(item); break; }
+        catch (e) {
+          if (attempt >= 3 || !/composer to close|schedule banner|schedule picker/.test(e.message)) throw e;
+          const said = [...document.querySelectorAll('[role="alert"], [role="status"]')].map((el) => el.innerText.trim()).filter(Boolean).join(" / ");
+          console.warn("… " + item.at + " didn't go through (" + e.message + (said ? "; X says: " + said : "") + ") — retrying in a minute");
+          await discardComposer();
+          await sleep(60000);
+        }
+      }
       done.add(item.id);
       localStorage.setItem(KEY, JSON.stringify([...done]));
       ok++;

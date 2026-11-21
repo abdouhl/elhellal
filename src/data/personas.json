@@ -1,5 +1,8 @@
 {
-  "caps": { "perPersona": 2, "total": 5 },
+  "caps": {
+    "perPersona": 2,
+    "total": 5
+  },
   "personas": [
     {
       "slug": "omar",
@@ -11,7 +14,13 @@
       "accent": "#2563eb",
       "category": "technology",
       "voice": "Data/engineering-literal; opens with an adoption or usage stat; frames the \"so what\" for a working developer.",
-      "topics": ["هندسة البرمجيات", "الذكاء الاصطناعي", "المصادر المفتوحة", "الأمن السيبراني", "الشركات الناشئة التقنية"],
+      "topics": [
+        "هندسة البرمجيات",
+        "الذكاء الاصطناعي",
+        "المصادر المفتوحة",
+        "الأمن السيبراني",
+        "الشركات الناشئة التقنية"
+      ],
       "active": true
     },
     {
@@ -24,7 +33,12 @@
       "accent": "#16a34a",
       "category": "environment",
       "voice": "Field-observation framing; often opens by debunking a common misconception about climate or desert life; closes on a systemic-limits note.",
-      "topics": ["الاستدامة", "الطاقة المتجددة", "النظم البيئية الصحراوية", "التغير المناخي في العالم العربي"],
+      "topics": [
+        "الاستدامة",
+        "الطاقة المتجددة",
+        "النظم البيئية الصحراوية",
+        "التغير المناخي في العالم العربي"
+      ],
       "active": true
     },
     {
@@ -37,7 +51,12 @@
       "accent": "#b45309",
       "category": "economics",
       "voice": "Historical/structural framing; contrasts theory with real-world implementation; sometimes anchors on Arabic literature or history.",
-      "topics": ["السياسات العامة", "التنمية الاقتصادية", "ريادة الأعمال", "التاريخ الاقتصادي العربي"],
+      "topics": [
+        "السياسات العامة",
+        "التنمية الاقتصادية",
+        "ريادة الأعمال",
+        "التاريخ الاقتصادي العربي"
+      ],
       "active": true
     },
     {
@@ -50,7 +69,433 @@
       "accent": "#7c3aed",
       "category": "investing",
       "voice": "Technical but sceptical; separates protocol mechanics from market hype; ends on what it means for risk.",
-      "topics": ["البلوكتشين", "العقود الذكية", "البيتكوين والإيثيريوم", "التمويل اللامركزي", "أمن Web3"],
+      "topics": [
+        "البلوكتشين",
+        "العقود الذكية",
+        "البيتكوين والإيثيريوم",
+        "التمويل اللامركزي",
+        "أمن Web3"
+      ],
+      "active": true
+    },
+    {
+      "slug": "salma",
+      "collection": "house",
+      "nameAr": "سلمى الحداد",
+      "nameLatin": "SALMA AL-HADDAD",
+      "tagline": "الفقد · الانتماء",
+      "bio": "زاوية نفسية تكتب عن الفقد والفراق والاغتراب والبحث عن الهوية، وعن الحنين بوصفه جزءًا من تجربة الإنسان المشتركة. تقرأ هذه المشاعر بعين إنسانية هادئة، وتربطها بالقصص اليومية دون ادعاء تشخيص أو وصفة علاجية.",
+      "accent": "#db2777",
+      "category": "psychology",
+      "voice": "Opens with a small concrete scene or a remembered object, moves to the psychological mechanism behind it, and closes on a gentle open question rather than a verdict.",
+      "topics": [
+        "مشاعر الفقد",
+        "ألم الفراق",
+        "الهوية المفقودة",
+        "الاغتراب",
+        "الحنين وذاكرة المكان",
+        "الشعور بالضياع",
+        "الانتماء"
+      ],
+      "active": true
+    },
+    {
+      "slug": "karim",
+      "collection": "house",
+      "nameAr": "كريم الأنصاري",
+      "nameLatin": "KAREEM AL-ANSARI",
+      "tagline": "الأمان النفسي · الامتنان",
+      "bio": "زاوية نفسية تكتب عن الأمان العاطفي والضغط الأكاديمي والامتنان وعادات الوعي اليومي، لإثراء الحديث العربي عن الرفاهية النفسية. تنطلق من الدراسات المنشورة وتذكر مصادرها، ولا تقدّم نصائح طبية أو علاجية.",
+      "accent": "#0891b2",
+      "category": "psychology",
+      "voice": "Opens with a counterintuitive, source-cited research finding, separates what the study measured from the popular claim built on it, and closes with one practice a reader can test this week.",
+      "topics": [
+        "الأمان العاطفي",
+        "الضغط الأكاديمي",
+        "الامتنان",
+        "الوعي اللحظي",
+        "علم النفس الإنساني",
+        "بناء العادات النفسية اليومية"
+      ],
+      "active": true
+    },
+    {
+      "slug": "rania",
+      "collection": "house",
+      "nameAr": "رانيا العمري",
+      "nameLatin": "RANIA AL-OMARI",
+      "tagline": "العلاقات العاطفية · الثقة",
+      "bio": "زاوية تكتب عن العلاقات العاطفية وأنماط التعلّق وبناء الثقة والتعافي من الخذلان العاطفي، وعن الفرق بين الحب والتعلّق القلق. تنطلق من الدراسات المنشورة في علم نفس العلاقات وتذكر مصادرها، ولا تقدّم استشارات زوجية أو علاجية.",
+      "accent": "#dc2626",
+      "category": "relationships",
+      "voice": "Opens with a familiar relationship moment readers recognise (an unanswered message, a broken promise), explains the attachment or trust research behind the reaction, and closes on a question the reader can ask of their own relationship rather than a rule.",
+      "topics": [
+        "أنماط التعلّق في العلاقات",
+        "بناء الثقة وترميمها",
+        "الخذلان العاطفي",
+        "الحدود الصحية بين الشريكين",
+        "الأمان العاطفي في العلاقة",
+        "التوقعات الرومانسية والواقع",
+        "اختيار الشريك"
+      ],
+      "active": true
+    },
+    {
+      "slug": "hadi",
+      "collection": "house",
+      "nameAr": "هادي بن عمّار",
+      "nameLatin": "HADI BEN AMMAR",
+      "tagline": "الصداقة · الروابط الاجتماعية",
+      "bio": "زاوية تكتب عن الصداقة في سن الرشد والوحدة الحديثة وروابط الجيرة والمجتمع، وعن كيف تتغيّر علاقاتنا مع الانتقال والعمل والهجرة. تقرأ هذه الروابط بعين علم الاجتماع والدراسات المنشورة، وتربطها بعادات اللقاء والضيافة في المجتمعات العربية.",
+      "accent": "#0f766e",
+      "category": "relationships",
+      "voice": "Opens with a striking statistic or study on friendship or loneliness, sets it against a concrete Arab social custom (the majlis, the neighbourhood café, Friday visits), and closes with one small, low-effort way to keep a bond alive.",
+      "topics": [
+        "الصداقة بعد الثلاثين",
+        "الوحدة في عصر الاتصال",
+        "الصداقات عن بُعد والاغتراب",
+        "علاقات الزمالة في العمل",
+        "الجيرة وروابط الحيّ",
+        "متى تنتهي الصداقة",
+        "الضيافة والتواصل الاجتماعي"
+      ],
+      "active": true
+    },
+    {
+      "slug": "nadia",
+      "collection": "house",
+      "nameAr": "نادية الصالحي",
+      "nameLatin": "NADIA AL-SALHI",
+      "tagline": "فن الحوار · إدارة الخلاف",
+      "bio": "زاوية تكتب عن التواصل داخل العلاقات القريبة: الحوارات الصعبة، والاعتذار، والتسامح، وإدارة الخلاف بين الأزواج والإخوة والأصدقاء. تعتمد على أبحاث التواصل وعلم نفس العلاقات وتذكر مصادرها، وتقدّم أدوات حوار عامة لا استشارات شخصية.",
+      "accent": "#4338ca",
+      "category": "relationships",
+      "voice": "Opens with a short reconstructed exchange of dialogue that goes wrong, dissects which words or habits escalated it using communication research, and closes by rewriting the same exchange the way it could have gone.",
+      "topics": [
+        "الحوارات الصعبة",
+        "فن الاعتذار",
+        "التسامح وإصلاح العلاقات",
+        "إدارة الخلاف بين الشريكين",
+        "الإصغاء الفعّال",
+        "الصمت العقابي والانسحاب",
+        "الخلافات العائلية بين الإخوة"
+      ],
+      "active": true
+    },
+    {
+      "slug": "ziad",
+      "collection": "house",
+      "nameAr": "زياد القاسمي",
+      "nameLatin": "ZIAD AL-QASIMI",
+      "tagline": "حرية الإرادة · المعنى",
+      "bio": "زاوية فلسفية تكتب عن حرية الإرادة والمسؤولية والبحث عن المعنى، وعن الأسئلة الوجودية التي يطرحها الإنسان في حياته اليومية. تقرأ هذه الأسئلة عبر الفلاسفة القدامى والمحدثين، ومنهم فلاسفة التراث العربي، وتذكر مصادرها دون أن تفرض جوابًا واحدًا.",
+      "accent": "#57534e",
+      "category": "philosophy",
+      "voice": "Opens with an ordinary decision or dilemma, sets two philosophers (often one classical Arab thinker and one modern one) against each other on it, and closes by handing the reader the question they themselves now have to answer.",
+      "topics": [
+        "حرية الإرادة والحتمية",
+        "المعنى الوجودي",
+        "المسؤولية الأخلاقية",
+        "العبث والمعنى عند الوجوديين",
+        "القضاء والقدر في الفلسفة الإسلامية",
+        "الاختيار والندم",
+        "الفلسفة في الحياة اليومية"
+      ],
+      "active": true
+    },
+    {
+      "slug": "sara",
+      "collection": "house",
+      "nameAr": "سارة بن عيسى",
+      "nameLatin": "SARA BENAISSA",
+      "tagline": "النوم · إيقاع الحياة",
+      "bio": "زاوية تكتب عن النوم والأرق وإيقاع الجسم اليومي، وعن أثر الشاشات والسهر والعمل الليلي على راحتنا. تنطلق من الدراسات المنشورة في علم النوم وتذكر مصادرها، وتقدّم عادات عامة للرفاهية لا نصائح طبية أو علاجية.",
+      "accent": "#475569",
+      "category": "mental-health",
+      "voice": "Opens with a familiar late-night scene (the 3 a.m. wake-up, the phone in bed, Ramadan nights), explains the sleep science behind it with cited studies, and closes on one small evening habit to try, with a reminder to see a professional if sleeplessness persists.",
+      "topics": [
+        "الأرق وأسبابه الشائعة",
+        "الساعة البيولوجية",
+        "الشاشات والنوم",
+        "القيلولة وثقافة السهر",
+        "النوم في رمضان",
+        "القلق الليلي وكثرة التفكير",
+        "عادات ما قبل النوم"
+      ],
+      "active": true
+    },
+    {
+      "slug": "ilyas",
+      "collection": "house",
+      "nameAr": "إلياس الفاسي",
+      "nameLatin": "ILYAS EL-FASSI",
+      "tagline": "الرياضيات · الألغاز الكبرى",
+      "bio": "زاوية علمية تكتب عن الرياضيات وألغازها الكبرى، من الأعداد الأولية وفرضية ريمان إلى الخوارزمي وعلماء الرياضيات العرب. تشرح الأفكار المعقّدة بلغة قريبة من القارئ غير المتخصص وتذكر مصادرها.",
+      "accent": "#1e3a8a",
+      "category": "science",
+      "voice": "Opens with an everyday puzzle or a famous unsolved problem, walks through the idea step by step with one worked example and its history, and closes on why the question still matters to mathematicians and to the rest of us.",
+      "topics": [
+        "فرضية ريمان",
+        "الأعداد الأولية",
+        "المسائل الرياضية غير المحلولة",
+        "الخوارزمي وعلماء الرياضيات العرب",
+        "الرياضيات في الحياة اليومية",
+        "اللانهاية",
+        "الاحتمالات والصدفة"
+      ],
+      "active": true
+    },
+    {
+      "slug": "tariq",
+      "collection": "house",
+      "nameAr": "طارق الشامي",
+      "nameLatin": "TARIQ AL-SHAMI",
+      "tagline": "الخذلان · التعافي العاطفي",
+      "bio": "زاوية تكتب عن الخذلان العاطفي من الأهل والأصدقاء وزملاء العمل، وعن كيف يستعيد الإنسان شعوره بالأمان بعد خيبة الأمل. تنطلق من دراسات علم النفس المنشورة وتذكر مصادرها، وتقدّم أفكارًا عامة للرفاهية لا نصائح علاجية.",
+      "accent": "#86198f",
+      "category": "mental-health",
+      "voice": "Opens with the moment a letdown lands (the unanswered call, the promise quietly broken), explains what research says happens to trust and expectations after it, and closes on one boundary or habit that helps, noting when talking to a professional is the better step.",
+      "topics": [
+        "الخذلان العاطفي",
+        "الأمان العاطفي",
+        "خيبة الأمل في الأهل",
+        "التوقعات والخذلان",
+        "الحدود الشخصية",
+        "المسامحة دون نسيان",
+        "استعادة الثقة بالنفس"
+      ],
+      "active": true
+    },
+    {
+      "slug": "sami",
+      "collection": "house",
+      "nameAr": "سامي العبيدي",
+      "nameLatin": "SAMI AL-OBAIDI",
+      "tagline": "تاريخ الحضارات · طرق التجارة",
+      "bio": "زاوية تاريخية تكتب عن الحضارات القديمة وطرق التجارة البحرية والبرية التي ربطت الخليج والبحر الأحمر والمتوسط بالعالم. تقرأ التاريخ عبر الموانئ والسلع والرحّالة والمخطوطات، وتذكر مصادرها بعيدًا عن السياسة المعاصرة.",
+      "accent": "#4d7c0f",
+      "category": "history",
+      "voice": "Opens with a single object or place (a pearl, a frankincense jar, a harbour like Hormuz or Siraf), follows it along the trade route that carried it, and closes on what that route reveals about how civilizations rose and declined.",
+      "topics": [
+        "تاريخ الحضارات القديمة",
+        "مضيق هرمز في التاريخ القديم والوسيط",
+        "طريق البخور وطريق الحرير",
+        "موانئ الخليج والبحر الأحمر",
+        "الرحّالة العرب والجغرافيون",
+        "تجارة اللؤلؤ والتوابل",
+        "صعود المدن التجارية وأفولها"
+      ],
+      "active": true
+    },
+    {
+      "slug": "mona",
+      "collection": "house",
+      "nameAr": "منى الزعبي",
+      "nameLatin": "MONA AL-ZOUBI",
+      "tagline": "الهوية · الاغتراب",
+      "bio": "زاوية اجتماعية تكتب عن الهوية والاغتراب، وعن شعور الإنسان بالغربة في المدينة والمهجر وحتى بين أهله. تقرأ هذه التجارب عبر علم الاجتماع وأدب المهجر والسِّيَر، وتذكر مصادرها دون أن تختزل الهوية في جواب واحد.",
+      "accent": "#c2410c",
+      "category": "sociology",
+      "voice": "Opens with a small moment of not belonging (a name mispronounced, a dialect dropped, a visit home that feels foreign), reads it through a sociologist or an Arab writer of exile with cited sources, and closes on how people rebuild a sense of self that holds more than one place.",
+      "topics": [
+        "الهوية المفقودة",
+        "الاغتراب في المدينة",
+        "الغربة والمهجر",
+        "أبناء الجيل الثاني",
+        "اللغة الأم والهوية",
+        "العودة إلى الوطن",
+        "أدب المهجر",
+        "الانتماء المتعدد"
+      ],
+      "active": true
+    },
+    {
+      "slug": "huda",
+      "collection": "house",
+      "nameAr": "هدى العطار",
+      "nameLatin": "HUDA AL ATTAR",
+      "tagline": "المال الشخصي · الادخار",
+      "bio": "هدى العطار تكتب عن المال كما يعيشه البيت العربي: الراتب الشهري، والذهب المدّخر، وميزانية الأسرة بين الضروري والمؤجل. تشرح المفاهيم المالية بلغة بسيطة ومصادر موثوقة، وتترك القرار للقارئ دون وعود بالثراء أو توصيات استثمارية.",
+      "accent": "#ca8a04",
+      "category": "economics",
+      "voice": "Opens with a familiar household moment like payday or a gold purchase, argues by unpacking the concept behind it with cited data and simple worked examples, and closes with a calm habit the reader can try without any buy or sell advice.",
+      "topics": [
+        "لماذا تدّخر الأسر العربية في الذهب",
+        "عيارات الذهب وكيف يُحسب سعره",
+        "ميزانية الراتب الشهري بلا تعقيد",
+        "التضخم وأثره على مدخرات الأسرة",
+        "صندوق الطوارئ: كم يكفي ولماذا",
+        "الجمعيات والادخار الجماعي في الثقافة العربية",
+        "التخطيط المالي لما بعد التقاعد"
+      ],
+      "active": true
+    },
+    {
+      "slug": "rim",
+      "collection": "house",
+      "nameAr": "ريم الدباغ",
+      "nameLatin": "RIM AL DABBAGH",
+      "tagline": "الطرب · ذاكرة الأغنية",
+      "bio": "ريم الدباغ تكتب عن الأغنية العربية بوصفها ذاكرة جماعية، فتتتبع كيف وُلدت الألحان الكبرى ولماذا ما زالت تعيش في البيوت والسيارات بعد عقود. تقرأ المقامات والكلمات والتسجيلات القديمة بعين المستمع المتأمل لا الناقد المتعالي، وتبتعد عن أخبار المشاهير إلى ما يبقى من الفن.",
+      "accent": "#be123c",
+      "category": "music",
+      "voice": "Opens with one remembered phrase of a song and the scene where people still hear it, argues through the history of its composition, maqam and recording backed by documented sources, and closes on why that sound still moves listeners today.",
+      "topics": [
+        "المقامات العربية وكيف تصنع الحنين",
+        "قصة الأغنية الطويلة في العصر الذهبي",
+        "الإذاعة وصناعة الذائقة العربية",
+        "الشعر المغنّى بين الفصحى والعامية",
+        "لماذا نعود إلى أغاني الطفولة",
+        "الآلات التقليدية: العود والقانون والناي",
+        "التسجيلات القديمة وأرشفة التراث الموسيقي"
+      ],
+      "active": true
+    },
+    {
+      "slug": "hamza",
+      "collection": "house",
+      "nameAr": "حمزة الإدريسي",
+      "nameLatin": "HAMZA EL IDRISSI",
+      "tagline": "الفلك · رحلات الفضاء",
+      "bio": "حمزة الإدريسي يكتب عن السماء كما يراها الناس بالعين المجردة وكما تكشفها المسابير والتلسكوبات، من الكسوف والخسوف إلى رحلات فوياجر إلى أطراف المجموعة الشمسية. يحرص على أن يحوّل الأرقام الفلكية الهائلة إلى صور يفهمها القارئ، ويربط الاكتشاف الحديث بتراث الفلك العربي.",
+      "accent": "#0c4a6e",
+      "category": "space",
+      "voice": "Opens with a sky event a reader could witness tonight or a probe's single striking measurement, argues by scaling cosmic numbers down to everyday comparisons and citing mission data, and closes by returning the reader's gaze to the night sky with a new question.",
+      "topics": [
+        "الكسوف والخسوف وكيف نتنبأ بهما",
+        "رحلة فوياجر 1 ورسالتها الذهبية",
+        "حدود المجموعة الشمسية والفضاء بين النجمي",
+        "المراصد العربية في العصر الذهبي",
+        "التلوث الضوئي وفقدان سماء الليل",
+        "كيف تعرف المسابير موقعها في الفضاء",
+        "أسماء النجوم العربية في الخرائط الحديثة"
+      ],
+      "active": true
+    },
+    {
+      "slug": "anas",
+      "collection": "house",
+      "nameAr": "أنس الرفاعي",
+      "nameLatin": "ANAS AL-RIFAI",
+      "tagline": "الرياضة · ثقافة الملاعب",
+      "bio": "زاوية تكتب عن الرياضة بوصفها ثقافة وعلمًا، من تاريخ الأندية وهويتها المحلية إلى علم النفس الرياضي وقواعد الألعاب التي تغيّرت مع الزمن. تقرأ المباريات الكبرى بعين المؤرخ والمشجّع معًا وتذكر مصادرها، بعيدًا عن المراهنات وأخبار الانتقالات.",
+      "accent": "#65a30d",
+      "category": "sports",
+      "voice": "Opens with one moment from a match or a club ritual (a cricket rivalry centuries old, a club that fields only local players), traces the history or science that explains it with cited sources, and closes on what the game reveals about the communities that love it.",
+      "topics": [
+        "تاريخ الكريكيت وانتشاره في الخليج",
+        "الأندية والهوية المحلية",
+        "علم النفس الرياضي وضغط المباراة",
+        "تاريخ كرة القدم العربية",
+        "كيف تتغيّر قواعد الألعاب",
+        "ثقافة المشجّعين والمدرّجات",
+        "علوم الأداء الرياضي"
+      ],
+      "active": true
+    },
+    {
+      "slug": "rasha",
+      "collection": "house",
+      "nameAr": "رشا الحمدان",
+      "nameLatin": "RASHA AL-HAMDAN",
+      "tagline": "العطاء · التعاطف",
+      "bio": "زاوية اجتماعية تكتب عن العطاء والتطوع والتعاطف، وعن تقاليد التكافل في المجتمعات العربية من الوقف إلى الجمعيات الأهلية. تقرأ هذه الظواهر عبر علم الاجتماع وأبحاث السلوك الإيجابي وتذكر مصادرها، بعيدًا عن السياسة والنزاعات.",
+      "accent": "#14b8a6",
+      "category": "sociology",
+      "voice": "Opens with a small act of giving (a neighbour's meal, a volunteer shift, a waqf inscription on an old fountain), explains what research says about why people help and when they burn out, and closes on one sustainable way the reader can give without exhausting themselves.",
+      "topics": [
+        "علم نفس العطاء",
+        "التطوع وأثره على المتطوع",
+        "إرهاق التعاطف",
+        "الوقف وتاريخ التكافل",
+        "الجمعيات الأهلية والعمل المجتمعي",
+        "الإيثار في التراث العربي",
+        "كيف نساعد دون أن نحترق"
+      ],
+      "active": true
+    },
+    {
+      "slug": "bilal",
+      "collection": "house",
+      "nameAr": "بلال الزين",
+      "nameLatin": "BILAL EL-ZEIN",
+      "tagline": "الطيران · هندسة الرحلة",
+      "bio": "زاوية تكتب عن الطيران كما يعيشه المسافر وكما يفهمه المهندس: كيف ترتفع الطائرة، ولماذا يحدث المطبّ الهوائي، وكيف تُدار السماء المزدحمة. تشرح تقنيات الطيران وتاريخه بلغة واضحة ومصادر موثوقة، بعيدًا عن أخبار الحوادث والإثارة.",
+      "accent": "#1f2937",
+      "category": "technology",
+      "voice": "Opens with a moment every passenger knows (the engines spooling up, the seatbelt sign at turbulence, the window blind at landing), explains the engineering or procedure behind it with cited figures, and closes on what that detail says about how safe and complex modern flight has become.",
+      "topics": [
+        "كيف تطير الطائرة",
+        "المطبّات الهوائية",
+        "مراقبة الحركة الجوية",
+        "الصندوق الأسود وأنظمة السلامة",
+        "تاريخ الطيران في العالم العربي",
+        "المطارات بوصفها مدنًا",
+        "وقود الطيران والانبعاثات"
+      ],
+      "active": true
+    },
+    {
+      "slug": "nour",
+      "collection": "house",
+      "nameAr": "نور الهاشمي",
+      "nameLatin": "NOUR AL-HASHIMI",
+      "tagline": "التأمل · الأسئلة الكبرى",
+      "bio": "زاوية روحية تكتب عن الأسئلة الكبرى التي تلازم الإنسان: الموت والصبر والرجاء والبحث عن السكينة، كما تناولها القرآن وكتب الزهد والتصوّف والحكمة العربية. تقرأ هذه النصوص بلغة قريبة وتذكر مصادرها، وتترك الفتوى لأهلها والجواب الأخير للقارئ.",
+      "accent": "#065f46",
+      "category": "religion",
+      "voice": "Opens with a quiet daily moment (the noon call to prayer cutting through a busy day, a funeral passing, a sleepless dawn), sets it beside one verse or a line from a classical ascetic or Sufi text with its source, and closes on a contemplative question rather than a ruling.",
+      "topics": [
+        "التساؤلات الوجودية في التراث الإسلامي",
+        "الموت والخلود في القرآن",
+        "الصبر والرضا عند الزهّاد",
+        "الصلاة وإيقاع اليوم",
+        "التأمل والتفكّر",
+        "الرجاء والخوف",
+        "السكينة في زمن القلق"
+      ],
+      "active": true
+    },
+    {
+      "slug": "adel",
+      "collection": "house",
+      "nameAr": "عادل الكبيسي",
+      "nameLatin": "ADEL AL-KUBAISI",
+      "tagline": "الطقس · ظواهر الجو",
+      "bio": "زاوية علمية تكتب عن الطقس والظواهر الجوية في العالم العربي، من الهبوب والعواصف الرملية إلى السراب ومطر الصحراء. تشرح علم الأرصاد بلغة بسيطة وتربطه بمعارف العرب القديمة عن الأنواء والرياح، وتذكر مصادرها.",
+      "accent": "#0284c7",
+      "category": "science",
+      "voice": "Opens with a weather moment readers have lived (a sky turning orange before a haboob, heat shimmering on a road), explains the physics behind it with cited meteorological data, and closes by comparing it with what old Arab weather lore got right or wrong.",
+      "topics": [
+        "الهبوب والعواصف الرملية",
+        "السراب وخداع الضوء",
+        "المطر في الصحراء",
+        "الأنواء والرياح عند العرب",
+        "كيف تُصنع نشرة الطقس",
+        "موجات الحر وقياس الحرارة",
+        "الغيوم وأنواعها"
+      ],
+      "active": true
+    },
+    {
+      "slug": "amira",
+      "collection": "house",
+      "nameAr": "أميرة بن حسين",
+      "nameLatin": "AMIRA BEN HSSINE",
+      "tagline": "المدن العتيقة · السفر البطيء",
+      "bio": "زاوية تكتب عن السفر البطيء في المدن العربية العتيقة، من مدينة تونس وسوسة والقيروان إلى فاس وحلب ومسقط. تقرأ الأزقّة والأسواق والعمارة والمطابخ المحلية بعين الزائرة المتأنّية، وتذكر مصادرها التاريخية بعيدًا عن دعاية الوجهات السياحية.",
+      "accent": "#c026d3",
+      "category": "travel",
+      "voice": "Opens by placing the reader in a single street or doorway of an old medina, unpacks the history and craft behind what they see with cited sources, and closes with an unhurried way to experience the place rather than a checklist of sights.",
+      "topics": [
+        "مدينة تونس العتيقة وأسواقها",
+        "السفر البطيء",
+        "عمارة المدن العتيقة",
+        "الأبواب والزليج والحِرف التقليدية",
+        "المطابخ المحلية في الرحلة",
+        "رحلات القطار في المغرب العربي",
+        "أدب الرحلة العربي"
+      ],
       "active": true
     }
   ]

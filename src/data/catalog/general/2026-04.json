@@ -95,7 +95,8 @@
       "تنظيف المجاري",
       "حلول الصرف الصحي"
     ],
-    "minutes": 2
+    "minutes": 2,
+    "slug": "أفضل-شركة-تسليك-مجاري-بالرياض-حلول-احترافية-لمشاكل-الصرف-الصحي"
   },
   {
     "id_str": "3544138935259547868",
@@ -117,7 +118,8 @@
       "تنظيف سجاد بمحايل",
       "خدمات منزلية متكاملة"
     ],
-    "minutes": 2
+    "minutes": 2,
+    "slug": "أفضل-شركة-تنظيف-بمحايل-عسير-خدمات-احترافية-لنظافة-مثالية"
   },
   {
     "id_str": "9087622300598302544",
@@ -207,7 +209,8 @@
     "screen_name": "lail3a7",
     "created_at": "2026-04-01",
     "url": "https://lail3a7.substack.com/p/49d",
-    "minutes": 1
+    "minutes": 1,
+    "slug": "التصالح-مع-الذات"
   },
   {
     "id_str": "5149351252453578785",
@@ -270,7 +273,8 @@
     "created_at": "2026-04-21",
     "url": "https://abualdairy.substack.com/p/466",
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!xro7!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fa0e5de7e-8ae4-4f92-8d0f-03910f9e511e_1376x768.jpeg",
-    "minutes": 2
+    "minutes": 2,
+    "slug": "العودة-الى-نقطة-الصفر"
   },
   {
     "id_str": "7356736313054497450",
@@ -677,7 +681,8 @@
       "حل مشكلة المجاري",
       "انسداد البالوعات"
     ],
-    "minutes": 3
+    "minutes": 3,
+    "slug": "شركة-تسليك-مجاري-بالرياض-الحل-الأمثل-لمشاكل-الانسداد-بسرعة-واحترافية"
   },
   {
     "id_str": "3913162181715796734",
@@ -699,7 +704,8 @@
       "تعقيم المنازل",
       "حلول العناية بالمنزل"
     ],
-    "minutes": 3
+    "minutes": 3,
+    "slug": "شركة-خدمات-منزلية-الحل-المتكامل-لراحة-منزلك-اليومية"
   },
   {
     "id_str": "2239968306954791559",
@@ -742,6 +748,16 @@
     "slug": "ضقوطات"
   },
   {
+    "id_str": "1639046197633931549",
+    "title": "طريقة واحدة للتخلص من التوتر",
+    "preview_text": "مبدئياً وقبل كل شيء يجب علينا تعريف التوتر، وهو حالة من الضغط النفسي والجسدي الذي يعد استجابة لتغيير معين ، له نوعان طبيعي، و مرضي وحتى الآن كل ما نقوله بديهيات . المعروف عن التوتر انه سيء ، نحاول الابتعاد عنه بكل الطرق، كشرب النعناع والبابونج ،تمارين التنفس وتقليل عوامل التوتر stressors ( المشاكل المالية ،و التراكمات الدراسية ،والمشاكل المتعلقة بالعلاقات العاطفية ) جرب البحث عن التوتر في المواقع ",
+    "screen_name": "1234619399",
+    "created_at": "2026-04-26",
+    "url": "https://1234619399.substack.com/p/94f",
+    "original_img_url": "https://substackcdn.com/image/fetch/$s_!y7Lq!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fd728e5ae-cd43-42b2-ab14-d279cec33900_736x559.jpeg",
+    "minutes": 3
+  },
+  {
     "id_str": "4932406249574921191",
     "title": "طَّوْرا التشيُّع",
     "preview_text": "هذا المقتطفٌ، من كتاب: تشيع علوى و تشيع صفوى (تهران، 1350هـ ش/1971م، ص 24-26)؛ يُصوِّرُ بدقَّة العديد من الملامح الرئيسيَّة في فكر شريعتي: تعريفه للتشيُّع بوصفه حركة ثوريَّة في جوهره، ونبذه للصيغ الثقافيَّة والنُسُكيَّة التي يُفتَرض أنها ألحِقَت بالتشيُّع لتشويهه منذ العهد الصفوي فصاعدًا، واستحسانهُ استخدام ثُنائيَّات مُتعارِضة، مُستقاة من مُعجم علم الاجتماع؛ والتي غالبًا ما يورِد أصولها الفرنسيَّ",
@@ -759,7 +775,8 @@
     "screen_name": "lail3a7",
     "created_at": "2026-04-05",
     "url": "https://lail3a7.substack.com/p/421",
-    "minutes": 1
+    "minutes": 1,
+    "slug": "عبير-الخمار-بين-فتنه-الجمال-وسماحة-الايمان"
   },
   {
     "id_str": "1630517414670204196",
@@ -778,7 +795,8 @@
     "screen_name": "lail3a7",
     "created_at": "2026-04-21",
     "url": "https://lail3a7.substack.com/p/f97",
-    "minutes": 2
+    "minutes": 2,
+    "slug": "على-أعتاب-القمة-يقين-السعي-وبركة-الدعاء"
   },
   {
     "id_str": "6467677123877304866",
@@ -790,6 +808,17 @@
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!Pe4G!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fb7f97abf-335e-40c0-bd58-3d32c7617dd2_996x664.jpeg",
     "minutes": 6,
     "slug": "على-وقع-المفاوضات-الأمريكية-الإيرانية-هل-يعلن-ترامب-وقفا-لإطلاق-النار"
+  },
+  {
+    "id_str": "8120261825738582922",
+    "title": "عمارة الاستعراض: جدلية المجاهرة وحين تصبح \"الواجهة\" زنزانة للروح",
+    "preview_text": "في القاموس المعماري، \"الواجهة\" (Facade) هي الوعد الذي يقطعه المبنى للناظرين. هي البيان الأول عن الهوية، الذوق، والمكانة. لكن في سيكولوجيا الاجتماع الحديث، تحولت \"المجاهرة\" من مجرد إفصاح عن الذات إلى \"استبداد بصري\"، حيث أصبحنا نبني حياتنا كأنها منصات عرض (Showrooms)، نفتقر فيها إلى الدفء الذي لا يمنحه إلا الستر، وإلى العمق الذي لا يوفره إلا الخفاء. من \"الحوش\" إلى \"الزجاج\": الارتداد المعماري للخصوصي",
+    "screen_name": "arwqatalwai",
+    "created_at": "2026-04-21",
+    "url": "https://arwqatalwai.substack.com/p/b1b",
+    "original_img_url": "https://substackcdn.com/image/fetch/$s_!AIMw!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fd1a7e2ab-0f9c-4f61-a2d1-118ede3b4243_1408x768.jpeg",
+    "minutes": 3,
+    "slug": "عمارة-الاستعراض-جدلية-المجاهرة-وحين-تصبح-الواجهة-زنزانة-للروح-1"
   },
   {
     "id_str": "7411140830612329500",
@@ -1123,6 +1152,17 @@
     "original_img_url": "https://substackcdn.com/image/fetch/$s_!LXqd!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fbad630ef-86ca-400f-894b-bbd86507525b_400x400.jpeg",
     "minutes": 5,
     "slug": "هل-يعد-ويجوفي-آمنا-لإدارة-الوزن-على-المدى-الطويل"
+  },
+  {
+    "id_str": "8874807156156497883",
+    "title": "هل يُعِيق الخوف حياتنا؟",
+    "preview_text": "علميًا الخوف هو رد فعل فسيولوجي يحدث تلقائيا عندما يشعر الجسم بالخطر ؟لكن،هل الخطر متواجد دائماً؟هل الخوف دائما متواجد حولنا ؟ الخوف من غداً ،الخوف من الفشل،الخوف من الموت أو حتى الخوف من الخوف أشعر أنه يراقبني أينما ذهبت حيث أعيش حيث أتعلم حيث أعمل أنه يسكن فؤادي من الأغاني المفضله لدي أغنيه “بنخاف”لفرقة كايروكي و هناك جزئية شديدة الواقعية بتلك الأغنيه تقول:**بنخاف من معنى الخوف ذاته نهايات الخوف",
+    "screen_name": "ayatollahheliel",
+    "created_at": "2026-04-25",
+    "url": "https://ayatollahheliel.substack.com/p/64d",
+    "original_img_url": "https://substackcdn.com/image/fetch/$s_!CHRk!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fd854dd5d-c1e4-4f67-9680-9d19c8df1527_400x400.jpeg",
+    "minutes": 1,
+    "slug": "هل-يعيق-الخوف-حياتنا"
   },
   {
     "id_str": "8572378165048896513",
