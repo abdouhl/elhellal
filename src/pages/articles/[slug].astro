@@ -91,6 +91,11 @@ interface ArticleView {
   related: RelatedCard[];
   relatedHeading: string;
   sister: SisterTile[];
+  /** Robots meta; undefined keeps the default (index) */
+  robots?: string | undefined;
+  /** Neighbouring articles of the category by date (catalog articles only) */
+  newer?: { href: string; title: string } | undefined;
+  older?: { href: string; title: string } | undefined;
 }
 
 let isPersonalPost = false;
@@ -143,6 +148,9 @@ if (isShell) {
     related: [{ href: T(".href"), image: T(".image"), title: T(".title"), author: T(".author"), category: T(".category") }],
     relatedHeading: "مقالات ذات صلة",
     sister: [],
+    robots: T("robots"),
+    newer: { href: T("newerHref"), title: T("newerTitle") },
+    older: { href: T("olderHref"), title: T("olderTitle") },
   };
 } else {
   let found: any;
@@ -314,6 +322,7 @@ import InstallCard from "../../components/InstallCard.astro";
   twitterImage={v.ogImage}
   twitterCreator={v.twitterCreator}
   keywords={v.keywordsString}
+  {...(v.robots ? { robots: v.robots } : {})}
 >
   {(isShell || v.coverSrc) && (
     <Fragment
@@ -767,8 +776,34 @@ import InstallCard from "../../components/InstallCard.astro";
 
     <SisterStrip shell={isShell} tiles={v.sister} />
 
+    {(v.newer || v.older) && (
+      <nav class="chrono-nav" aria-label="مقالات التصنيف حسب التاريخ">
+        {v.newer && (
+          <Fragment>
+            <Fragment set:html={open("newerHref")} />
+            <a href={v.newer.href} class="chrono-link chrono-newer" rel="prev">
+              <span class="chrono-label">→ مقالة أحدث</span>
+              <span class="chrono-title">{v.newer.title}</span>
+            </a>
+            <Fragment set:html={close("newerHref")} />
+          </Fragment>
+        )}
+        {v.older && (
+          <Fragment>
+            <Fragment set:html={open("olderHref")} />
+            <a href={v.older.href} class="chrono-link chrono-older" rel="next">
+              <span class="chrono-label">مقالة أقدم ←</span>
+              <span class="chrono-title">{v.older.title}</span>
+            </a>
+            <Fragment set:html={close("olderHref")} />
+          </Fragment>
+        )}
+      </nav>
+    )}
+
     <div class="page-nav">
       <a href={v.fallbackPath} class="back-link">العودة إلى {v.categoryTitle} →</a>
+      {isShell && <a href={`${v.categoryHref}archive/`} class="back-link">أرشيف {v.categoryTitle}</a>}
     </div>
 
   </main>
@@ -1381,10 +1416,42 @@ import InstallCard from "../../components/InstallCard.astro";
     }
 
     /* ── Page nav ─────────────────────────────────────── */
+    .chrono-nav {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
+      margin: 32px 0 0;
+    }
+    .chrono-link {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 14px 16px;
+      border: 0.5px solid var(--border-muted);
+      border-radius: 12px;
+      color: var(--content-primary);
+      text-decoration: none;
+      min-width: 0;
+    }
+    .chrono-link:hover { border-color: var(--content-secondary); }
+    .chrono-older { text-align: left; }
+    .chrono-label { font-size: 0.8rem; color: var(--content-secondary); }
+    .chrono-title {
+      font-weight: 600;
+      line-height: 1.5;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
     .page-nav {
       margin-top: var(--spacing-07);
       padding-top: var(--spacing-05);
       border-top: 0.5px solid var(--border-muted);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 12px;
     }
     .back-link {
       font-size: var(--desktop-body-sm);

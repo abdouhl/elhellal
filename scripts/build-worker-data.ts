@@ -31,6 +31,7 @@ import type { Article } from '../src/types/index.ts';
 import {
     ARTICLE_SHELL_SLUG,
     SHARD_COUNT,
+    isThinArticle,
     shardOf,
     type ArticleRecord,
     type ArticleShard,
@@ -279,7 +280,40 @@ function buildArticleShards(categoryTitles: Record<string, string>, sisters: Ret
             count++;
         }
     }
+    linkChronology(shards);
     return { shards, count, duplicates, backlinks };
+}
+
+/** Newest first; slug breaks ties so the order is the same every build. */
+function byDateThenSlug(a: { created_at: string; slug: string }, b: { created_at: string; slug: string }): number {
+    return b.created_at.localeCompare(a.created_at) || (a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0);
+}
+
+/**
+ * Chains each category's indexable articles by date (ArticleRecord.newer /
+ * .older). Related links favour well-tagged articles, so without this many
+ * articles had no plain link pointing at them and Google only knew them from
+ * the sitemap ("Discovered – currently not indexed").
+ */
+function linkChronology(shards: ArticleShard[]) {
+    const byCategory = new Map<string, ArticleRecord[]>();
+    for (const shard of shards) {
+        for (const r of Object.values(shard)) {
+            if (isThinArticle(r)) continue;
+            const list = byCategory.get(r.category) ?? [];
+            list.push(r);
+            byCategory.set(r.category, list);
+        }
+    }
+    for (const list of byCategory.values()) {
+        list.sort(byDateThenSlug);
+        list.forEach((r, i) => {
+            const newer = list[i - 1];
+            const older = list[i + 1];
+            if (newer) r.newer = [newer.slug, newer.title];
+            if (older) r.older = [older.slug, older.title];
+        });
+    }
 }
 
 /** Newest first, like the static listing pages sorted (stable for equal dates). */
@@ -476,8 +510,10 @@ function main() {
     fs.writeFileSync(path.join(DIST, 'sister-links.json'), JSON.stringify({ v: 1, pages: articles.backlinks }));
     fs.writeFileSync(path.join(DATA_DIR, 'random.json'), JSON.stringify(buildRandomPool(articles.shards, buildId)));
 
+    // Thin articles are noindex (isThinArticle), so they're left out too.
     const articlePaths = articles.shards
         .flatMap((shard) => Object.values(shard))
+        .filter((r) => !isThinArticle(r))
         .sort((a, b) => b.created_at.localeCompare(a.created_at) || a.slug.localeCompare(b.slug))
         .map((r) => ({ path: `/articles/${encodeURIComponent(r.slug)}/`, lastmod: r.created_at }));
     // lastmod: the newest article in the listing, i.e. when the page last changed.

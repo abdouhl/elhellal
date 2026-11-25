@@ -67,6 +67,9 @@ const breadcrumbs = [
         lessLabel="تصنيفات أقل"
       />
     )}
+    <p class="archive-cta">
+      <a href={`/${category}/archive/`}>تصفّح أرشيف {categoryTitle} كاملاً حسب الشهر ←</a>
+    </p>
     <MasonryFeed
       client:idle
       scope={category}
@@ -76,3 +79,14 @@ const breadcrumbs = [
     />
   </main>
 </Layout>
+
+<style>
+  .archive-cta {
+    max-width: 1100px;
+    margin: 0 auto var(--spacing-05);
+    padding: 0 var(--spacing-05);
+    font-size: var(--desktop-body-sm);
+  }
+  .archive-cta a { color: var(--content-secondary); text-decoration: none; }
+  .archive-cta a:hover { color: var(--content-primary); text-decoration: underline; }
+</style>

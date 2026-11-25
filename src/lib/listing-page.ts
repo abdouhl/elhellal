@@ -33,7 +33,7 @@ export const LISTING_INITIAL = 30;
  * stays out of the sitemaps and IndexNow, so crawlers spend their budget on
  * articles (Bing's budget especially is small next to 33k articles).
  */
-export const MIN_INDEXED_LISTING = 3;
+export const MIN_INDEXED_LISTING = 5;
 
 export function isThinListing(r: Pick<ListingRecord, 'total'>): boolean {
     return r.total < MIN_INDEXED_LISTING;

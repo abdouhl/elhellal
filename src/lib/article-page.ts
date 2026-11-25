@@ -61,9 +61,25 @@ export interface ArticleRecord {
     related: Array<[string, string, string | undefined, string | undefined, string]>;
     /** The "من عالم الهلال" strip: sibling-site pages (src/lib/sister-sites.ts) */
     sister?: SisterLink[];
+    /**
+     * [slug, title] of the neighbouring indexable articles of the category by
+     * date, so every article has plain links pointing at it (isThinArticle).
+     */
+    newer?: [string, string];
+    older?: [string, string];
 }
 
 export type ArticleShard = Record<string, ArticleRecord>;
+
+/**
+ * An article with no summary (tldr / whyThisMatters) is only its source's
+ * excerpt: the page says noindex, and it stays out of the sitemaps, the
+ * archive pages and the newer/older chain, so crawlers spend their budget on
+ * pages with something of our own on them.
+ */
+export function isThinArticle(a: { tldr?: string | undefined; whyThisMatters?: string | undefined }): boolean {
+    return !a.tldr && !a.whyThisMatters;
+}
 
 const SITE = 'https://elhellal.com';
 
@@ -208,6 +224,11 @@ export function articleTemplateData(r: ArticleRecord): TemplateData {
             category: categoryTitle ?? r.categoryTitle,
         })),
         sister: sisterTiles(r.sister),
+        robots: isThinArticle(r) ? 'noindex, follow' : 'index, follow',
+        newerHref: r.newer ? `/articles/${encodeURIComponent(r.newer[0])}/` : '',
+        newerTitle: r.newer?.[1] ?? '',
+        olderHref: r.older ? `/articles/${encodeURIComponent(r.older[0])}/` : '',
+        olderTitle: r.older?.[1] ?? '',
     };
 }
 

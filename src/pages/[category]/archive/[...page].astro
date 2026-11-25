@@ -1,0 +1,225 @@
+---
+// Category archives — see src/lib/archive.ts.
+//   /<category>/archive/                → the category's months
+//   /<category>/archive/<YYYY-MM>/      → that month's articles (page 1)
+//   /<category>/archive/<YYYY-MM>/<n>/  → page n of a big month
+import Layout from "../../../layouts/Layout.astro";
+import BreadcrumbSchema from "../../../components/schema/BreadcrumbSchema.astro";
+import {
+  ARCHIVE_PAGE_SIZE,
+  archiveHref,
+  categoryArchives,
+  type ArchiveMonth,
+  type CategoryArchive,
+} from "../../../lib/archive";
+
+export function getStaticPaths() {
+  const paths: Array<{
+    params: { category: string; page: string | undefined };
+    props: { archive: CategoryArchive; month?: ArchiveMonth; pageNumber: number };
+  }> = [];
+  for (const archive of categoryArchives()) {
+    if (!archive.total) continue;
+    paths.push({ params: { category: archive.category, page: undefined }, props: { archive, pageNumber: 1 } });
+    for (const month of archive.months) {
+      for (let n = 1; n <= month.pages; n++) {
+        paths.push({
+          params: { category: archive.category, page: n === 1 ? month.key : `${month.key}/${n}` },
+          props: { archive, month, pageNumber: n },
+        });
+      }
+    }
+  }
+  return paths;
+}
+
+const { archive, month, pageNumber } = Astro.props as {
+  archive: CategoryArchive;
+  month?: ArchiveMonth;
+  pageNumber: number;
+};
+
+const SITE = "https://elhellal.com";
+const categoryHref = `/${archive.category}/`;
+const indexHref = archiveHref(archive.category);
+const selfHref = month ? archiveHref(archive.category, month.key, pageNumber) : indexHref;
+const pageSuffix = month && month.pages > 1 ? ` (صفحة ${pageNumber} من ${month.pages})` : "";
+
+const heading = month
+  ? `مقالات ${archive.title} — ${month.label}${pageSuffix}`
+  : `أرشيف مقالات ${archive.title}`;
+const pageTitle = `${heading} | الهلال`;
+const pageDescription = month
+  ? `${month.articles.length} مقالة عربية منتقاة في ${archive.title} نُشرت في ${month.label}، مع ملخص كل مقالة ورابطها الأصلي.`
+  : `أرشيف ${archive.total} مقالة عربية منتقاة في ${archive.title}، مرتبة حسب شهر النشر.`;
+
+const articles = month
+  ? month.articles.slice((pageNumber - 1) * ARCHIVE_PAGE_SIZE, pageNumber * ARCHIVE_PAGE_SIZE)
+  : [];
+
+// Neighbouring months, for walking the archive without going back up.
+const monthIndex = month ? archive.months.indexOf(month) : -1;
+const newerMonth = monthIndex > 0 ? archive.months[monthIndex - 1] : undefined;
+const olderMonth = monthIndex >= 0 ? archive.months[monthIndex + 1] : undefined;
+
+const breadcrumbs = [
+  { name: "الرئيسية", url: SITE },
+  { name: archive.title, url: `${SITE}${categoryHref}` },
+  ...(month
+    ? [{ name: "الأرشيف", url: `${SITE}${indexHref}` }, { name: month.label }]
+    : [{ name: "الأرشيف" }]),
+];
+---
+
+<Layout
+  site={`الهلال - ${archive.title}`}
+  title="الهلال"
+  tagline="دليل منتقى لأفضل المقالات العربية على الإنترنت"
+  pageTitle={pageTitle}
+  pageDescription={pageDescription}
+  canonicalUrl={`${SITE}${selfHref}`}
+>
+  <BreadcrumbSchema items={breadcrumbs} />
+
+  <main id="main-content" class="archive-page">
+    <nav class="breadcrumb" aria-label="مسار التنقل">
+      <a href="/">الرئيسية</a>
+      <span aria-hidden="true">›</span>
+      <a href={categoryHref}>{archive.title}</a>
+      <span aria-hidden="true">›</span>
+      {month ? (
+        <Fragment>
+          <a href={indexHref}>الأرشيف</a>
+          <span aria-hidden="true">›</span>
+          <span>{month.label}</span>
+        </Fragment>
+      ) : (
+        <span>الأرشيف</span>
+      )}
+    </nav>
+
+    <header class="archive-header">
+      <h1>{heading}</h1>
+      <p>{pageDescription}</p>
+    </header>
+
+    {!month && (
+      <ul role="list" class="month-list">
+        {archive.months.map((m) => (
+          <li>
+            <a href={archiveHref(archive.category, m.key)} class="month-link">
+              <span>{m.label}</span>
+              <span class="month-count">{m.articles.length}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    )}
+
+    {month && (
+      <Fragment>
+        <ol role="list" class="article-list">
+          {articles.map((a) => (
+            <li>
+              <a href={`/articles/${encodeURIComponent(a.slug!)}/`} class="article-link">{a.title}</a>
+              <span class="article-meta">@{a.screen_name}{a.created_at ? ` · ${a.created_at}` : ""}</span>
+            </li>
+          ))}
+        </ol>
+
+        {month.pages > 1 && (
+          <nav class="pager" aria-label="صفحات الشهر">
+            {Array.from({ length: month.pages }, (_, i) => i + 1).map((n) =>
+              n === pageNumber ? (
+                <span class="pager-current" aria-current="page">{n}</span>
+              ) : (
+                <a href={archiveHref(archive.category, month.key, n)}>{n}</a>
+              )
+            )}
+          </nav>
+        )}
+
+        <nav class="month-nav" aria-label="الأشهر المجاورة">
+          {newerMonth ? <a href={archiveHref(archive.category, newerMonth.key)}>→ {newerMonth.label}</a> : <span />}
+          <a href={indexHref}>كل الأشهر</a>
+          {olderMonth ? <a href={archiveHref(archive.category, olderMonth.key)}>{olderMonth.label} ←</a> : <span />}
+        </nav>
+      </Fragment>
+    )}
+  </main>
+
+  <style>
+    .archive-page {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: var(--spacing-06) var(--spacing-05) var(--spacing-10);
+    }
+    .breadcrumb {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      font-size: var(--desktop-caption);
+      color: var(--content-secondary);
+      margin-bottom: var(--spacing-05);
+    }
+    .breadcrumb a { color: var(--content-secondary); text-decoration: none; }
+    .breadcrumb a:hover { color: var(--content-primary); }
+    .archive-header h1 {
+      font-size: clamp(1.4rem, 4vw, 2rem);
+      line-height: 1.4;
+      margin: 0 0 8px;
+      color: var(--content-primary);
+    }
+    .archive-header p { color: var(--content-secondary); margin: 0 0 var(--spacing-06); line-height: 1.7; }
+    .month-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 10px;
+    }
+    .month-link {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 12px 14px;
+      border: 0.5px solid var(--border-muted);
+      border-radius: 10px;
+      color: var(--content-primary);
+      text-decoration: none;
+    }
+    .month-link:hover { border-color: var(--content-secondary); }
+    .month-count { color: var(--content-secondary); font-variant-numeric: tabular-nums; }
+    .article-list { margin: 0; padding: 0 1.5em 0 0; }
+    .article-list li { padding: 8px 0; border-bottom: 0.5px solid var(--border-muted); line-height: 1.6; }
+    .article-link { color: var(--content-primary); text-decoration: none; font-weight: 600; }
+    .article-link:hover { text-decoration: underline; }
+    .article-meta {
+      display: block;
+      font-size: var(--desktop-caption);
+      color: var(--content-secondary);
+      direction: ltr;
+      text-align: right;
+    }
+    .pager, .month-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: var(--spacing-06);
+    }
+    .month-nav { justify-content: space-between; }
+    .pager a, .pager-current, .month-nav a {
+      min-width: 36px;
+      min-height: 36px;
+      padding: 6px 12px;
+      border: 0.5px solid var(--border-muted);
+      border-radius: 8px;
+      color: var(--content-primary);
+      text-decoration: none;
+      text-align: center;
+    }
+    .pager-current { background: var(--content-primary); color: var(--background-primary, #000); }
+  </style>
+</Layout>
