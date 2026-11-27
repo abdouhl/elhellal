@@ -1711,6 +1711,21 @@ const releaseFor = (url: string): Record<string, SiteStep> => ({
     },
 });
 
+/** releaseFor with a check (a shell line that must exit 0) between the build and the deploy. */
+const guardedRelease = (url: string, check: string, checkDisplay: string): Record<string, SiteStep> => ({
+    build: runScript('Build', 'build'),
+    deploy: {
+        label: 'Deploy',
+        cmd: ['sh', '-c', `${check} && "${BUN}" x wrangler deploy && ${indexNow(url)}`],
+        display: `${checkDisplay} && bunx wrangler deploy && bun run indexnow`,
+    },
+    'build+deploy': {
+        label: 'Build & deploy',
+        cmd: ['sh', '-c', `"${BUN}" run build && ${check} && "${BUN}" x wrangler deploy && ${indexNow(url)}`],
+        display: `bun run build && ${checkDisplay} && bunx wrangler deploy && bun run indexnow`,
+    },
+});
+
 const SITES: Record<string, Site> = {
     quotes: {
         title: 'Quotes',
@@ -1747,7 +1762,8 @@ const SITES: Record<string, Site> = {
         title: 'Quiz',
         dir: siteDir('elhellal-quiz'),
         url: 'https://quiz.elhellal.com',
-        data: ['src/data'],
+        // engine.ts holds the daily-set gates (BANK_Vn / DAILY_Vn) that go with each bank append.
+        data: ['src/data', 'src/game/engine.ts'],
         steps: {
             // Its default quotes path predates the quotes repo split.
             'build-questions': {
@@ -1765,12 +1781,16 @@ const SITES: Record<string, Site> = {
                 cwd: 'video',
                 args: /^(\d{4}-\d{2}-\d{2}|\d{2}:\d{2}|\d{1,2}|--(long-time|short-time|long|timer|no-voice))$/,
             },
+            // Local build vs live site: fails when a daily set on or before today would change.
+            'check-daily': { label: 'Check daily sets', cmd: [BUN, 'scripts/check-daily.ts'], display: 'bun scripts/check-daily.ts' },
             'd1-migrate': {
                 label: 'Apply D1 migrations',
                 cmd: [BUN, 'x', 'wrangler', 'd1', 'migrations', 'apply', 'elhellal-quiz', '--remote'],
                 display: 'bunx wrangler d1 migrations apply elhellal-quiz --remote',
             },
         },
+        // Every deploy first checks that no daily set players have already seen would change.
+        release: guardedRelease('https://quiz.elhellal.com', `"${BUN}" scripts/check-daily.ts`, 'bun scripts/check-daily.ts'),
     },
     // Deployed by Cloudflare from GitHub: pushing main is the deploy.
     abderahmane: {
@@ -2620,6 +2640,108 @@ async function quizReports(params: URLSearchParams) {
     }
     reportsCache = { at: Date.now(), value };
     return value;
+}
+
+/** Clears a question's player reports once it has been fixed (or the flag was wrong). */
+async function clearQuizReport(body: Body) {
+    const id = str(body.id);
+    if (!/^([a-z]{2}:)?[a-z][\w-]*$/i.test(id)) throw new HttpError(400, 'Bad question id');
+    await d1(`DELETE FROM reports WHERE id = '${id}'`);
+    reportsCache = null;
+    return { ok: true };
+}
+
+// How players do on each question (D1 `answers`): a very low success rate often means a wrong answer key.
+let quizStatsCache: { at: number; value: unknown } | null = null;
+
+async function quizStats(params: URLSearchParams) {
+    if (quizStatsCache && Date.now() - quizStatsCache.at < 60_000 && params.get('fresh') !== '1') return quizStatsCache.value;
+    const min = Math.max(3, Math.min(500, Number(params.get('min')) || 5));
+    const [totals, hardest, easiest, popular] = await d1Results([
+        'SELECT COUNT(*) AS questions, SUM(n) AS answers, SUM(ok) AS correct FROM answers',
+        `SELECT id, n, ok FROM answers WHERE n >= ${min} ORDER BY CAST(ok AS REAL) / n ASC, n DESC LIMIT 40`,
+        `SELECT id, n, ok FROM answers WHERE n >= ${min} ORDER BY CAST(ok AS REAL) / n DESC, n DESC LIMIT 15`,
+        'SELECT id, n, ok FROM answers ORDER BY n DESC LIMIT 15',
+    ].join('; '));
+    const rows = (list: Record<string, any>[] = []) => list.map((r) => ({ ...r, ...describeQuizId(String(r.id)) }));
+    const value = { min, totals: totals?.[0] ?? {}, hardest: rows(hardest), easiest: rows(easiest), popular: rows(popular) };
+    quizStatsCache = { at: Date.now(), value };
+    return value;
+}
+
+// Daily-set gates. A daily challenge must stay the same once players have seen it, so bank rows the
+// live site doesn't have yet join the daily pool only from a future day: engine.ts pairs
+// `const BANK_Vn = <first new row>` with `const DAILY_Vm = "<first day using them>"` and filters
+// `key < DAILY_Vm` sets down to `bankIndex < BANK_Vn` (once in the Arabic chain, once for the others).
+const QUIZ_ENGINE = path.join(SITES.quiz!.dir, 'src/game/engine.ts');
+const QUIZ_APP_JSON = path.join(SITES.quiz!.dir, 'dist/app/ar.json');
+let liveBankCache: { at: number; value: { bank: number; generated: string } } | null = null;
+
+/** The live site's bank size, from the iOS app's data file (/app/ar.json). */
+async function liveQuizBank(fresh = false) {
+    if (!fresh && liveBankCache && Date.now() - liveBankCache.at < 60_000) return liveBankCache.value;
+    const res = await fetch(`${SITES.quiz!.url}/app/ar.json`, { headers: { 'cache-control': 'no-cache' } });
+    if (!res.ok) throw new HttpError(502, `${SITES.quiz!.url}/app/ar.json: HTTP ${res.status}`);
+    const data = (await res.json()) as { bank: unknown[]; generated: string };
+    liveBankCache = { at: Date.now(), value: { bank: data.bank.length, generated: data.generated } };
+    return liveBankCache.value;
+}
+
+const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+function quizGates(src = fs.readFileSync(QUIZ_ENGINE, 'utf-8')) {
+    const last = (re: RegExp) => [...src.matchAll(re)].map((m) => ({ n: +m[1]!, v: m[2]! })).sort((a, b) => a.n - b.n).at(-1);
+    const bank = last(/^const BANK_V(\d+) = (\d+);$/gm);
+    const daily = last(/^const DAILY_V(\d+) = "(\d{4}-\d{2}-\d{2})";$/gm);
+    if (!bank || !daily) throw new HttpError(500, 'No BANK_Vn / DAILY_Vn constants in engine.ts');
+    return { bank: { n: bank.n, v: +bank.v }, daily: daily };
+}
+
+async function quizDaily(params: URLSearchParams) {
+    const live = await liveQuizBank(params.get('fresh') === '1');
+    const local = readJson<unknown[]>(quizFile('bank')).length;
+    const gate = quizGates();
+    const today = localDay();
+    const pending = Math.max(0, local - live.bank);
+    // The last gate covers the new rows if it starts exactly at the live bank's end and isn't in effect yet.
+    const gatePending = gate.daily.v > today;
+    const covered = pending === 0 || (gatePending && gate.bank.v === live.bank);
+    const built = fs.existsSync(QUIZ_APP_JSON) ? fs.statSync(QUIZ_APP_JSON).mtimeMs : 0;
+    const newest = Math.max(fs.statSync(QUIZ_ENGINE).mtimeMs, fs.statSync(quizFile('bank')).mtimeMs);
+    return { today, live, local, pending, gate, gatePending, covered, built, stale: !built || newest > built };
+}
+
+/** Adds the next BANK_Vn / DAILY_Vm gate for the rows the live site lacks — or moves a gate that isn't in effect yet. */
+async function addQuizGate(body: Body) {
+    siteWritable('quiz');
+    const date = str(body.date);
+    const today = localDay();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date <= today) throw new HttpError(400, `The first day must be after today (${today})`);
+    const live = (await liveQuizBank(true)).bank;
+    const local = readJson<unknown[]>(quizFile('bank')).length;
+    if (local <= live) throw new HttpError(409, 'Every bank row is already live — nothing to gate');
+    let src = fs.readFileSync(QUIZ_ENGINE, 'utf-8');
+    const g = quizGates(src);
+    const day = new Date().toISOString().slice(0, 10);
+    const note = `/** Bank rows at or past this index were added on ${day} (b${live}–b${local - 1}); dailies before DAILY_V${g.daily.n + (g.daily.v > today ? 0 : 1)} leave them out. */`;
+    if (g.daily.v > today) {
+        // Not in effect yet (not played): retarget it rather than stacking another gate.
+        src = src.replace(new RegExp(`^/\\*\\*[^\\n]*\\*/\\nconst BANK_V${g.bank.n} = \\d+;$`, 'm'), `${note}\nconst BANK_V${g.bank.n} = ${live};`)
+            .replace(new RegExp(`^const DAILY_V${g.daily.n} = "[\\d-]+";$`, 'm'), `const DAILY_V${g.daily.n} = "${date}";`);
+        fs.writeFileSync(QUIZ_ENGINE, src);
+        return { ok: true, moved: true, bank: `BANK_V${g.bank.n} = ${live}`, daily: `DAILY_V${g.daily.n} = ${date}` };
+    }
+    const b = g.bank.n + 1, d = g.daily.n + 1;
+    const filter = (indent: string, dn: number, bn: number) => `${indent}else if (key < DAILY_V${dn}) all = all.filter(([qid]) => bankIndex(qid) < BANK_V${bn});`;
+    const chain = new RegExp(`^(\\s*)else if \\(key < DAILY_V${g.daily.n}\\) all = all\\.filter\\(\\(\\[qid\\]\\) => bankIndex\\(qid\\) < BANK_V${g.bank.n}\\);$`, 'gm');
+    const hits = [...src.matchAll(chain)].length;
+    if (hits !== 2) throw new HttpError(500, `Expected the DAILY_V${g.daily.n} filter twice in engine.ts (Arabic + other languages), found ${hits} — add the gate by hand`);
+    src = src
+        .replace(chain, (line, indent: string) => `${line}\n${filter(indent, d, b)}`)
+        .replace(new RegExp(`^const DAILY_V${g.daily.n} = "[\\d-]+";$`, 'm'), (line) => `${line}\n/** From this day on the daily sets (every language) also draw from the bank rows added after BANK_V${b}. */\nconst DAILY_V${d} = "${date}";`)
+        .replace(new RegExp(`^const BANK_V${g.bank.n} = \\d+;$`, 'm'), (line) => `${line}\n${note.replace(/DAILY_V\d+ leave/, `DAILY_V${d} leave`)}\nconst BANK_V${b} = ${live};`);
+    fs.writeFileSync(QUIZ_ENGINE, src);
+    return { ok: true, bank: `BANK_V${b} = ${live}`, daily: `DAILY_V${d} = ${date}` };
 }
 
 // AI: each sibling repo has Claude Code skills that write its content (../<repo>/.claude/skills/).
@@ -4006,6 +4128,8 @@ const POST: Record<string, (body: Body) => unknown | Promise<unknown>> = {
     '/api/entries/markdown': saveMarkdown,
     '/api/quiz/bank/edit': editBank,
     '/api/quiz/batch/open': openQuizBatch,
+    '/api/quiz/reports/clear': clearQuizReport,
+    '/api/quiz/gate': addQuizGate,
     '/api/leads/status': setLeadStatus,
     '/api/leads/add': addLead,
     '/api/leads/remove': removeLeads,
@@ -4060,6 +4184,8 @@ const GET: Record<string, (params: URLSearchParams) => unknown | Promise<unknown
     '/api/entries/markdown': readMarkdown,
     '/api/quiz/bank': listBank,
     '/api/quiz/reports': quizReports,
+    '/api/quiz/stats': quizStats,
+    '/api/quiz/daily': quizDaily,
     '/api/quiz/batches': quizBatches,
     '/api/quiz/batch/prompt': quizBatchPrompt,
     '/api/leads': listLeads,

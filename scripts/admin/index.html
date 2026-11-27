@@ -1806,7 +1806,7 @@ async function renderPersonas() {
 }
 
 // ─── Sites (quotes / books / biographies / quiz) ───
-const sites = { site: 'quotes', ai: null, aiIn: {}, aiModel: '', overview: null, message: {}, args: '', q: '', author: '', book: '', sort: 'likes', cat: '', untranslated: false, editing: null, markdown: null, reports: null, reportsLoading: false };
+const sites = { site: 'quotes', ai: null, aiIn: {}, aiModel: '', overview: null, message: {}, args: '', q: '', author: '', book: '', sort: 'likes', cat: '', untranslated: false, editing: null, markdown: null, reports: null, reportsLoading: false, stats: null, statsLoading: false, statsView: 'hardest', gateDate: '' };
 const siteJob = jobPoller('site', '/api/sites/job', 'sites', async () => { sites.ai = null; await loadSites(); if (state.tab === 'sites') renderSites(); });
 
 async function loadSites() {
@@ -1854,7 +1854,7 @@ function siteCard(s, running) {
         siteJob.start('/api/sites/run', { site: s.name, step: st.key, args });
       } }, isRunning(st.key) ? st.label + '…' : st.label)];
     if (st.key === 'd1-migrate') return step(st.key, st.label, '', 'Apply pending migrations to the live quiz D1 database?');
-    if (st.key === 'youtube-batch') return null; // its own form in quizSection
+    if (st.key === 'youtube-batch' || st.key === 'check-daily') return null; // their own cards in quizSection
     return step(st.key, st.label);
   });
 
@@ -2297,8 +2297,10 @@ const QUIZ_CATS = { geo: 'Geography', sci: 'Science', hist: 'History', gen: 'Gen
 async function quizSection() {
   const data = await api('/api/quiz/bank?' + new URLSearchParams({ q: sites.q, cat: sites.cat, untranslated: sites.untranslated ? '1' : '', page: state.page }));
   return h('div', {},
-    await youtubeSection(),
+    await dailySection(),
     reportsSection(),
+    statsSection(),
+    await youtubeSection(),
     h('h2', {}, 'Question bank'),
     h('div', { class: 'toolbar' }, siteSearch('Search questions, answers, or an id like b12…'),
       h('select', { onchange: (e) => { sites.cat = e.target.value; state.page = 1; render(); } },
@@ -2388,6 +2390,83 @@ async function youtubeSection() {
       : h('div', { class: 'meta', style: 'margin-top:8px' }, `No batches yet in ${data.dir}.`));
 }
 
+/** A stat id's question (bank rows show their text and answers; generated kinds just their kind). */
+function quizDescribe(x) {
+  return x.row ? [h('div', { dir: 'auto' }, x.translation ? x.translation[0] : x.row[1]), answers(x.translation ? x.translation : x.row.slice(1))]
+    : [h('div', { class: 'meta' }, `${x.kind} question (generated from quotes, books, pictures or numbers)`)];
+}
+
+/** Opens bank row i in the editor below. */
+function quizFix(i) {
+  sites.q = 'b' + i; sites.cat = ''; sites.untranslated = false; sites.editing = 'b' + i; state.page = 1; render();
+}
+
+// Daily-set gates: bank rows the live site lacks may only join the daily pool from a future day.
+async function dailySection() {
+  let d;
+  try { d = await api('/api/quiz/daily'); } catch (e) { return h('div', { class: 'card bad', style: 'margin-top:18px' }, `Daily sets: ${e.message}`); }
+  const running = !!siteJob.job?.running;
+  const tomorrow = isoDay(new Date(Date.now() + 86400000));
+  if (!sites.gateDate || sites.gateDate <= d.today) sites.gateDate = tomorrow;
+  const gate = `BANK_V${d.gate.bank.n} = ${d.gate.bank.v} · DAILY_V${d.gate.daily.n} = ${d.gate.daily.v} (${d.gatePending ? 'starts then' : 'in effect'})`;
+  const status = d.pending === 0
+    ? h('div', { class: 'ok' }, '✓ Every bank row is live — nothing to gate.')
+    : d.covered
+      ? h('div', { class: 'ok' }, `✓ ${d.pending} new row(s) (b${d.live.bank}–b${d.local - 1}) are gated: they join the daily sets on ${d.gate.daily.v}. Safe to deploy.`)
+      : h('div', {},
+          h('div', { class: 'bad', style: 'margin-bottom:6px' }, `✗ ${d.pending} new row(s) (b${d.live.bank}–b${d.local - 1}) aren't gated — deploying now would change today's and past daily challenges.`),
+          h('div', { class: 'toolbar' },
+            h('label', { class: 'meta' }, 'They join the daily sets from ',
+              h('input', { type: 'date', min: tomorrow, value: sites.gateDate, disabled: running, oninput: (e) => { sites.gateDate = e.target.value; } })),
+            h('button', { class: 'btn primary', disabled: running, onclick: () => siteAct(() => api('/api/quiz/gate', { date: sites.gateDate }), (r) => `${r.moved ? 'Moved' : 'Added'} ${r.bank}, ${r.daily} in engine.ts — build & deploy to ship it`) },
+              d.gatePending ? `Move the DAILY_V${d.gate.daily.n} gate` : `Add BANK_V${d.gate.bank.n + 1} / DAILY_V${d.gate.daily.n + 1}`)));
+  return h('div', { class: 'card', style: 'margin-top:18px' },
+    h('div', { class: 'toolbar' }, h('h2', { style: 'margin:0' }, 'Daily sets'),
+      h('span', { class: 'meta' }, `today ${d.today}`),
+      h('button', { class: 'btn', style: 'margin-inline-start:auto', onclick: () => act(async () => { await api('/api/quiz/daily?fresh=1'); render(); }, 'Re-read the live site') }, 'Refresh'),
+      h('button', { class: 'btn', disabled: running || !d.built, title: d.built ? 'Compares dist/app/*.json with the live site, every language' : 'Build first',
+        onclick: () => siteJob.start('/api/sites/run', { site: 'quiz', step: 'check-daily' }) }, running && siteJob.job?.mode === 'quiz:check-daily' ? 'Checking…' : 'Check build vs live')),
+    h('div', { class: 'meta', style: 'margin:6px 0 8px' },
+      h('span', {}, `live bank ${d.live.bank.toLocaleString()} (deployed ${new Date(d.live.generated).toLocaleString()})`),
+      h('span', {}, `local ${d.local.toLocaleString()}`),
+      h('span', {}, gate),
+      h('span', { class: d.stale ? 'bad' : '' }, !d.built ? 'not built' : d.stale ? 'build is older than bank.json / engine.ts' : `built ${new Date(d.built).toLocaleString()}`)),
+    status,
+    h('div', { class: 'meta', style: 'margin-top:8px' }, 'Deploy and Build & deploy run the same check first (scripts/check-daily.ts) and stop if a daily set on or before today would change — that catches code changes to the pool too, not just new rows.'));
+}
+
+// How players do on each question (D1 answers).
+function statsSection() {
+  const r = sites.stats;
+  const load = async (fresh) => {
+    sites.statsLoading = true; render();
+    try { sites.stats = await api('/api/quiz/stats' + (fresh ? '?fresh=1' : '')); } catch (e) { sites.stats = { error: e.message }; }
+    sites.statsLoading = false; if (state.tab === 'sites') render();
+  };
+  const pct = (x) => x.n ? Math.round((x.ok / x.n) * 100) + '%' : '—';
+  const views = { hardest: 'Hardest (check the answer key)', easiest: 'Easiest', popular: 'Most answered' };
+  const list = r && !r.error ? r[sites.statsView] ?? [] : [];
+  return h('div', {},
+    h('div', { class: 'toolbar', style: 'margin-top:18px' }, h('h2', { style: 'margin:0' }, 'Question stats'),
+      h('button', { class: 'btn', disabled: sites.statsLoading, onclick: () => load(!!r) }, sites.statsLoading ? 'Loading…' : r ? 'Refresh' : 'Load from D1'),
+      r && !r.error ? Object.entries(views).map(([k, l]) => h('button', { class: 'btn' + (sites.statsView === k ? ' primary' : ''), onclick: () => { sites.statsView = k; render(); } }, l)) : null,
+      h('span', { class: 'meta' }, 'Answers and success rate per question (live D1).')),
+    !r ? null
+      : r.error ? h('div', { class: 'card bad' }, r.error)
+      : h('div', {},
+          h('div', { class: 'meta', style: 'margin:6px 0' },
+            h('span', {}, `${(r.totals.answers ?? 0).toLocaleString()} answers`),
+            h('span', {}, `${(r.totals.questions ?? 0).toLocaleString()} questions played`),
+            h('span', {}, `${r.totals.answers ? Math.round((r.totals.correct / r.totals.answers) * 100) : 0}% correct overall`),
+            sites.statsView !== 'popular' ? h('span', {}, `questions with ${r.min}+ answers`) : null),
+          !list.length ? h('div', { class: 'card meta' }, 'Not enough answers yet.')
+          : h('div', { class: 'list' }, h('table', {}, h('tr', {}, h('th', {}, 'Question'), h('th', {}, 'Lang'), h('th', { class: 'num' }, 'Answered'), h('th', { class: 'num' }, 'Correct'), h('th', {})),
+              list.map((x) => h('tr', {},
+                h('td', {}, ...quizDescribe(x)), h('td', {}, x.lang), h('td', { class: 'num' }, x.n.toLocaleString()),
+                h('td', { class: 'num' + (x.n && x.ok / x.n < 0.25 ? ' bad' : '') }, pct(x)),
+                h('td', {}, x.i != null ? h('button', { class: 'btn', onclick: () => quizFix(x.i) }, 'Fix') : x.id)))))));
+}
+
 function reportsSection() {
   const r = sites.reports;
   const load = async (fresh) => {
@@ -2395,8 +2474,10 @@ function reportsSection() {
     try { sites.reports = await api('/api/quiz/reports' + (fresh ? '?fresh=1' : '')); } catch (e) { sites.reports = { error: e.message }; }
     sites.reportsLoading = false; if (state.tab === 'sites') render();
   };
-  const describe = (x) => x.row ? [h('div', { dir: 'auto' }, x.translation ? x.translation[0] : x.row[1]), answers(x.translation ? x.translation : x.row.slice(1))]
-    : [h('div', { class: 'meta' }, `${x.kind} question (generated from quotes, books, pictures or numbers)`)];
+  const clear = (x) => {
+    if (!confirm(`Clear the ${x.n} report(s) on ${x.id}? Do it once the question is fixed (or the flags were wrong).`)) return;
+    act(async () => { await api('/api/quiz/reports/clear', { id: x.id }); sites.reports.reports = sites.reports.reports.filter((y) => y.id !== x.id); }, 'Reports cleared');
+  };
   return h('div', {},
     h('div', { class: 'toolbar', style: 'margin-top:18px' }, h('h2', { style: 'margin:0' }, 'Player reports'),
       h('button', { class: 'btn', disabled: sites.reportsLoading, onclick: () => load(!!r) }, sites.reportsLoading ? 'Loading…' : r ? 'Refresh' : 'Load from D1'),
@@ -2407,9 +2488,10 @@ function reportsSection() {
       : !r.reports.length ? h('div', { class: 'card meta' }, 'No reports yet.')
       : h('div', { class: 'list' }, h('table', {}, h('tr', {}, h('th', {}, 'Question'), h('th', {}, 'Lang'), h('th', { class: 'num' }, 'Reports'), h('th', { class: 'num' }, 'Answered'), h('th', { class: 'num' }, 'Correct'), h('th', {})),
         r.reports.map((x) => h('tr', {},
-          h('td', {}, ...describe(x)), h('td', {}, x.lang), h('td', { class: 'num bad' }, x.n), h('td', { class: 'num' }, x.answered ?? '—'),
+          h('td', {}, ...quizDescribe(x)), h('td', {}, x.lang), h('td', { class: 'num bad' }, x.n), h('td', { class: 'num' }, x.answered ?? '—'),
           h('td', { class: 'num' }, x.answered ? Math.round((x.ok / x.answered) * 100) + '%' : '—'),
-          h('td', {}, x.i != null ? h('button', { class: 'btn', onclick: () => { sites.q = 'b' + x.i; sites.cat = ''; sites.untranslated = false; sites.editing = 'b' + x.i; state.page = 1; render(); } }, 'Fix') : x.id))))),
+          h('td', { style: 'white-space:nowrap' }, x.i != null ? h('button', { class: 'btn', onclick: () => quizFix(x.i) }, 'Fix') : x.id, ' ',
+            h('button', { class: 'btn', title: 'Remove these reports from D1', onclick: () => clear(x) }, 'Clear')))))),
   );
 }
 
